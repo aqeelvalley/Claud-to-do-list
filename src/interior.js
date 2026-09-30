@@ -348,6 +348,19 @@
             ],
             label: "Dispatch office",
           };
+        case "faith":
+          // a calm hall: rows of prayer mats facing a lectern, books along the wall
+          return {
+            wall: "#F6F1E8", floor: "#D9C7A8",
+            items: [
+              ...[0, 1, 2].flatMap((r) => [0, 1, 2].map((k) => [80 + r * 42, 60 + k * 44, h(Rug, { a: 80 + r * 42, b: 60 + k * 44, ra: 14, rb: 17, c: [T(c, 0.05), "#C98FA8", "#8FB8B0"][(r + k) % 3] })])),
+              [34, 104, h(Counter, { a: 34, b: 104, c: T(c, -0.1) })],
+              [16, 175, h(Shelf, { a: 16, b: 175, c: "#B98759", items: ["#8FB8B0", "#F0C06A", "#C98FA8", "#9FB0D9"] })],
+              [205, 30, h(Plant, { a: 205, b: 30, s: 1.1 })],
+              [205, 180, h(Plant, { a: 205, b: 180, s: 1.1 })],
+            ],
+            label: "Prayer hall",
+          };
         case "cottage":
         case "house":
         default:
@@ -513,6 +526,7 @@
       cottage: { W: 226, D: 196, H: 90, roof: "gable", rise: 64, tex: "timber", open: "cottage", fire: true },
       house: { W: 220, D: 190, H: 96, roof: "gable", rise: 50, tex: "plaster" },
       townhall: { W: 250, D: 210, H: 124, roof: "flat", tex: "plaster" },
+      faith: { W: 240, D: 210, H: 132, roof: "flat", tex: "plaster" },
     };
     SHELLS.shop = SHELLS.cafe; SHELLS.tower = SHELLS.office; SHELLS.farm = SHELLS.mill;
     const lerp2 = (x, y, t) => x + (y - x) * t;

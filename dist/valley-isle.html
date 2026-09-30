@@ -2753,6 +2753,37 @@ select.inp {
 .save-ico { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: #f6ecc8; color: #8a6d12; font-size: 14px; }
 .save-bar { height: 10px; border-radius: 5px; background: rgba(70, 61, 99, 0.1); overflow: hidden; margin-top: 6px; }
 .save-bar span { display: block; height: 100%; border-radius: 5px; background: #e9b949; }
+.focus-card { position: absolute; left: 76px; bottom: calc(env(safe-area-inset-bottom, 0px) + 100px); z-index: 23; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 18px; width: min(340px, calc(100vw - 32px)); }
+.focus-t { font: 700 15px Fredoka, sans-serif; fill: var(--ink); }
+.focus-l { font-size: 11.5px; color: var(--ink3); }
+.focus-n { display: block; font: 600 14.5px Fredoka, sans-serif; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 767px) { .focus-card { right: 16px; left: 16px; width: auto; bottom: calc(env(safe-area-inset-bottom, 0px) + 92px); } }
+.drawer.wide { width: min(760px, calc(100vw - 32px)); }
+.wk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.wk-col { border-radius: 14px; background: var(--paper2); padding: 8px; min-height: 90px; transition: background 0.15s; }
+.wk-col.over { background: #efe7f7; box-shadow: inset 0 0 0 2px #9f8fc9; }
+.wk-h { display: flex; align-items: baseline; gap: 6px; padding: 2px 4px 6px; }
+.wk-h b { font: 600 14px Fredoka, sans-serif; color: var(--ink); }
+.wk-h span { font-size: 11.5px; color: var(--ink3); }
+.wk-h .wk-n { margin-left: auto; font-weight: 700; color: var(--ink2); }
+.wk-task { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 10px; background: #fff; border: 1.5px solid var(--line); margin-bottom: 6px; cursor: grab; }
+.wk-task.rep { cursor: pointer; border-style: dashed; }
+.wk-task.late { border-color: #e3ada2; }
+.wk-t { display: block; font-size: 13px; font-weight: 700; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wk-m { display: block; font-size: 11px; color: var(--ink3); }
+.wk-move { flex: none; max-width: 74px; font-size: 11px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink2); padding: 2px; }
+.wk-empty { font-size: 12px; color: var(--ink3); text-align: center; padding: 14px 0; }
+.dock-glyph { display: inline-grid; place-items: center; width: 20px; height: 20px; border: 2px solid currentColor; border-radius: 5px; font: 700 11px Fredoka, sans-serif; }
+.mood-row { display: flex; gap: 6px; }
+.mood { flex: 1; display: grid; justify-items: center; gap: 3px; padding: 6px 2px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--paper); font-size: 11px; color: var(--ink2); cursor: pointer; }
+.mood.on { border-color: var(--ink2); background: #fff; color: var(--ink); }
+.mood-dot { display: inline-block; width: 18px; height: 18px; border-radius: 50%; flex: none; }
+.row-li.vid { align-items: center; }
+.pipe { display: flex; gap: 2px; margin-top: 4px; }
+.pipe-s { flex: 1; height: 4px; border-radius: 2px; background: rgba(70, 61, 99, 0.12); }
+.pipe-s.done { background: #9bc98a; }
+.pipe-s.now { background: #e9b949; }
+.crest { cursor: pointer; }
 </style>
 <div id="root"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
@@ -3100,6 +3131,7 @@ select.inp {
       { id: "steps", name: "Steps", detail: "10 000 steps" },
       { id: "sleep", name: "Sleep", detail: "7+ hours" },
     ],
+    WT_BASE = wt.slice(),
     uo = { low: 10, med: 20, high: 35 },
     bt = (e) => uo[e.priority] || 15;
   function ho(e, t = 20) {
@@ -3132,9 +3164,12 @@ select.inp {
     for (; t[s] > 0; ) (n++, (s = ft(s, -1)));
     return { streak: n, activeToday: !!t[Be()] };
   }
+  // does a repeating task come round today?
+  var repeatsToday = (tk, d = new Date()) => tk.repeat === "daily" || (tk.repeat === "weekdays" && d.getDay() > 0 && d.getDay() < 6) || (tk.repeat === "weekly" && d.getDay() === (tk.repeatDay != null ? tk.repeatDay : new Date(tk.createdAt || Date.now()).getDay()));
   function nn(e, t) {
     let s = t,
-      n = e.filter((i) => i.status !== "done" || (i.doneAt && i.doneAt === s)),
+      rep = e.filter((i) => i.repeat && repeatsToday(i) && (i.status !== "done" || i.doneAt === s)),
+      n = e.filter((i) => !i.repeat && (i.status !== "done" || (i.doneAt && i.doneAt === s))),
       o = (i) => {
         let l = 50;
         if (i.due) {
@@ -3150,7 +3185,8 @@ select.inp {
       .map((i) => ({ t: i, s: o(i) }))
       .sort((i, l) => i.s - l.s)
       .slice(0, 3)
-      .map((i) => i.t);
+      .map((i) => i.t)
+      .concat(rep);
   }
   function on(e, t) {
     let s = { ...e };
@@ -11076,6 +11112,19 @@ select.inp {
             ],
             label: "Dispatch office",
           };
+        case "faith":
+          // a calm hall: rows of prayer mats facing a lectern, books along the wall
+          return {
+            wall: "#F6F1E8", floor: "#D9C7A8",
+            items: [
+              ...[0, 1, 2].flatMap((r) => [0, 1, 2].map((k) => [80 + r * 42, 60 + k * 44, h(Rug, { a: 80 + r * 42, b: 60 + k * 44, ra: 14, rb: 17, c: [T(c, 0.05), "#C98FA8", "#8FB8B0"][(r + k) % 3] })])),
+              [34, 104, h(Counter, { a: 34, b: 104, c: T(c, -0.1) })],
+              [16, 175, h(Shelf, { a: 16, b: 175, c: "#B98759", items: ["#8FB8B0", "#F0C06A", "#C98FA8", "#9FB0D9"] })],
+              [205, 30, h(Plant, { a: 205, b: 30, s: 1.1 })],
+              [205, 180, h(Plant, { a: 205, b: 180, s: 1.1 })],
+            ],
+            label: "Prayer hall",
+          };
         case "cottage":
         case "house":
         default:
@@ -11241,6 +11290,7 @@ select.inp {
       cottage: { W: 226, D: 196, H: 90, roof: "gable", rise: 64, tex: "timber", open: "cottage", fire: true },
       house: { W: 220, D: 190, H: 96, roof: "gable", rise: 50, tex: "plaster" },
       townhall: { W: 250, D: 210, H: 124, roof: "flat", tex: "plaster" },
+      faith: { W: 240, D: 210, H: 132, roof: "flat", tex: "plaster" },
     };
     SHELLS.shop = SHELLS.cafe; SHELLS.tower = SHELLS.office; SHELLS.farm = SHELLS.mill;
     const lerp2 = (x, y, t) => x + (y - x) * t;
@@ -13090,7 +13140,7 @@ select.inp {
         )
       : React.createElement("div", { className: "empty" }, i);
   }
-  function Bn({ init: e, sections: t, workers: s, onClose: n, onSave: o }) {
+  function Bn({ init: e, sections: t, workers: s, onClose: n, onSave: o, onFocus: fz }) {
     let [i, l] = ve(() => ({
         title: "",
         notes: "",
@@ -13114,6 +13164,7 @@ select.inp {
         footer: React.createElement(
           React.Fragment,
           null,
+          e != null && e.id && fz && i.status !== "done" && React.createElement(Q, { variant: "ghost", onClick: () => fz(i) }, "\u25D4 Focus 25 min"),
           React.createElement(Q, { variant: "ghost", onClick: n }, "Cancel"),
           React.createElement(
             Q,
@@ -13245,6 +13296,15 @@ select.inp {
         ),
         React.createElement(
           Y,
+          { label: "Repeat" },
+          React.createElement("select", { className: "inp", value: i.repeat || "", onChange: (c) => d("repeat", c.target.value) },
+            React.createElement("option", { value: "" }, "Doesn't repeat"),
+            React.createElement("option", { value: "daily" }, "Every day"),
+            React.createElement("option", { value: "weekdays" }, "Weekdays (Mon\u2013Fri)"),
+            React.createElement("option", { value: "weekly" }, "Every week on " + ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][i.repeatDay != null ? i.repeatDay : new Date().getDay()])),
+        ),
+        React.createElement(
+          Y,
           { label: "Notes", className: "col-span-2" },
           React.createElement("textarea", {
             id: "task-notes",
@@ -13269,6 +13329,7 @@ select.inp {
     onAdd: d,
     onClose: p,
     onDemolish: u,
+    extra: ex,
   }) {
     let c = s.filter((r) => r.status !== "done").length;
     return React.createElement(
@@ -13283,6 +13344,7 @@ select.inp {
       e.building && React.createElement("div", { className: "site-banner" },
         React.createElement("b", null, "Under construction"),
         React.createElement("span", null, s.length ? "Finish any task below to cut the ribbon and open " + e.name + "." : "Add its first task, then finish it to cut the ribbon and open " + e.name + ".")),
+      ex,
       React.createElement(
         "div",
         { className: "sec-stats" },
@@ -13950,6 +14012,7 @@ select.inp {
     onLogWorkout: c,
     onDelWorkout: r,
     onToggleHabit: y,
+    onHabitsChange: hc,
   }) {
     let [k, f] = ve(e || "weight"),
       [w, v] = ve(""),
@@ -14409,8 +14472,9 @@ select.inp {
           React.createElement(
             "p",
             { className: "hint-note" },
-            "Ticking all three habits completes a daily quest and keeps your streak alive.",
+            "Ticking every habit completes a daily quest and keeps your streak alive.",
           ),
+          hc && React.createElement(HabitEditor, { onChange: hc })
         ),
     );
   }
@@ -15281,6 +15345,120 @@ select.inp {
                 React.createElement("input", { type: "checkbox", checked: f.crew, onChange: (a) => setF({ ...f, crew: a.target.checked }) }),
                 React.createElement("span", null, React.createElement("b", null, "Hire the studio crew"), " \xB7 Scriptwriter, Image Gen, Voiceover, Editor, Thumbnail and Publisher, each with their own look.")))));
   }
+  /* journal at home: a 30-second check-in, mood and one win */
+  var MOODS = [{ v: 1, c: "#9FB0D9", l: "Rough" }, { v: 2, c: "#B7A6DC", l: "Meh" }, { v: 3, c: "#E9D9A6", l: "Okay" }, { v: 4, c: "#F0C06A", l: "Good" }, { v: 5, c: "#E4826A", l: "Great" }];
+  function Journal({ entries: es, today: td, onSave: f }) {
+    let el = React.createElement, cur = es.find((x) => x.d === td) || {}, [w, setW] = React.useState(cur.win || ""), [open, setOpen] = React.useState(!1),
+      past = [...es].filter((x) => x.d !== td).sort((a, b) => (a.d < b.d ? 1 : -1)).slice(0, 14);
+    return el("div", { className: "chart-card space-y-2 mb-3" },
+      el("div", { className: "flex items-center justify-between" }, el("b", { className: "text-[14px]" }, "Today's check-in"), past.length > 0 && el("button", { type: "button", className: "link-btn", onClick: () => setOpen(!open) }, open ? "Hide past days" : "Past days")),
+      el("div", { className: "mood-row", role: "radiogroup", "aria-label": "Mood" }, MOODS.map((m) => el("button", { key: m.v, type: "button", role: "radio", "aria-checked": cur.mood === m.v, className: "mood" + (cur.mood === m.v ? " on" : ""), onClick: () => f({ mood: m.v, win: w }) }, el("span", { className: "mood-dot", style: { background: m.c } }), el("span", null, m.l)))),
+      el("div", { className: "flex gap-2" }, el("input", { className: "inp", value: w, placeholder: "One win today, however small", onChange: (e) => setW(e.target.value) }), el(Q, { variant: "gold", disabled: !w.trim() || w === cur.win, onClick: () => f({ mood: cur.mood || 3, win: w.trim() }) }, "Save")),
+      open && el("div", { className: "list-card" }, past.map((x) => el("div", { key: x.d, className: "row-li" }, el("span", { className: "mood-dot", style: { background: (MOODS.find((m) => m.v === x.mood) || MOODS[2]).c } }), el("span", { className: "muted", style: { minWidth: 58 } }, new Date(x.d + "T12:00").toLocaleDateString("en", { day: "numeric", month: "short" })), el("span", { className: "flex-1 min-w-0" }, x.win || "\u2014")))));
+  }
+  /* studio content calendar: each video moves through the crew's pipeline */
+  var PIPE = [{ id: "idea", l: "Idea", role: null }, { id: "script", l: "Script", role: "script" }, { id: "voice", l: "Voiceover", role: "voice" }, { id: "images", l: "Images", role: "imagegen" }, { id: "edit", l: "Edit", role: "editor" }, { id: "thumb", l: "Thumbnail", role: "thumb" }, { id: "publish", l: "Publish", role: "publish" }, { id: "live", l: "Live", role: null }];
+  function ContentCal({ videos: vs, crew: cw, onSave: f, onDelete: del }) {
+    let el = React.createElement, [n, setN] = React.useState({ title: "", date: "" }),
+      byRole = Object.fromEntries((cw || []).map((w) => [w.id, w]));
+    return el("div", { className: "chart-card space-y-2 mb-3" },
+      el("b", { className: "text-[14px]" }, "Content calendar"),
+      vs.length ? el("div", { className: "list-card" }, [...vs].sort((a, b) => (a.date || "9") < (b.date || "9") ? -1 : 1).map((x) => {
+        let si = Math.max(0, PIPE.findIndex((p2) => p2.id === x.stage)), st = PIPE[si], who = st.role && byRole[st.role];
+        return el("div", { key: x.id, className: "row-li vid" },
+          el("span", { className: "flex-1 min-w-0" }, el("b", null, x.title), el("span", { className: "muted" }, (x.date ? " \xB7 " + new Date(x.date + "T12:00").toLocaleDateString("en", { day: "numeric", month: "short" }) : "") + " \xB7 " + st.l + (who ? " with " + who.name : "")),
+            el("span", { className: "pipe" }, PIPE.map((p2, k) => el("span", { key: p2.id, className: "pipe-s" + (k < si ? " done" : k === si ? " now" : ""), title: p2.l })))),
+          si < PIPE.length - 1 && el(Q, { variant: "ghost", onClick: () => f({ ...x, stage: PIPE[si + 1].id }) }, PIPE[si + 1].l + " \u2192"),
+          el("button", { type: "button", className: "x-btn", "aria-label": "Delete " + x.title, onClick: () => del(x.id) }, "\xD7"));
+      })) : el("div", { className: "muted text-[12px]" }, "Plan videos from idea to live. Each stage belongs to one of the studio crew."),
+      el("div", { className: "grid grid-cols-3 gap-2" }, el("input", { className: "inp col-span-2", value: n.title, placeholder: "Video title", onChange: (e) => setN({ ...n, title: e.target.value }) }), el("input", { className: "inp", type: "date", value: n.date, "aria-label": "Publish date", onChange: (e) => setN({ ...n, date: e.target.value }) })),
+      el(Q, { variant: "gold", disabled: !n.title.trim(), onClick: () => { f({ title: n.title.trim(), date: n.date, stage: "idea" }); setN({ title: "", date: "" }); } }, "Add video"));
+  }
+  /* island settings: rename, back up everything to a file, restore from one */
+  var BACKUP_COLS = ["tasks", "workers", "leads", "sections", "pgoals", "spend", "bills", "savings", "journal", "videos"],
+    BACKUP_DOCS = ["settings/island", "budget/plan", "habits/list", "fitness/profile", "fitness/weights", "fitness/workouts", "fitness/habits", "stats/activity", "stats/treasury", "stats/focus"];
+  async function exportIsland(db) {
+    let out = { app: "valley-isle", version: 1, exportedAt: new Date().toISOString(), collections: {}, docs: {} };
+    for (let c of BACKUP_COLS) { let q = await db.collection(c).get(); out.collections[c] = q.docs.map((d) => ({ id: d.id, ...d.data() })); }
+    for (let d of BACKUP_DOCS) { let x = await db.doc(d).get(); x.exists && (out.docs[d] = x.data()); }
+    return out;
+  }
+  async function saveFile(name, text) {
+    let dl = null;
+    try { dl = window.claude && window.claude.use ? await window.claude.use("downloads") : null; } catch { dl = null; }
+    if (dl) return dl.save({ filename: name, data: text });
+    let a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type: "application/json" })); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  }
+  function SettingsDlg({ isl: il, onRename: rn, onExport: ex, onImport: im, onClose: close }) {
+    let el = React.createElement, [nm, setNm] = React.useState((il && il.islandName) || "Valley Isle"), [busy, setBusy] = React.useState(""), fileRef = React.useRef(null);
+    return el(cs, { title: "Island settings", color: "#9F8FC9", onClose: close, footer: el(Q, { variant: "ghost", onClick: close }, "Close") },
+      el("div", { className: "space-y-4" },
+        el(Y, { label: "Island name" }, el("div", { className: "flex gap-2" }, el("input", { className: "inp", value: nm, onChange: (e) => setNm(e.target.value) }), el(Q, { variant: "gold", disabled: !nm.trim(), onClick: () => rn(nm.trim()) }, "Rename"))),
+        el("div", { className: "chart-card space-y-2" }, el("b", { className: "text-[14px]" }, "Backup"),
+          el("p", { className: "muted text-[12.5px]" }, "Download everything (tasks, crew, leads, goals, fitness, budget, savings, journal and your layout) as one file. Keep it somewhere safe; you can restore from it on any device."),
+          el("div", { className: "flex gap-2 flex-wrap" },
+            el(Q, { variant: "gold", disabled: !!busy, onClick: async () => { setBusy("export"); try { await ex(); } finally { setBusy(""); } } }, busy === "export" ? "Preparing\u2026" : "Download backup"),
+            el(Q, { variant: "ghost", disabled: !!busy, onClick: () => fileRef.current && fileRef.current.click() }, "Restore from a file\u2026"),
+            el("input", { ref: fileRef, type: "file", accept: "application/json,.json", style: { display: "none" }, onChange: async (e) => { let f2 = e.target.files && e.target.files[0]; e.target.value = ""; if (!f2) return; setBusy("import"); try { await im(await f2.text()); } finally { setBusy(""); } } })))));
+  }
+  /* your own daily habits, alongside water, steps and sleep */
+  function HabitEditor({ onChange: f }) {
+    let [n, setN] = React.useState(""), el = React.createElement, custom = wt.slice(WT_BASE.length);
+    return el("div", { className: "chart-card space-y-2" },
+      el("b", { className: "text-[14px]" }, "Your own habits"),
+      custom.length ? el("div", { className: "flex flex-wrap gap-1.5" }, custom.map((h) => el("span", { key: h.id, className: "chip-btn sm on" }, h.name, el("button", { type: "button", className: "x-btn", "aria-label": "Remove " + h.name, onClick: () => f(custom.filter((x) => x.id !== h.id)) }, "\xD7")))) : el("div", { className: "muted text-[12px]" }, "Reading, prayer, no-spend day, stretching \u2026 add anything you want to do every day."),
+      el("div", { className: "flex gap-2" }, el("input", { className: "inp", value: n, placeholder: "e.g. Read 10 pages", onChange: (e) => setN(e.target.value), onKeyDown: (e) => e.key === "Enter" && n.trim() && (f([...custom, { id: "h" + Date.now().toString(36), name: n.trim(), detail: "Daily" }]), setN("")) }),
+        el(Q, { variant: "gold", disabled: !n.trim(), onClick: () => (f([...custom, { id: "h" + Date.now().toString(36), name: n.trim(), detail: "Daily" }]), setN("")) }, "Add")));
+  }
+  /* ---------------- week planner (Town Hall): every task by day, drag to reschedule ---------------- */
+  function WeekDrawer({ tasks: ts, secById: sb, onMove: mv, onOpen: op, onClose: close }) {
+    let el = React.createElement, days = [], t0 = new Date();
+    t0.setHours(12, 0, 0, 0);
+    for (let k = 0; k < 7; k++) { let d = new Date(t0.getTime() + k * 864e5); days.push({ key: d.toISOString().slice(0, 10), d, label: k === 0 ? "Today" : k === 1 ? "Tomorrow" : d.toLocaleDateString("en", { weekday: "long" }), sub: d.toLocaleDateString("en", { day: "numeric", month: "short" }) }); }
+    let [drag, setDrag] = React.useState(null), [over, setOver] = React.useState(null),
+      open = ts.filter((tk) => tk.status !== "done"),
+      late = open.filter((tk) => tk.due && tk.due < days[0].key && !tk.repeat),
+      col = (key) => open.filter((tk) => !tk.repeat && (tk.due === key || (key === days[0].key && late.includes(tk)))),
+      reps = (d) => ts.filter((tk) => tk.repeat && repeatsToday(tk, d)),
+      anytime = open.filter((tk) => !tk.due && !tk.repeat),
+      card = (tk, rep) => {
+        let sec = sb[tk.venture] || { name: "\u2014", color: "#999" }, isLate = late.includes(tk);
+        return el("div", { key: tk.id + (rep ? "r" : ""), className: "wk-task" + (rep ? " rep" : "") + (isLate ? " late" : ""), draggable: !rep, onDragStart: (e) => (setDrag(tk), e.dataTransfer.setData("text/plain", tk.id)), onDragEnd: () => (setDrag(null), setOver(null)), onClick: () => op(tk) },
+          el("span", { className: "gdot", style: { background: sec.color } }),
+          el("span", { className: "min-w-0 flex-1" }, el("span", { className: "wk-t" }, tk.title), el("span", { className: "wk-m" }, sec.name + (rep ? " \xB7 repeats" : isLate ? " \xB7 overdue" : ""))),
+          !rep && el("select", { className: "wk-move", value: "", "aria-label": "Move " + tk.title, onClick: (e) => e.stopPropagation(), onChange: (e) => mv(tk, e.target.value === "none" ? "" : e.target.value) },
+            el("option", { value: "" }, "Move\u2026"), days.map((d) => el("option", { key: d.key, value: d.key }, d.label)), el("option", { value: "none" }, "Anytime")));
+      },
+      zone = (key, title, sub, items) => el("div", { key, className: "wk-col" + (over === key ? " over" : ""), onDragOver: (e) => (e.preventDefault(), setOver(key)), onDragLeave: () => setOver(null), onDrop: (e) => { e.preventDefault(); drag && mv(drag, key === "any" ? "" : key); setDrag(null); setOver(null); } },
+        el("div", { className: "wk-h" }, el("b", null, title), el("span", null, sub), el("span", { className: "wk-n" }, items.length || "")), items.length ? items : el("div", { className: "wk-empty" }, "Free"));
+    return el(zt, { title: "Week planner", sub: "Town Hall \xB7 drag tasks between days", color: "#9F8FC9", icon: el("span", { style: { fontSize: 15, color: "#fff" } }, "7"), onClose: close, wide: !0 },
+      el("div", { className: "wk-grid" },
+        days.map((d) => zone(d.key, d.label, d.sub, [...col(d.key).map((tk) => card(tk)), ...reps(d.d).map((tk) => card(tk, !0))])),
+        zone("any", "Anytime", "no date", anytime.map((tk) => card(tk)))));
+  }
+  /* ---------------- focus timer: 25 minutes on one task ---------------- */
+  function FocusCard({ focus: f, venture: vn, onPause: pz, onStop: st, onDone: dn }) {
+    let [, tick] = React.useState(0);
+    React.useEffect(() => { let id = setInterval(() => tick((x) => x + 1), 1000); return () => clearInterval(id); }, []);
+    let el = React.createElement,
+      used = f.paused ? f.used : f.used + (Date.now() - f.since) / 1000,
+      left = Math.max(0, f.dur - used), p = 1 - left / f.dur,
+      mm = String(Math.floor(left / 60)).padStart(2, "0"), ss = String(Math.floor(left % 60)).padStart(2, "0");
+    React.useEffect(() => { left <= 0 && dn(); }, [left <= 0]);
+    let R2 = 30, C = 2 * Math.PI * R2;
+    return el("div", { className: "focus-card hud-card", role: "timer", "aria-label": "Focus timer" },
+      el("svg", { width: 72, height: 72, viewBox: "0 0 72 72", "aria-hidden": "true" },
+        el("circle", { cx: 36, cy: 36, r: R2, fill: "none", stroke: "rgba(70,61,99,0.12)", strokeWidth: 6 }),
+        el("circle", { cx: 36, cy: 36, r: R2, fill: "none", stroke: vn ? vn.color : "#E4826A", strokeWidth: 6, strokeLinecap: "round", strokeDasharray: C, strokeDashoffset: C * (1 - p), transform: "rotate(-90 36 36)" }),
+        el("text", { x: 36, y: 40, textAnchor: "middle", className: "focus-t" }, mm + ":" + ss)),
+      el("div", { className: "min-w-0 flex-1" },
+        el("div", { className: "focus-l" }, f.paused ? "Paused" : "Focusing"),
+        el("b", { className: "focus-n" }, f.task.title),
+        el("div", { className: "focus-l" }, (vn ? vn.name : "") + " \xB7 +8 XP when the timer ends"),
+        el("div", { className: "flex gap-1.5 mt-1.5" },
+          el(Q, { variant: "ghost", onClick: pz }, f.paused ? "Resume" : "Pause"),
+          el(Q, { variant: "ghost", onClick: st }, "Stop"))));
+  }
   /* ---------------- Bank: budget planner, spending, bills, savings goals ---------------- */
   var SAVE_KINDS = [
     { id: "holiday", label: "Holiday", icon: "✈", grows: "An airport: the plane loads up as you save" },
@@ -15641,7 +15819,7 @@ select.inp {
               React.createElement(
                 "span",
                 { className: "q-name" },
-                "Tick water, steps and sleep",
+                wt.length > 3 ? "Tick your " + wt.length + " daily habits" : "Tick water, steps and sleep",
               ),
               React.createElement(
                 "span",
@@ -15661,6 +15839,10 @@ select.inp {
     let { db: e, live: t, sandbox: sandbox, setSandbox: setSandbox } = jo(),
       isl = St(e, "settings/island"),
       budgetDoc = St(e, "budget/plan"),
+      focusDoc = St(e, "stats/focus"),
+      habitsDoc = St(e, "habits/list"),
+      journalC = Ht(e, "journal"),
+      videosC = Ht(e, "videos"),
       spendC = Ht(e, "spend"),
       billsC = Ht(e, "bills"),
       savingsC = Ht(e, "savings"),
@@ -15687,6 +15869,7 @@ select.inp {
       [lightMode, setLightMode] = He(() => On("valley-light", "auto")),
       [crewCard, setCrewCard] = He(null),
       [editing, setEditing] = He(!1),
+      [focus, setFocus] = He(null),
       [editSel, setEditSel] = He(null),
       [, setCrewTick] = He(0),
       [z, ne] = He(!0),
@@ -15706,6 +15889,8 @@ select.inp {
         let a = setTimeout(() => ne(!1), 9e3);
         return () => clearTimeout(a);
       }, []));
+    // custom habits join the built-in three wherever habits are counted
+    wt.splice(WT_BASE.length, wt.length, ...((habitsDoc && habitsDoc.items) || []));
     let xe = s || [],
       // "classic": the full sample island. "fresh": only what the player has built.
       // No settings yet: an island with any data stays classic; an empty one starts onboarding.
@@ -15803,6 +15988,7 @@ select.inp {
       (a, g) => a + wt.filter((F) => g && g[F.id]).length,
       0,
     );
+    ((focusDoc && focusDoc.sessions) || []).forEach((f2) => se[f2.venture] != null && (se[f2.venture] += 8)),
     (se.bank != null && (se.bank += (spendC || []).length * 2 + (billsC || []).reduce((a2, b2) => a2 + Object.keys(b2.paid || {}).length * 5, 0) + (savingsC || []).reduce((a2, g2) => a2 + ((g2.log || []).length) * 5, 0) + (budgetDoc ? 20 : 0)),
       se.fitness != null && (se.fitness += Z.length * 15 + _.length * 5 + ke * 3),
       se.goals != null && (se.goals += G.filter((a) => a.progress >= 100).length * 40));
@@ -16029,6 +16215,8 @@ select.inp {
             status: a.status,
             priority: a.priority,
             due: a.due || "",
+            repeat: a.repeat || "",
+            ...(a.repeat === "weekly" ? { repeatDay: a.repeatDay != null ? a.repeatDay : new Date().getDay() } : {}),
             createdAt: a.createdAt || Date.now(),
             updatedAt: Date.now(),
             doneAt:
@@ -16263,6 +16451,38 @@ select.inp {
         }
         Fe.pop && Fe.pop();
         Re(c.group === "scenery" ? c.label + " placed." : a.name + ": building site ready. Finish its first task to open it." + (a.crew ? " The studio crew is waiting on the square." : ""), "gold");
+      },
+      doExport = async () => {
+        try {
+          let data = await exportIsland(e), nm = ((isl && isl.islandName) || "valley-isle").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+          await saveFile(nm + "-backup-" + ue + ".json", JSON.stringify(data, null, 1));
+          Re("Backup ready.", "gold");
+        } catch (er) { er && er.code === "declined" ? Re("Backup not saved.") : Re("Couldn't make the backup" + (er && er.message ? ": " + er.message : "."), "bad"); }
+      },
+      doImport = async (txt) => {
+        let data;
+        try { data = JSON.parse(txt); } catch { return Re("That file isn't a Valley Isle backup.", "bad"); }
+        if (!data || data.app !== "valley-isle") return Re("That file isn't a Valley Isle backup.", "bad");
+        let n2 = Object.values(data.collections || {}).reduce((a2, l2) => a2 + l2.length, 0);
+        M({ type: "confirm", text: "Restore " + n2 + " items from " + (data.exportedAt || "").slice(0, 10) + "? Anything with the same id is replaced; nothing else is deleted.", confirmLabel: "Restore", onYes: async () => {
+          M(null);
+          for (let [c2, list] of Object.entries(data.collections || {})) if (BACKUP_COLS.includes(c2)) for (let d2 of list) d2 && d2.id && (await e.collection(c2).doc(String(d2.id)).set(d2));
+          for (let [p2, d2] of Object.entries(data.docs || {})) BACKUP_DOCS.includes(p2) && (await e.doc(p2).set(d2));
+          Re("Backup restored.", "gold");
+        } });
+      },
+      startFocus = (tk) => {
+        setFocus({ task: tk, dur: 25 * 60, used: 0, since: Date.now(), paused: !1 });
+        fe.current && fe.current.sendCrew && fe.current.sendCrew("me", tk.venture);
+        Re("Focus started: " + tk.title + ". You head to " + ((te[tk.venture] || {}).name || "work") + ".", "gold");
+      },
+      finishFocus = () => {
+        if (!focus) return;
+        let sess = [...((focusDoc && focusDoc.sessions) || []), { d: ue, venture: focus.task.venture, task: focus.task.id, min: Math.round(focus.dur / 60) }];
+        U("stats/focus", () => e.doc("stats/focus").set({ sessions: sess.slice(-500) }));
+        Fe.level && Fe.level();
+        Re("Focus session done: +8 XP for " + ((te[focus.task.venture] || {}).name || "that building") + ".", "gold");
+        setFocus(null);
       },
       // bank: every write goes through U so failures surface like everything else
       bankAct = {
@@ -16518,6 +16738,7 @@ select.inp {
       },
       lo = ds((a) => {
         if (a === "bank") return Ie({ type: "bank" });
+        if (a === "townhall") return Ie({ type: "week" });
         if (typeof a === "string" && a.startsWith("sv:")) return Ie({ type: "bank", tab: "savings", focus: a.slice(3) });
         Ie(
           a === "port" || a === "hub" || a === "marina"
@@ -16596,6 +16817,14 @@ select.inp {
         }
       hs.current = a;
     }, [k, Hs]);
+    // repeating tasks come back: a done repeating task from an earlier day reopens on its next day
+    at(() => {
+      if (!k || !t && !sandbox) return;
+      (s || []).forEach((tk) => {
+        if (tk.repeat && tk.status === "done" && tk.doneAt && tk.doneAt !== ue && repeatsToday(tk))
+          U("tasks/" + tk.id, () => e.collection("tasks").doc(tk.id).set({ ...tk, status: "todo", doneAt: "", updatedAt: Date.now() }));
+      });
+    }, [k, ue, (s || []).map((tk) => tk.id + tk.status + tk.doneAt).join("|")]);
     // a building site that just got its first finished task: raise the building with a little ceremony
     let prevBuilding = Lt(null),
       [opening, setOpening] = He(null);
@@ -16727,7 +16956,7 @@ select.inp {
         { className: "hud-top" },
         React.createElement(
           "div",
-          { className: "crest hud-card" },
+          { className: "crest hud-card", role: "button", tabIndex: 0, title: "Island settings", onClick: () => M({ type: "settings" }), onKeyDown: (a) => (a.key === "Enter" || a.key === " ") && M({ type: "settings" }) },
           React.createElement(qn, null),
           React.createElement(
             "div",
@@ -16735,7 +16964,7 @@ select.inp {
             React.createElement(
               "div",
               { className: "crest-title" },
-              (fresh && isl && isl.islandName) || "Valley Isle",
+              (isl && isl.islandName) || "Valley Isle",
             ),
             React.createElement(
               "div",
@@ -16849,6 +17078,9 @@ select.inp {
           ),
         ),
       ),
+      focus &&
+        React.createElement(FocusCard, { focus, venture: te[focus.task.venture], onDone: finishFocus, onStop: () => (setFocus(null), Re("Focus stopped.")),
+          onPause: () => setFocus((f2) => (f2.paused ? { ...f2, paused: !1, since: Date.now() } : { ...f2, paused: !0, used: f2.used + (Date.now() - f2.since) / 1000 })) }),
       editing &&
         React.createElement("div", { className: "edit-bar hud-card", role: "toolbar", "aria-label": "Layout editor" },
           React.createElement("div", { className: "edit-txt" },
@@ -17009,6 +17241,12 @@ select.inp {
           onClick: () => Ie({ type: "goals" }),
         }),
         React.createElement(Xt, {
+          icon: React.createElement("span", { className: "dock-glyph", "aria-hidden": "true" }, "7"),
+          label: "Week",
+          active: (v == null ? void 0 : v.type) === "week",
+          onClick: () => Ie({ type: "week" }),
+        }),
+        React.createElement(Xt, {
           icon: React.createElement(zs, { size: 20 }),
           label: "Crew",
           active: (v == null ? void 0 : v.type) === "crew",
@@ -17099,6 +17337,11 @@ select.inp {
           onAdd: () => Yt(rt.id),
           onClose: () => $(null),
           onDemolish: pe.some((a) => a.id === rt.id) ? () => Kn(rt) : null,
+          extra: rt.id === "personal"
+            ? React.createElement(Journal, { entries: journalC || [], today: ue, onSave: (x2) => U("journal/" + ue, () => e.collection("journal").doc(ue).set({ id: ue, d: ue, ...x2, updatedAt: Date.now() })) })
+            : rt.id === "youtube"
+              ? React.createElement(ContentCal, { videos: videosC || [], crew: Ce, onSave: (x2) => { let id = x2.id || Ze("vd"); U("videos/" + id, () => e.collection("videos").doc(id).set({ ...x2, id, updatedAt: Date.now(), createdAt: x2.createdAt || Date.now() })); }, onDelete: (id) => U("videos/" + id, () => e.collection("videos").doc(id).delete()) })
+              : null,
         }),
       (v == null ? void 0 : v.type) === "port" &&
         React.createElement(zn, {
@@ -17114,6 +17357,9 @@ select.inp {
           onNew: () => M({ type: "lead", init: v.via === "marina" ? { type: "order" } : v.via === "port" ? { type: "tender" } : {} }),
           ..._n,
         }),
+      (v == null ? void 0 : v.type) === "week" &&
+        React.createElement(WeekDrawer, { tasks: xe, secById: te, onClose: () => $(null), onOpen: (tk) => M({ type: "task", init: tk }),
+          onMove: (tk, due) => (U("tasks/" + tk.id, () => e.collection("tasks").doc(tk.id).set({ ...tk, due, updatedAt: Date.now() })), Fe.tap(), Re(tk.title + (due ? " moved to " + new Date(due + "T12:00").toLocaleDateString("en", { weekday: "long" }) : " moved to anytime") + ".")) }),
       (v == null ? void 0 : v.type) === "bank" &&
         React.createElement(BankDrawer, { key: "bank" + (v.tab || "") + (v.focus || ""), building: buildingIds.has("bank"), plan: budgetDoc, spend: spendC, bills: billsC, savings: savingsC, business: B, tab: v.tab, focus: v.focus, onClose: () => $(null), act: bankAct }),
       (v == null ? void 0 : v.type) === "fitness" &&
@@ -17132,6 +17378,7 @@ select.inp {
           onLogWorkout: Un,
           onDelWorkout: Jn,
           onToggleHabit: eo,
+          onHabitsChange: (items) => U("habits/list", () => e.doc("habits/list").set({ items })),
         }),
       (v == null ? void 0 : v.type) === "goals" &&
         React.createElement(Tn, {
@@ -17182,6 +17429,7 @@ select.inp {
           workers: Ce,
           onClose: () => M(null),
           onSave: Gn,
+          onFocus: (tk) => (M(null), startFocus(tk)),
         }),
       (E == null ? void 0 : E.type) === "lead" &&
         React.createElement(Ln, {
@@ -17190,6 +17438,9 @@ select.inp {
           onClose: () => M(null),
           onSave: jn,
         }),
+      (E == null ? void 0 : E.type) === "settings" &&
+        React.createElement(SettingsDlg, { isl, onClose: () => M(null), onExport: doExport, onImport: (txt) => (M(null), doImport(txt)),
+          onRename: (nm) => (U("settings/island", () => e.doc("settings/island").set({ ...(isl || { mode: fresh ? "fresh" : "classic" }), islandName: nm })), Re("Renamed to " + nm + "."), M(null)) }),
       (E == null ? void 0 : E.type) === "section" &&
         React.createElement(Pn, { onClose: () => M(null), onCreate: Yn }),
       (E == null ? void 0 : E.type) === "build" &&
