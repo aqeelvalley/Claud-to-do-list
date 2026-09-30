@@ -587,7 +587,7 @@
       pave: "#E9DBC0",
       paveEdge: "#D6C29D",
       leaf: "#5E9E5A",
-      stroke: "rgba(74,48,26,0.30)",
+      stroke: "none", // flat art: no outlines
     };
   function Fs(e) {
     return (
@@ -615,7 +615,29 @@
     );
   }
   function T(e, t) {
-    return t >= 0 ? rn(e, "#FFFFFF", t) : rn(e, "#1E1408", -t);
+    return t >= 0 ? rn(e, "#FFF8F0", t) : rn(e, "#3A3158", Math.min(1, -t * 1.25));
+  }
+  /* flat pastel pass (matches the world pen): cap saturation, lift lightness,
+     steel blues lean periwinkle, greys and blacks go dusky violet */
+  var PZ = new Map();
+  function pz(c) {
+    if (typeof c !== "string" || c[0] !== "#" || (c.length !== 7 && c.length !== 4)) return c;
+    let v = PZ.get(c);
+    if (v) return v;
+    let [r, g, b2] = Fs(c).map((x) => x / 255),
+      mx = Math.max(r, g, b2), mn = Math.min(r, g, b2), l = (mx + mn) / 2, d = mx - mn, h = 0, s = 0;
+    if (d > 1e-6) {
+      s = d / (1 - Math.abs(2 * l - 1));
+      h = 60 * (mx === r ? ((g - b2) / d + 6) % 6 : mx === g ? (b2 - r) / d + 2 : (r - g) / d + 4);
+    }
+    if (h > 190 && h < 240) h += (240 - h) * 0.35;
+    let L2 = 0.3 + 0.62 * l, S2 = s < 0.08 ? s : Math.min(0.72, s * 0.9 + 0.1);
+    if (d <= 1e-6 && l < 0.5) (h = 255), (S2 = 0.18);
+    let C = (1 - Math.abs(2 * L2 - 1)) * S2, X = C * (1 - Math.abs(((h / 60) % 2) - 1)), m = L2 - C / 2,
+      q = h < 60 ? [C, X, 0] : h < 120 ? [X, C, 0] : h < 180 ? [0, C, X] : h < 240 ? [0, X, C] : h < 300 ? [X, 0, C] : [C, 0, X];
+    v = "#" + q.map((x) => Math.max(0, Math.min(255, Math.round((x + m) * 255))).toString(16).padStart(2, "0")).join("");
+    PZ.set(c, v);
+    return v;
   }
   function pt(e, t) {
     let [s, n, o] = Fs(e);
@@ -651,7 +673,7 @@
             [y, f, w],
             [r, f, w],
           ]),
-          fill: p || l,
+          fill: pz(p || l),
         }),
       i > 0 &&
         React.createElement("polygon", {
@@ -661,7 +683,7 @@
             [y, f, w],
             [y, k, w],
           ]),
-          fill: u || T(l, -0.17),
+          fill: pz(u || T(l, -0.24)),
         }),
       React.createElement("polygon", {
         points: J([
@@ -670,7 +692,7 @@
           [y, f, w],
           [r, f, w],
         ]),
-        fill: d || T(l, 0.12),
+        fill: pz(d || T(l, 0.12)),
       }),
     );
   }
@@ -977,7 +999,7 @@
       null,
       React.createElement("path", {
         d: r.side,
-        fill: l,
+        fill: pz(l),
         stroke: D.stroke,
         strokeWidth: "0.7",
       }),
@@ -985,7 +1007,7 @@
         React.createElement("path", {
           key: k,
           d: fo(r.cx, r.cyb, i, n, c, y.z1, y.z2),
-          fill: y.c,
+          fill: pz(y.c),
         }),
       ),
       React.createElement("path", { d: r.side, fill: "url(#cylShade)" }),
@@ -995,7 +1017,7 @@
           cy: L(r.cyt),
           rx: L(r.bx),
           ry: L(r.by),
-          fill: d || T(l, 0.14),
+          fill: pz(d || T(l, 0.14)),
           stroke: D.stroke,
           strokeWidth: "0.7",
         }),

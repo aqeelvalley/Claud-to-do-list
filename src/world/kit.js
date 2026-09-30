@@ -138,7 +138,7 @@
       const k = winK++;
       if (E) {
         poly(faceQ(bx, face, u0 - 0.015, u1 + 0.015, v0 - 0.03, v1 + 0.03, 0.5), "#000", null);
-        if (litFn(k)) { path(faceQ(bx, face, u0, u1, v0, v1, 0.7)); ctx.fillStyle = k % 3 ? "#FFD58A" : "#FFE9B8"; ctx.fill(); }
+        if (litFn(k)) { path(faceQ(bx, face, u0, u1, v0, v1, 0.7)); ctx.fillStyle = k % 3 ? "#FFC98F" : "#FFDDB0"; ctx.fill(); }
         return;
       }
       // flat recessed window: a deep inset with a light reveal on one side and a sill

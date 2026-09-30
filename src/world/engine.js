@@ -284,6 +284,6 @@
   function tintColor(L) {
     let c = "#FFFFFF";
     if (L.golden > 0) c = mix(c, "#FFC98C", L.golden * 0.5);
-    if (L.night > 0) c = mix(c, "#3A4A86", L.night * 0.78);
+    if (L.night > 0) c = mix(c, "#5A5AA0", L.night * 0.74); // flat periwinkle-indigo night
     return c;
   }

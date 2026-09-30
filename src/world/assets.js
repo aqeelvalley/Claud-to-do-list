@@ -246,11 +246,17 @@
       else if (look.hat.kind === "sun") { ctx.beginPath(); ctx.ellipse(0, hy - 0.9, hr + 2.2, 0.9, 0, 0, TAU); ctx.fill(); ctx.beginPath(); ctx.arc(0, hy - 1, hr * 0.8, Math.PI, 0); ctx.fill(); }
       else { ctx.fillRect(-hr * 0.8, hy - hr - 1.6, hr * 1.6, 2.4); ctx.fillRect(-hr - 0.8, hy - 0.9, hr * 2 + 1.6, 0.8); }
     }
-    if (front) {
-      ctx.fillStyle = "#2E2A40";
-      const blink = Math.sin(t * 1.3 + look.h * 40) > 0.97;
-      if (!blink) { ctx.fillRect(0.5, hy - 0.2, 0.55, 0.75); ctx.fillRect(1.5, hy - 0.2, 0.5, 0.75); } else { ctx.fillRect(0.4, hy + 0.3, 0.7, 0.25); ctx.fillRect(1.4, hy + 0.3, 0.7, 0.25); }
-      ctx.fillStyle = "rgba(240,120,120,0.45)"; ctx.beginPath(); ctx.arc(1.9, hy + 1, 0.6, 0, TAU); ctx.fill();
+    // faceless, Monument Valley style: personality comes from build, dress and body language.
+    // crew wear a cream backpack with a pennant in their colour, so they read at a glance
+    if (look.crew) {
+      const bx = front ? -wid * 0.95 : -wid * 0.35, bw = wid * 1.1;
+      if (!front) { ctx.fillStyle = "#F7EEDF"; ctx.fillRect(bx, top + 1, bw, bodyH * 0.62); ctx.fillStyle = "#E6D8C2"; ctx.fillRect(bx + bw * 0.55, top + 1, bw * 0.45, bodyH * 0.62); }
+      else { ctx.fillStyle = "#F7EEDF"; ctx.fillRect(-wid * 0.5, top + 0.6, 0.7, bodyH * 0.55); ctx.fillRect(wid * 0.25, top + 0.6, 0.7, bodyH * 0.55); }
+      const px = front ? -wid * 0.7 : -wid * 0.1, py = top + 1;
+      ctx.strokeStyle = "#5A4E7A"; ctx.lineWidth = 0.35; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px, py - 9); ctx.stroke();
+      const flap = Math.sin(t * 5 + look.h * 9) * 0.5;
+      ctx.fillStyle = look.crew.flag; ctx.beginPath(); ctx.moveTo(px, py - 9); ctx.lineTo(px - 3.6, py - 7.9 + flap); ctx.lineTo(px, py - 6.6); ctx.closePath(); ctx.fill();
+      if (look.crew.you) { ctx.fillStyle = "#FFE7A8"; ctx.beginPath(); ctx.arc(px, py - 9.3, 0.7, 0, TAU); ctx.fill(); }
     }
     ctx.restore();
   }

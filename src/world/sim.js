@@ -40,7 +40,7 @@
       const kind = k === 0 || k === 13 ? "bus" : k % 9 === 4 ? "truck" : k % 5 === 1 ? "van" : k % 4 === 2 ? "bakkie" : k % 3 ? "hatch" : "sedan";
       const e = spawnable[k % spawnable.length], dir = R() < 0.5 ? 1 : -1;
       const V = VEHICLES[kind];
-      const c = { id: "car" + k, kind, color: kind === "bus" ? "#F2C14E" : kind === "truck" ? pick(["#2A9D8F", "#3E7CB1", "#E0474C"]) : pick(CAR_COLS), e, dir, s: 0, v: 0, L: V.L, vmax: kind === "bus" || kind === "truck" ? 34 : 44 + R() * 12, mode: "lane", wheel: 0, name: kind === "bus" ? "Island bus" : kind === "truck" ? "Delivery truck" : "Car" };
+      const c = { id: "car" + k, prio: k, kind, color: kind === "bus" ? "#F2C14E" : kind === "truck" ? pick(["#2A9D8F", "#3E7CB1", "#E0474C"]) : pick(CAR_COLS), e, dir, s: 0, v: 0, L: V.L, vmax: kind === "bus" || kind === "truck" ? 34 : 44 + R() * 12, mode: "lane", wheel: 0, name: kind === "bus" ? "Island bus" : kind === "truck" ? "Delivery truck" : "Car" };
       const cs = cutAt(startNode(c), e), ce = e.len - cutAt(endNode(c), e);
       c.s = lerp(cs, ce, (k * 0.37) % 1 * 0.8 + 0.1);
       S.cars.push(c);
@@ -121,11 +121,25 @@
           if (fwd <= 0 || fwd > 60) continue;
           const lat = Math.abs(da * p.hb - db * p.ha);
           if (lat > 6.5) continue;
-          // two cars sharing a junction: the lower id has right of way
-          if (c.mode === "turn" && q.c.mode === "turn" && q.c.turnNode === c.turnNode && q.c.fromE !== c.fromE && q.c.id > c.id) continue;
+          // two cars each in front of the other (crossing paths): the lower number has right of way
+          if ((da * -q.ha + db * -q.hb) > 0 && c.prio < q.c.prio) continue;
           if (c.mode === "turn" && q.c.claim === c.turnNode && q.c.mode === "lane") continue;
+          // inside the box, cars queued on other approaches are behind their stop line and
+          // are waiting for us - only the exit lane and other turning cars matter
+          if (c.mode === "turn" && q.c.mode === "lane" && !(q.c.e === c.next.e && q.c.dir === c.next.dir)) continue;
           const gap = fwd - (c.L + q.c.L) / 2;
           target = Math.min(target, Math.max(0, (gap - 5) * 1.6));
+        }
+        // crossing paths inside a junction, where "car ahead" can miss an angled approach
+        if (c.mode === "turn") for (const q of P) {
+          const o = q.c;
+          if (o === c || o.mode !== "turn" || o.turnNode !== c.turnNode || o.fromE === c.fromE) continue;
+          const da = q.a - p.a, db = q.b - p.b;
+          if (da * p.ha + db * p.hb <= 0) continue; // behind us: not our problem
+          if (Math.abs(p.ha * q.hb - p.hb * q.ha) < 0.35) continue; // parallel lanes never cross
+          if ((-da * q.ha - db * q.hb) > 0 && c.prio < o.prio) continue; // mutual: we have priority
+          const d = Math.hypot(da, db);
+          if (d < (c.L + o.L) / 2 + 8) target = Math.min(target, Math.max(0, (d - (c.L + o.L) / 2 - 2) * 1.5));
         }
         // pedestrians in front (crossings)
         for (const w of S.peds) {
@@ -319,7 +333,7 @@
         const base = wk.base || null;
         if (!w) {
           const look = randomLook(rng(hash(wk.id)));
-          look.top = wk.color; look.h = 1.02;
+          look.top = wk.color; look.h = 1.02; look.crew = { flag: wk.color, you: wk.kind === "human" }; look.acc = null; look.scarf = null;
           const tgt = base && doorOf(base);
           const start = tgt || squareNode;
           w = { id: "crew:" + wk.id, look, node: start, a: start.a, b: start.b, speed: 17, phase: 0, wait: tgt ? 0 : 1 + k, name: wk.name, crew: { id: wk.id, role: wk.kind === "human" ? "You" : wk.name, color: wk.color, base, target: tgt, status: tgt ? "working" : "idle", queue: [] } };

@@ -4,7 +4,11 @@
    * wall as sticky notes (tap one to edit it).
    */
   var Inside = (() => {
-    const h = React.createElement;
+    // every raw SVG shape in a room goes through the same flat pastel pass
+    const h = (t, pr, ...k) => {
+      if (pr && typeof t === "string" && (pr.fill || pr.stroke)) pr = { ...pr, fill: pz(pr.fill), stroke: pz(pr.stroke) };
+      return React.createElement(t, pr, ...k);
+    };
     let W = 230, D = 210, H = 118; // room size in iso units (set per building)
     const P = (a, b, z = 0) => ye(a, b, z);
     const pts = (arr) => J(arr);
@@ -625,7 +629,10 @@
           const [x, y] = P(a, bb, 0);
           return { d: a + bb + 1, el: h("g", { key: "p" + w.id, className: "crew-in", style: { animationDelay: n * 0.4 + "s" } },
             h("g", { transform: `translate(${R(x)},${R(y)}) scale(1.7) translate(${R(-x)},${R(-y)})` },
-              h(cn, { sx: x, sy: y, shirt: w.color, title: w.name, walk: n % 2 ? "walk-b" : "walk-a", delay: n * 0.9 })),
+              h(cn, { sx: x, sy: y, shirt: w.color, title: w.name, walk: n % 2 ? "walk-b" : "walk-a", delay: n * 0.9 }),
+              // crew pennant, same as out on the island
+              h("line", { x1: R(x - 3.2), y1: R(y - 12), x2: R(x - 3.2), y2: R(y - 22), stroke: "#5A4E7A", strokeWidth: 0.4 }),
+              h("path", { d: `M${R(x - 3.2)},${R(y - 22)} l-4,1.3 l4,1.4 z`, fill: w.color })),
             h("g", { transform: `translate(${R(x)},${R(y - 44)})` },
               h("rect", { x: -w.name.length * 2.6 - 5, y: -7, width: w.name.length * 5.2 + 10, height: 12, rx: 6, fill: "rgba(255,248,236,0.92)", stroke: w.color, strokeWidth: 1 }),
               h("text", { y: 2, textAnchor: "middle", className: "crew-t" }, w.name))) };

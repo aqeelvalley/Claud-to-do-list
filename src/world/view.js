@@ -90,7 +90,7 @@
 
       /* ---- sprite helpers ---- */
       const hourNow = () => { const m = cb.current.lightMode; if (m === "day") return 12.5; if (m === "golden") return 17.9; if (m === "night") return 22; const d = new Date(); return d.getHours() + d.getMinutes() / 60; };
-      const litFor = (key, q) => (k) => { const r = ((hash(key + ":" + k) % 1000) / 1000); return q > 0.12 + r * 0.8 && !(r > 0.86 && q >= 1); };
+      const litFor = (key, q) => (k) => { const r = ((hash(key + ":" + k) % 1000) / 1000); return q > 0.2 + r * 1.3 && !(r > 0.86 && q >= 1); };
       const lmState = (d) => {
         const lm = d.o.landmark && cb.current.landmarks[d.o.landmark];
         return { tier: lm ? lm.tier : 1, data: lm ? lm.data : null, sig: lm ? lm.tier + ":" + JSON.stringify(lm.data || "") : "" };
@@ -138,7 +138,7 @@
       };
 
       const poolSprite = makeCanvas(92, 46);
-      { const g = poolSprite.getContext("2d"), gg = g.createRadialGradient(46, 23, 0, 46, 23, 46); gg.addColorStop(0, "rgba(255,196,110,0.34)"); gg.addColorStop(0.55, "rgba(255,180,90,0.12)"); gg.addColorStop(1, "rgba(255,180,90,0)"); g.setTransform(1, 0, 0, 0.5, 0, 0); g.fillStyle = gg; g.beginPath(); g.arc(46, 46, 46, 0, TAU); g.fill(); }
+      { const g = poolSprite.getContext("2d"), gg = g.createRadialGradient(46, 23, 0, 46, 23, 46); gg.addColorStop(0, "rgba(255,214,170,0.3)"); gg.addColorStop(0.55, "rgba(255,206,160,0.1)"); gg.addColorStop(1, "rgba(255,180,90,0)"); g.setTransform(1, 0, 0, 0.5, 0, 0); g.fillStyle = gg; g.beginPath(); g.arc(46, 46, 46, 0, TAU); g.fill(); }
       /* ---- water ---- */
       const glints = [];
       { const r = rng(7); for (let k = 0; k < 260; k++) { const a = T.abox.a0 - 400 + r() * (T.abox.a1 - T.abox.a0 + 800), b = T.abox.b0 - 400 + r() * (T.abox.b1 - T.abox.b0 + 800); if (!T.landAt(a, b) && !T.landAt(a + 40, b) && !T.landAt(a, b + 40) && !T.landAt(a - 40, b - 40)) glints.push({ x: a - b, y: (a + b) / 2 + SEA_DROP, w: 5 + r() * 10, p: r() * TAU }); } }
@@ -222,7 +222,7 @@
             drawPerson(ctx, d.sx, d.sy + lift, w.look, dx < 0 ? -1 : 1, dy >= 0, w.phase, w.moving || w.carried, w.crew ? 1.08 : 1, w.act, time);
             if (w.bubble && !w.crew) drawBubble(ctx, d.sx + 3, d.sy + lift - 17 * w.look.h, w.bubble.ch, 1);
             if (w.crew) {
-              const x = d.sx, y = d.sy + lift - 22 * w.look.h;
+              const x = d.sx, y = d.sy + lift - 27 * w.look.h;
               ctx.fillStyle = w.crew.color; ctx.strokeStyle = "#FFF8EC"; ctx.lineWidth = 1.2;
               ctx.beginPath(); ctx.arc(x, y, 4.2, 0, TAU); ctx.fill(); ctx.stroke();
               ctx.fillStyle = "#FFF"; ctx.font = "700 5px Fredoka, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText((w.name || "?")[0], x, y + 0.3);
@@ -244,7 +244,10 @@
         // ---- lighting ----
         const tint = tintColor(L);
         if (tint !== "#FFFFFF") {
-          ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = "multiply"; ctx.fillStyle = tint; ctx.fillRect(0, 0, cv.width, cv.height); ctx.restore();
+          ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = "multiply"; ctx.fillStyle = tint; ctx.fillRect(0, 0, cv.width, cv.height);
+          // flatten: lift the darks into one soft indigo so night reads as a single calm wash
+          if (L.night > 0) { ctx.globalCompositeOperation = "screen"; ctx.globalAlpha = 0.5 * L.night; ctx.fillStyle = "#2B2757"; ctx.fillRect(0, 0, cv.width, cv.height); }
+          ctx.restore();
         }
         if (L.night > 0.04) {
           ectx.setTransform(1, 0, 0, 1, 0, 0); ectx.clearRect(0, 0, emitCv.width, emitCv.height);
@@ -272,7 +275,7 @@
             if (es) ectx.drawImage(es.cv, d.sx - es.ox, d.sy - es.oy + bob, es.w, es.h);
           });
           ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
-          ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = Math.min(1, L.night * 1.1);
+          ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = Math.min(0.85, L.night * 0.95); // soft, un-blown lights
           ctx.drawImage(emitCv, 0, 0, cv.width, cv.height);
           ctx.restore();
           // lighthouse beam
@@ -283,7 +286,7 @@
             const dx = Math.cos(ang), dy = Math.sin(ang) * 0.5, L2 = 520;
             const px = -dy, py = dx;
             const gb = ctx.createLinearGradient(bx, by, bx + dx * L2, by + dy * L2);
-            gb.addColorStop(0, `rgba(255,246,200,${0.55 * L.night})`); gb.addColorStop(1, "rgba(255,246,200,0)");
+            gb.addColorStop(0, `rgba(255,240,214,${0.32 * L.night})`); gb.addColorStop(1, "rgba(255,246,200,0)");
             ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.fillStyle = gb;
             ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx + dx * L2 + px * 70, by + dy * L2 + py * 70); ctx.lineTo(bx + dx * L2 - px * 70, by + dy * L2 - py * 70); ctx.closePath(); ctx.fill(); ctx.restore();
           }
@@ -335,11 +338,13 @@
           ctx.font = "600 12.5px Fredoka, Nunito, sans-serif";
           const nameW = ctx.measureText(lm.name).width;
           const wdt = nameW + 10 + 32 + (lm.open > 0 ? 22 : 0);
-          ctx.fillStyle = "rgba(70,45,20,0.22)"; roundRect(ctx, -wdt / 2, -9.5, wdt, 25, 12.5); ctx.fill();
-          ctx.fillStyle = S.hover === lm.id ? "#FFFDF6" : "#FFF8EC"; ctx.strokeStyle = S.hover === lm.id ? lm.color : "#E6D2AE"; ctx.lineWidth = 1.2; roundRect(ctx, -wdt / 2, -12, wdt, 25, 12.5); ctx.fill(); ctx.stroke();
+                    // flat tag: a cream pill with a pastel tab, no drop shadow; outline only on hover
+          ctx.fillStyle = "#FFF6EC"; roundRect(ctx, -wdt / 2, -12, wdt, 25, 12.5); ctx.fill();
+          if (S.hover === lm.id) { ctx.strokeStyle = lm.color; ctx.lineWidth = 1.6; ctx.stroke(); }
+          ctx.fillStyle = "rgba(90,78,122,0.16)"; ctx.beginPath(); ctx.moveTo(-4, 13); ctx.lineTo(4, 13); ctx.lineTo(0, 17); ctx.closePath(); ctx.fill();
           ctx.fillStyle = lm.color; ctx.beginPath(); ctx.arc(-wdt / 2 + 13, 0.5, 9, 0, TAU); ctx.fill();
           ctx.fillStyle = "#FFF"; ctx.font = "700 11px Fredoka, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(String(lm.level), -wdt / 2 + 13, 1);
-          ctx.fillStyle = "#24393d"; ctx.font = "600 12.5px Fredoka, Nunito, sans-serif"; ctx.textAlign = "left"; ctx.fillText(lm.name, -wdt / 2 + 27, 1);
+          ctx.fillStyle = "#4A4068"; ctx.font = "600 12.5px Fredoka, Nunito, sans-serif"; ctx.textAlign = "left"; ctx.fillText(lm.name, -wdt / 2 + 27, 1);
           if (lm.open > 0) { ctx.fillStyle = shade(lm.color, 0.78); roundRect(ctx, wdt / 2 - 27, -7.5, 20, 16, 8); ctx.fill(); ctx.fillStyle = shade(lm.color, -0.35); ctx.textAlign = "center"; ctx.font = "700 11px Fredoka, sans-serif"; ctx.fillText(String(lm.open), wdt / 2 - 17, 1); }
           if (lm.alert) { const bob = Math.sin(performance.now() / 240) * 1.5; ctx.fillStyle = "#D9534F"; ctx.strokeStyle = "#FFF8EC"; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.arc(wdt / 2 - 3, -17 + bob, 8.5, 0, TAU); ctx.fill(); ctx.stroke(); ctx.fillStyle = "#FFF"; ctx.font = "800 12px Fredoka, sans-serif"; ctx.textAlign = "center"; ctx.fillText("!", wdt / 2 - 3, -16.5 + bob); }
           // crew working inside
