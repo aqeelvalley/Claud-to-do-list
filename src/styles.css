@@ -2612,8 +2612,8 @@ select.inp {
 .crew-t { font: 700 6.5px Fredoka, sans-serif; fill: #24393d; }
 .shaft { mix-blend-mode: screen; animation: glowp 6s ease-in-out infinite; }
 @media (max-width: 767px) {
-  .interior-stage { left: 4px; right: 4px; top: calc(env(safe-area-inset-top, 0px) + 60px); bottom: auto; height: 36vh; }
-  .interior ~ .drawer { max-height: 50vh; }
+  .interior-stage { left: 4px; right: 4px; top: calc(env(safe-area-inset-top, 0px) + 58px); bottom: calc(env(safe-area-inset-bottom, 0px) + 96px + 46vh); height: auto; }
+  .interior ~ .drawer { max-height: 46vh; }
   .interior-title { font-size: 16px; }
   .pin-btn { display: none; }
 }

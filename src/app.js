@@ -6259,8 +6259,12 @@
     onEdit: i,
     onDelete: l,
     monthWon: d,
+    title: zTitle = "Port & Logistics Hub",
+    sub: zSub = "Leads arrive by ship and get worked in the hub",
+    color: zColor = "#1F7A8C",
+    initialTab: zTab = "new",
   }) {
-    let [p, u] = ve("new"),
+    let [p, u] = ve(zTab),
       c = Object.fromEntries(
         vt.map((f) => [f.id, e.filter((w) => w.stage === f.id).length]),
       ),
@@ -6276,9 +6280,9 @@
     return React.createElement(
       zt,
       {
-        title: "Port & Logistics Hub",
-        sub: "Leads arrive by ship and get worked in the hub",
-        color: "#1F7A8C",
+        title: zTitle,
+        sub: zSub,
+        color: zColor,
         icon: React.createElement(ls, { size: 18 }),
         onClose: s,
       },
@@ -9437,11 +9441,16 @@
         }),
       (v == null ? void 0 : v.type) === "port" &&
         React.createElement(zn, {
-          leads: C,
+          key: v.via || "port",
+          leads: v.via === "marina" ? C.filter((a) => a.type !== "tender") : v.via === "port" ? C.filter((a) => a.type === "tender") : C,
+          title: v.via === "marina" ? "Marina" : v.via === "port" ? "Tender Port" : "Logistics Hub",
+          sub: v.via === "marina" ? "Orders, sponsors and freelance work dock here" : v.via === "port" ? "EPCM tenders and RFQs arrive by ship" : "Every lead being worked, from qualifying to won",
+          color: v.via === "marina" ? "#2A9D8F" : v.via === "port" ? "#1F7A8C" : "#C9A227",
+          initialTab: v.via === "hub" ? "qualifying" : "new",
           secById: te,
           monthWon: x.reduce((a, g) => a + (Number(g.value) || 0), 0),
           onClose: () => $(null),
-          onNew: () => M({ type: "lead", init: {} }),
+          onNew: () => M({ type: "lead", init: v.via === "marina" ? { type: "order" } : v.via === "port" ? { type: "tender" } : {} }),
           ..._n,
         }),
       (v == null ? void 0 : v.type) === "fitness" &&
