@@ -53,6 +53,8 @@ public class LLWidgetPlugin: CAPPlugin, CAPBridgedPlugin {
                 "plugins": plugins,
                 "widget": widgetInfo,
                 "appGroup": group,
+                "groupName": LLShared.group,
+                "provisionedGroups": LLShared.provisionedGroups(),
                 "snapshotSaved": LLShared.defaults?.string(forKey: LLShared.snapKey) != nil,
                 "placedWidgets": placed,
                 "error": err
