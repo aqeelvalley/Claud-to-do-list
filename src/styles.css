@@ -2708,3 +2708,41 @@ select.inp {
 .edit-txt b { font: 600 14.5px Fredoka, sans-serif; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .edit-txt span { font-size: 12px; color: var(--ink2); }
 @media (max-width: 767px) { .edit-bar { top: calc(env(safe-area-inset-top, 0px) + 150px); flex-wrap: wrap; } }
+
+/* ---- bank ---- */
+.bank-note { font-size: 12.5px; line-height: 1.45; color: var(--ink2); padding: 9px 12px; border-radius: 12px; background: var(--paper2); }
+.bank-note.good { background: #eaf4e4; color: #3f5f3a; }
+.bank-note.warn { background: #fbe7df; color: #7a3f30; }
+.link-btn { border: 0; background: none; font: 600 12.5px Fredoka, sans-serif; color: var(--terraD); cursor: pointer; padding: 2px 4px; }
+.bars { display: grid; gap: 7px; }
+.bar-row { display: grid; grid-template-columns: minmax(84px, 32%) 1fr 122px; align-items: center; gap: 8px; font-size: 12.5px; padding: 2px 0; border-radius: 6px; }
+.bar-row:hover { background: rgba(70, 61, 99, 0.05); }
+.bar-name { color: var(--ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar-track { position: relative; height: 10px; border-radius: 4px; background: rgba(70, 61, 99, 0.08); }
+.bar-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 0 4px 4px 0; background: #c9a227; }
+.bar-fill.over { background: #d0705a; }
+.bar-plan { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--ink); border-radius: 1px; }
+.bar-val { color: var(--ink); font-weight: 700; white-space: nowrap; text-align: right; }
+.bar-val small { color: var(--ink3); font-weight: 600; }
+.bar-legend { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 11.5px; color: var(--ink3); }
+.lg-fill { width: 12px; height: 8px; border-radius: 2px; background: #c9a227; margin-left: 4px; }
+.lg-plan { width: 2px; height: 12px; background: var(--ink); margin-left: 10px; }
+.bank-table summary { font-size: 12.5px; color: var(--ink2); cursor: pointer; }
+.bank-table table { width: 100%; margin-top: 6px; font-size: 12.5px; border-collapse: collapse; }
+.bank-table th, .bank-table td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+.bank-table th { color: var(--ink3); font-weight: 700; }
+.list-card { border-radius: 14px; background: #fff; border: 1.5px solid var(--line); overflow: hidden; }
+.row-li { display: flex; align-items: center; gap: 10px; padding: 9px 12px; font-size: 13px; color: var(--ink); border-top: 1px solid var(--line); }
+.row-li:first-child { border-top: 0; }
+.row-li .q-check { flex: none; display: grid; place-items: center; font-size: 12px; color: #fff; }
+.row-li .q-check.on { background: #7cb87a; border-color: #7cb87a; }
+.muted { color: var(--ink3); }
+.late { color: #b8604c; font-weight: 700; }
+.due { color: #9a7a1e; font-weight: 700; }
+.x-btn { border: 0; background: none; font-size: 18px; line-height: 1; color: var(--ink3); cursor: pointer; padding: 0 2px; }
+.empty-li { padding: 14px; font-size: 12.5px; color: var(--ink3); text-align: center; }
+.chip-btn.sm { font-size: 12px; padding: 4px 10px; }
+.save-card.focus { box-shadow: inset 0 0 0 2px #c9a227; }
+.save-ico { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: #f6ecc8; color: #8a6d12; font-size: 14px; }
+.save-bar { height: 10px; border-radius: 5px; background: rgba(70, 61, 99, 0.1); overflow: hidden; margin-top: 6px; }
+.save-bar span { display: block; height: 100%; border-radius: 5px; background: #e9b949; }

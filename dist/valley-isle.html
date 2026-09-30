@@ -2715,6 +2715,44 @@ select.inp {
 .edit-txt b { font: 600 14.5px Fredoka, sans-serif; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .edit-txt span { font-size: 12px; color: var(--ink2); }
 @media (max-width: 767px) { .edit-bar { top: calc(env(safe-area-inset-top, 0px) + 150px); flex-wrap: wrap; } }
+
+/* ---- bank ---- */
+.bank-note { font-size: 12.5px; line-height: 1.45; color: var(--ink2); padding: 9px 12px; border-radius: 12px; background: var(--paper2); }
+.bank-note.good { background: #eaf4e4; color: #3f5f3a; }
+.bank-note.warn { background: #fbe7df; color: #7a3f30; }
+.link-btn { border: 0; background: none; font: 600 12.5px Fredoka, sans-serif; color: var(--terraD); cursor: pointer; padding: 2px 4px; }
+.bars { display: grid; gap: 7px; }
+.bar-row { display: grid; grid-template-columns: minmax(84px, 32%) 1fr 122px; align-items: center; gap: 8px; font-size: 12.5px; padding: 2px 0; border-radius: 6px; }
+.bar-row:hover { background: rgba(70, 61, 99, 0.05); }
+.bar-name { color: var(--ink2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar-track { position: relative; height: 10px; border-radius: 4px; background: rgba(70, 61, 99, 0.08); }
+.bar-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 0 4px 4px 0; background: #c9a227; }
+.bar-fill.over { background: #d0705a; }
+.bar-plan { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--ink); border-radius: 1px; }
+.bar-val { color: var(--ink); font-weight: 700; white-space: nowrap; text-align: right; }
+.bar-val small { color: var(--ink3); font-weight: 600; }
+.bar-legend { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 11.5px; color: var(--ink3); }
+.lg-fill { width: 12px; height: 8px; border-radius: 2px; background: #c9a227; margin-left: 4px; }
+.lg-plan { width: 2px; height: 12px; background: var(--ink); margin-left: 10px; }
+.bank-table summary { font-size: 12.5px; color: var(--ink2); cursor: pointer; }
+.bank-table table { width: 100%; margin-top: 6px; font-size: 12.5px; border-collapse: collapse; }
+.bank-table th, .bank-table td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+.bank-table th { color: var(--ink3); font-weight: 700; }
+.list-card { border-radius: 14px; background: #fff; border: 1.5px solid var(--line); overflow: hidden; }
+.row-li { display: flex; align-items: center; gap: 10px; padding: 9px 12px; font-size: 13px; color: var(--ink); border-top: 1px solid var(--line); }
+.row-li:first-child { border-top: 0; }
+.row-li .q-check { flex: none; display: grid; place-items: center; font-size: 12px; color: #fff; }
+.row-li .q-check.on { background: #7cb87a; border-color: #7cb87a; }
+.muted { color: var(--ink3); }
+.late { color: #b8604c; font-weight: 700; }
+.due { color: #9a7a1e; font-weight: 700; }
+.x-btn { border: 0; background: none; font-size: 18px; line-height: 1; color: var(--ink3); cursor: pointer; padding: 0 2px; }
+.empty-li { padding: 14px; font-size: 12.5px; color: var(--ink3); text-align: center; }
+.chip-btn.sm { font-size: 12px; padding: 4px 10px; }
+.save-card.focus { box-shadow: inset 0 0 0 2px #c9a227; }
+.save-ico { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: #f6ecc8; color: #8a6d12; font-size: 14px; }
+.save-bar { height: 10px; border-radius: 5px; background: rgba(70, 61, 99, 0.1); overflow: hidden; margin-top: 6px; }
+.save-bar span { display: block; height: 100%; border-radius: 5px; background: #e9b949; }
 </style>
 <div id="root"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
@@ -8548,6 +8586,9 @@ select.inp {
         } else if (w === "field") {
           put({ kind: "ground-track", ...whole });
           k.track = whole;
+        } else if (w === "runway") {
+          put({ kind: "ground-garden", ...whole });
+          plots[lm + ":runway"] = building(k, whole, { drawer: "runway", id: lm + ":runway", landmark: lm, H: 40, pad: 16, noDoor: true });
         } else if (w === "courtyard") {
           put({ kind: "ground-square", ...whole });
           [[I.a0 + 24, I.b0 + 24], [I.a1 - 24, I.b0 + 24], [I.a0 + 24, I.b1 - 24], [I.a1 - 24, I.b1 - 24]].forEach(([a, b]) => put({ kind: "prop", p: "planterTree", a, b }));
@@ -8992,10 +9033,70 @@ select.inp {
     else { pn.box(0, 0, bx.h, o.w + 2, o.d + 2, 3, "#E4826A"); pn.sign({ ...bx, h: bx.h }, FACE[o.face] || "L", 0.5, 0.6, "STAGE 1", "#E4826A", "#FFF", 5, false); }
     pn.box(0, 0, bx.h, o.w, o.d, 2, shade(o.color || "#7E6BC4", 0.2));
   };
-  // savings buildings (drawn in full later in this build)
-  B.terminal = (pn, o) => { pn.box(0, 0, 0, o.w, o.d * 0.7, 34, "#EEF2F8"); facade(pn, { x: 0, y: 0, z: 0, w: o.w, d: o.d * 0.7, h: 34 }, 1, o, { pitch: 16 }); pn.box(0, 0, 34, o.w + 6, o.d * 0.7 + 6, 4, "#9EC1E6"); pn.cyl(o.w * 0.35, -o.d * 0.2, 38, 5, 26, "#F6F2EC"); pn.box(o.w * 0.35, -o.d * 0.2, 64, 16, 16, 8, "#9EC1E6"); };
-  B.dealership = (pn, o) => { pn.box(0, 0, 0, o.w * 0.9, o.d * 0.7, 30, "#E9F1F6"); pn.box(0, 0, 30, o.w * 0.92, o.d * 0.72, 4, "#E4826A"); facade(pn, { x: 0, y: 0, z: 0, w: o.w * 0.9, d: o.d * 0.7, h: 30 }, 1, o, { pitch: 30, shopfront: true }); };
-  B.dreamhouse = (pn, o) => B.house(pn, { ...o, wall: "#F7E1E6", roof: "#C98FA8", floors: 2, seed: 11 });
+  /* ---- savings goals that grow with the money saved (o.data.progress, 0..1) ---- */
+  const prog = (o) => clamp((o.data && o.data.progress) || 0, 0, 1);
+  // holiday: a small terminal, control tower and a departures board that fills up
+  B.terminal = (pn, o) => {
+    const w = Math.min(o.w, 150), d = Math.min(o.d * 0.6, 80), bx = { x: 0, y: 0, z: 0, w, d, h: 32 };
+    pn.box(0, 0, 0, w, d, 32, "#EEF2F8"); facade(pn, bx, 1, o, { pitch: 14, shopfront: true });
+    pn.box(0, 0, 32, w + 6, d + 6, 4, "#9EC1E6");
+    pn.cyl(w * 0.38, -d * 0.3, 36, 6, 34, "#F6F2EC"); pn.box(w * 0.38, -d * 0.3, 70, 18, 18, 10, "#7FB0DA"); pn.box(w * 0.38, -d * 0.3, 80, 20, 20, 2, "#EEF2F8");
+    // departures board: the loading bar
+    const fr = FACE[o.face] || "L", q = prog(o);
+    if (!pn.E) {
+      const pts = pn.faceQ(bx, fr, 0.12, 0.88, 0.62, 0.9, 0.8).map((p3) => pn.P(p3[0], p3[1], p3[2]));
+      const ctx = pn.ctx; ctx.beginPath(); pts.forEach(([x, y], k) => (k ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); ctx.fillStyle = "#463D63"; ctx.fill();
+      const f = pn.faceQ(bx, fr, 0.15, 0.15 + 0.7 * q, 0.68, 0.84, 0.9).map((p3) => pn.P(p3[0], p3[1], p3[2]));
+      ctx.beginPath(); f.forEach(([x, y], k) => (k ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); ctx.fillStyle = q >= 1 ? "#9BC98A" : "#F0C06A"; ctx.fill();
+    }
+  };
+  // the runway wing: the plane rolls down the runway as the goal fills, and lifts off at 100%
+  B.runway = (pn, o) => {
+    const alongA = o.w >= o.d, L = alongA ? o.w : o.d, Wd = Math.min(alongA ? o.d : o.w, 70);
+    const R4 = (u0, u1, v0, v1, z, c) => pn.poly(alongA ? [[u0, v0, z], [u1, v0, z], [u1, v1, z], [u0, v1, z]] : [[v0, u0, z], [v1, u0, z], [v1, u1, z], [v0, u1, z]], c);
+    R4(-L / 2 + 6, L / 2 - 6, -Wd / 2, Wd / 2, 0.4, "#8E8CAA");
+    for (let u = -L / 2 + 20; u < L / 2 - 20; u += 30) R4(u, u + 14, -1.2, 1.2, 0.6, "#FBF4EA");
+    [-1, 1].forEach((sd) => { for (let u = -L / 2 + 12; u < L / 2 - 8; u += 22) { const p3 = alongA ? [u, sd * (Wd / 2 - 3), 0.7] : [sd * (Wd / 2 - 3), u, 0.7]; if (pn.E) pn.glow(p3[0], p3[1], 2, 3, "#FFE7A8", 0.6); else pn.box(p3[0], p3[1], 0.5, 2, 2, 1, "#F0C06A"); } });
+    const q = prog(o), u = -L / 2 + 34 + q * (L - 80), z = q >= 1 ? 26 : 0;
+    const at = (du, dv, dz) => (alongA ? [u + du, dv, z + dz] : [dv, u + du, z + dz]);
+    const bxA = (du, dv, dz, lu, lv, h, c) => { const [x, y, zz] = at(du, dv, dz); pn.box(x, y, zz, alongA ? lu : lv, alongA ? lv : lu, h, c); };
+    pn.poly([at(-4, -22, 5), at(6, -22, 5), at(10, 22, 5), at(0, 22, 5)].map((p3) => p3), "#E4E8F0"); // wings (under the body)
+    bxA(0, 0, 3, 46, 8, 7, "#FBFCFF");
+    bxA(-2, 0, 6, 40, 8.4, 1.6, "#E4826A");
+    pn.poly([at(-20, 0, 10), at(-12, 0, 10), at(-20, 0, 22)], "#E4826A");
+    bxA(-20, 0, 9, 6, 16, 1.2, "#E4E8F0");
+    if (q < 1) [[-10, -4], [-10, 4], [14, 0]].forEach(([du, dv]) => { const [x, y] = at(du, dv, 0); pn.cyl(x, y, 0, 1.3, 3, "#3E3A52"); });
+  };
+  // car: a showroom with the car being put together on a turntable out front
+  B.dealership = (pn, o) => {
+    const w = Math.min(o.w, 130), d = Math.min(o.d * 0.55, 80), bx = { x: 0, y: -o.d * 0.18, z: 0, w, d, h: 34 };
+    pn.box(bx.x, bx.y, 0, w, d, 34, "#E9F1F6");
+    const fr = FACE[o.face] || "L";
+    for (let k = 0; k < 4; k++) pn.windowQ(bx, fr, 0.06 + k * 0.23, 0.25 + k * 0.23, 0.12, 0.86);
+    pn.box(bx.x, bx.y, 34, w + 4, d + 4, 5, "#E4826A");
+    pn.sign({ ...bx, z: 34, h: 5 }, fr, 0.5, 0.5, "MOTORS", "#E4826A", "#FFF", 4.6, false);
+    const cx = 0, cy = o.d * 0.26, q = prog(o);
+    pn.cyl(cx, cy, 0, 24, 2, "#D9D4E4", { top: "#ECE8F4" });
+    const car = pen(pn.ctx, pn.P(cx, cy, 2)[0], pn.P(cx, cy, 2)[1], { emit: pn.E });
+    if (q < 0.34) { [[-10, -5], [10, -5], [-10, 5], [10, 5]].forEach(([x, y]) => car.cyl(x, y, 0, 2.6, 2.4, "#3E3A52")); car.box(0, 0, 2.4, 28, 11, 2, "#A9A3BC"); crate(pn, cx + 26, cy - 14, 0, 8); }
+    else drawVehicle(car, "sedan", q < 0.67 ? "#B8B4C8" : "#E4826A", 0.55, 0);
+    if (q >= 1 && !pn.E) { const [x, y] = pn.P(cx, cy, 22); const ctx = pn.ctx; ctx.fillStyle = "#F0C06A"; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 7, y - 4); ctx.lineTo(x - 7, y + 4); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 7, y - 4); ctx.lineTo(x + 7, y + 4); ctx.closePath(); ctx.fill(); }
+    if (q >= 1 && pn.E) pn.glow(cx, cy, 14, 16, "#FFF1C4", 1);
+  };
+  // house: the slab, then walls, a second floor and the roof go up as the deposit grows
+  B.dreamhouse = (pn, o) => {
+    const q = prog(o), w = Math.min(o.w * 0.6, 96), d = Math.min(o.d * 0.5, 70);
+    pn.box(0, 0, 0, w + 10, d + 10, 3, "#D9CDBE");
+    if (q >= 1) { B.house(pn, { ...o, w: w + 10, d: d + 10, wall: "#F7E1E6", roof: "#C98FA8", floors: 2, seed: 11 }); pn.sign({ x: 0, y: o.d * 0.36, z: 8, w: 30, d: 2, h: 10 }, "L", 0.5, 0.5, "HOME", "#9BC98A", "#FFF", 5, false); pn.box(-12, o.d * 0.36, 0, 1.5, 1.5, 12, "#8E86A8"); pn.box(12, o.d * 0.36, 0, 1.5, 1.5, 12, "#8E86A8"); return; }
+    const fl = q < 0.2 ? 0 : q < 0.5 ? 1 : 2, h = fl * 20;
+    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sy]) => pn.box(sx * w / 2, sy * d / 2, 3, 3, 3, 8, "#C9A07A"));
+    if (fl) { pn.box(0, 0, 3, w, d, h, "#F7E1E6"); facade(pn, { x: 0, y: 0, z: 3, w, d, h }, fl, o, { pitch: 20 }); }
+    if (q >= 0.8) pn.gable(0, 0, 3 + h, w, d, 22, "#C98FA8", "a", "#F7E1E6", 4);
+    const sc = "#D9A441", top = 3 + h + 10;
+    for (let k = 0; k <= 4; k++) { const u = -w / 2 + (k * w) / 4; pn.line([u, d / 2 + 5, 0], [u, d / 2 + 5, top], sc, 1); pn.line([w / 2 + 5, -d / 2 + (k * d) / 4, 0], [w / 2 + 5, -d / 2 + (k * d) / 4, top], sc, 1); }
+    for (let z = 10; z <= top; z += 12) { pn.line([-w / 2, d / 2 + 5, z], [w / 2 + 5, d / 2 + 5, z], sc, 1.2); pn.line([w / 2 + 5, -d / 2, z], [w / 2 + 5, d / 2 + 5, z], sc, 1.2); }
+    crate(pn, -w / 2 - 14, d / 2 + 16, 0, 9); crate(pn, -w / 2 - 2, d / 2 + 20, 0, 7, "#B98759");
+  };
   /* user-created sections pick a building style from their kind */
   B.section = (pn, o) => {
     const k = o.sKind;
@@ -10422,7 +10523,9 @@ select.inp {
           if (S.hover === lm.id) { ctx.strokeStyle = lm.color; ctx.lineWidth = 1.6; ctx.stroke(); }
           ctx.fillStyle = "rgba(90,78,122,0.16)"; ctx.beginPath(); ctx.moveTo(-4, 13); ctx.lineTo(4, 13); ctx.lineTo(0, 17); ctx.closePath(); ctx.fill();
           ctx.fillStyle = lm.color; ctx.beginPath(); ctx.arc(-wdt / 2 + 13, 0.5, 9, 0, TAU); ctx.fill();
-          ctx.fillStyle = "#FFF"; ctx.font = "700 11px Fredoka, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(String(lm.level), -wdt / 2 + 13, 1);
+          const lvs = String(lm.level); ctx.fillStyle = "#FFF"; ctx.font = lvs.length > 2 ? "700 7px Fredoka, sans-serif" : "700 11px Fredoka, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(lvs, -wdt / 2 + 13, 1);
+          // savings goals carry a loading bar under their name
+          if (lm.data && lm.data.bar != null) { const bw = wdt - 16, f = clamp(lm.data.bar, 0, 1); ctx.fillStyle = "rgba(70,61,99,0.18)"; roundRect(ctx, -bw / 2, 15, bw, 6, 3); ctx.fill(); if (f > 0) { ctx.fillStyle = f >= 1 ? "#7CB87A" : "#E9B949"; roundRect(ctx, -bw / 2, 15, Math.max(6, bw * f), 6, 3); ctx.fill(); } }
           ctx.fillStyle = "#4A4068"; ctx.font = "600 12.5px Fredoka, Nunito, sans-serif"; ctx.textAlign = "left"; ctx.fillText(lm.name, -wdt / 2 + 27, 1);
           if (lm.open > 0) { ctx.fillStyle = shade(lm.color, 0.78); roundRect(ctx, wdt / 2 - 27, -7.5, 20, 16, 8); ctx.fill(); ctx.fillStyle = shade(lm.color, -0.35); ctx.textAlign = "center"; ctx.font = "700 11px Fredoka, sans-serif"; ctx.fillText(String(lm.open), wdt / 2 - 17, 1); }
           if (lm.alert) { const bob = Math.sin(performance.now() / 240) * 1.5; ctx.fillStyle = "#D9534F"; ctx.strokeStyle = "#FFF8EC"; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.arc(wdt / 2 - 3, -17 + bob, 8.5, 0, TAU); ctx.fill(); ctx.stroke(); ctx.fillStyle = "#FFF"; ctx.font = "800 12px Fredoka, sans-serif"; ctx.textAlign = "center"; ctx.fillText("!", wdt / 2 - 3, -16.5 + bob); }
@@ -15178,6 +15281,116 @@ select.inp {
                 React.createElement("input", { type: "checkbox", checked: f.crew, onChange: (a) => setF({ ...f, crew: a.target.checked }) }),
                 React.createElement("span", null, React.createElement("b", null, "Hire the studio crew"), " \xB7 Scriptwriter, Image Gen, Voiceover, Editor, Thumbnail and Publisher, each with their own look.")))));
   }
+  /* ---------------- Bank: budget planner, spending, bills, savings goals ---------------- */
+  var SAVE_KINDS = [
+    { id: "holiday", label: "Holiday", icon: "✈", grows: "An airport: the plane loads up as you save" },
+    { id: "house", label: "House", icon: "⌂", grows: "Your dream house rises floor by floor" },
+    { id: "car", label: "Car", icon: "⛟", grows: "A dealership: your car gets built in the showroom" },
+    { id: "emergency", label: "Emergency fund", icon: "☂", grows: "A vault in the bank that fills up" },
+    { id: "general", label: "Something else", icon: "★", grows: "A vault in the bank that fills up" },
+  ];
+  var BUDGET_DEFAULT = { income: [{ id: "i1", name: "Salary", amount: 0 }], cats: [
+    { id: "home", name: "Rent / bond", planned: 0 }, { id: "food", name: "Groceries", planned: 0 }, { id: "transport", name: "Transport", planned: 0 },
+    { id: "bills", name: "Utilities & phone", planned: 0 }, { id: "subs", name: "Subscriptions", planned: 0 }, { id: "fun", name: "Eating out & fun", planned: 0 },
+    { id: "giving", name: "Giving", planned: 0 }, { id: "other", name: "Other", planned: 0 } ] };
+  var money = (v) => "R" + Math.round(Number(v) || 0).toLocaleString("en-ZA").replace(/,/g, " ");
+  var monthKey = (d = new Date()) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+  function BankDrawer({ building: bld, plan: pl, spend: sp, bills: bl, savings: sv, business: biz, tab: t0, focus: fg, onClose: close, act: A }) {
+    let [tab, setTab] = React.useState(t0 || "overview"),
+      plan = pl || BUDGET_DEFAULT,
+      mk = monthKey(),
+      mine = (sp || []).filter((x) => (x.d || "").slice(0, 7) === mk),
+      spentBy = {},
+      [q, setQ] = React.useState({ amount: "", cat: (plan.cats[0] || {}).id, note: "" }),
+      [nb, setNb] = React.useState({ name: "", amount: "", day: "1" }),
+      [ng, setNg] = React.useState({ name: "", kind: "holiday", target: "" }),
+      [dep, setDep] = React.useState({}),
+      [editPlan, setEditPlan] = React.useState(null);
+    mine.forEach((x) => (spentBy[x.cat] = (spentBy[x.cat] || 0) + (Number(x.amount) || 0)));
+    let income = plan.income.reduce((a, x) => a + (Number(x.amount) || 0), 0) + (biz || 0),
+      planned = plan.cats.reduce((a, x) => a + (Number(x.planned) || 0), 0),
+      spent = mine.reduce((a, x) => a + (Number(x.amount) || 0), 0),
+      day = new Date().getDate(), dim = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate(),
+      pace = planned ? (spent / planned) / (day / dim) : 0,
+      maxBar = Math.max(1, ...plan.cats.map((c) => Math.max(Number(c.planned) || 0, spentBy[c.id] || 0))),
+      el = React.createElement,
+      numInp = (v, f, ph) => el("input", { className: "inp", inputMode: "decimal", value: v, placeholder: ph || "0", onChange: (e) => f(e.target.value.replace(/[^0-9.]/g, "")) });
+    let overview = el("div", { className: "space-y-3 mt-3" },
+      el("div", { className: "grid grid-cols-3 gap-2" },
+        el("div", { className: "stat" }, el("div", { className: "stat-v" }, money(income)), el("div", { className: "stat-l" }, "Income")),
+        el("div", { className: "stat" }, el("div", { className: "stat-v" }, money(planned)), el("div", { className: "stat-l" }, "Planned")),
+        el("div", { className: "stat" }, el("div", { className: "stat-v" }, money(spent)), el("div", { className: "stat-l" }, "Spent so far"))),
+      biz > 0 && el("div", { className: "bank-note" }, "Includes ", el("b", null, money(biz)), " business income this month from won leads and the treasury."),
+      planned > 0 && el("div", { className: "bank-note" + (pace > 1.05 ? " warn" : " good") },
+        pace > 1.05 ? "⚠ Spending faster than planned: " + Math.round(pace * 100) + "% of the pace for day " + day + "." : "✔ On budget: you've used " + Math.round((spent / planned) * 100) + "% with " + (dim - day) + " days to go. Staying on budget earns XP.",
+        income > 0 && " Left to plan: " + money(income - planned) + "."),
+      el("div", { className: "chart-card" },
+        el("div", { className: "flex items-center justify-between mb-2" }, el("b", { className: "text-[14px]" }, "Where the money went \xB7 " + new Date().toLocaleString("en", { month: "long" })), el("button", { type: "button", className: "link-btn", onClick: () => setEditPlan(JSON.parse(JSON.stringify(plan))) }, "Edit plan")),
+        el("div", { className: "bars", role: "list" }, plan.cats.map((c) => {
+          let pv = Number(c.planned) || 0, sv2 = spentBy[c.id] || 0, over = pv > 0 && sv2 > pv;
+          return el("div", { key: c.id, className: "bar-row", role: "listitem", title: c.name + ": spent " + money(sv2) + (pv ? " of " + money(pv) + " planned" : " (no plan)") },
+            el("span", { className: "bar-name" }, c.name),
+            el("span", { className: "bar-track" },
+              el("span", { className: "bar-fill" + (over ? " over" : ""), style: { width: (sv2 / maxBar) * 100 + "%" } }),
+              pv > 0 && el("span", { className: "bar-plan", style: { left: (pv / maxBar) * 100 + "%" } })),
+            el("span", { className: "bar-val tnum" }, over ? "⚠ " + money(sv2) : money(sv2), pv ? el("small", null, " / " + money(pv)) : null));
+        })),
+        el("div", { className: "bar-legend" }, el("span", { className: "lg-fill" }), "spent", el("span", { className: "lg-plan" }), "planned")),
+      el("details", { className: "bank-table" }, el("summary", null, "Show as a table"),
+        el("table", null, el("thead", null, el("tr", null, el("th", null, "Category"), el("th", null, "Planned"), el("th", null, "Spent"), el("th", null, "Left"))),
+          el("tbody", null, plan.cats.map((c) => el("tr", { key: c.id }, el("td", null, c.name), el("td", null, money(c.planned)), el("td", null, money(spentBy[c.id] || 0)), el("td", null, money((Number(c.planned) || 0) - (spentBy[c.id] || 0)))))))));
+    let spending = el("div", { className: "space-y-3 mt-3" },
+      el("div", { className: "chart-card space-y-2" },
+        el("b", { className: "text-[14px]" }, "Log a spend"),
+        el("div", { className: "grid grid-cols-2 gap-2" }, numInp(q.amount, (v) => setQ({ ...q, amount: v }), "Amount (R)"), el("input", { className: "inp", value: q.note, placeholder: "What for? (optional)", onChange: (e) => setQ({ ...q, note: e.target.value }) })),
+        el("div", { className: "flex flex-wrap gap-1.5" }, plan.cats.map((c) => el("button", { key: c.id, type: "button", className: "chip-btn sm" + (q.cat === c.id ? " on" : ""), "aria-pressed": q.cat === c.id, onClick: () => setQ({ ...q, cat: c.id }) }, c.name))),
+        el(Q, { variant: "gold", disabled: !(Number(q.amount) > 0), onClick: () => { A.addSpend({ amount: Number(q.amount), cat: q.cat, note: q.note.trim() }); setQ({ ...q, amount: "", note: "" }); } }, "Add spend")),
+      el("div", { className: "list-card" }, mine.length ? [...mine].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).map((x) =>
+        el("div", { key: x.id, className: "row-li" }, el("span", { className: "tnum", style: { minWidth: 76 } }, money(x.amount)), el("span", { className: "flex-1 min-w-0" }, ((plan.cats.find((c) => c.id === x.cat) || {}).name || "Other") + (x.note ? " \xB7 " + x.note : "")), el("span", { className: "muted" }, x.d.slice(5)), el("button", { type: "button", className: "x-btn", "aria-label": "Delete", onClick: () => A.delSpend(x.id) }, "\xD7")))
+        : el("div", { className: "empty-li" }, "Nothing logged this month yet.")));
+    let bills = el("div", { className: "space-y-3 mt-3" },
+      el("div", { className: "list-card" }, (bl || []).length ? [...bl].sort((a, b) => a.day - b.day).map((b) => {
+        let paid = b.paid && b.paid[mk], late = !paid && day > b.day, due = !paid && day === b.day;
+        return el("div", { key: b.id, className: "row-li" },
+          el("button", { type: "button", className: "q-check" + (paid ? " on" : ""), "aria-label": paid ? "Mark unpaid" : "Mark paid", onClick: () => A.toggleBill(b, mk) }, paid ? "✓" : ""),
+          el("span", { className: "flex-1 min-w-0" }, el("b", null, b.name), el("span", { className: "muted" }, " \xB7 due on the " + b.day + ([, "st", "nd", "rd"][b.day % 10] && ![11, 12, 13].includes(b.day) ? [, "st", "nd", "rd"][b.day % 10] : "th"))),
+          el("span", { className: "tnum" + (late ? " late" : due ? " due" : "") }, (late ? "⚠ late \xB7 " : due ? "today \xB7 " : "") + money(b.amount)),
+          el("button", { type: "button", className: "x-btn", "aria-label": "Delete bill", onClick: () => A.delBill(b.id) }, "\xD7"));
+      }) : el("div", { className: "empty-li" }, "No bills yet. Unpaid bills show up in Today's quests on their due day.")),
+      el("div", { className: "chart-card space-y-2" }, el("b", { className: "text-[14px]" }, "Add a monthly bill"),
+        el("div", { className: "grid grid-cols-3 gap-2" }, el("input", { className: "inp col-span-3", value: nb.name, placeholder: "e.g. Internet", onChange: (e) => setNb({ ...nb, name: e.target.value }) }), numInp(nb.amount, (v) => setNb({ ...nb, amount: v }), "Amount"),
+          el("select", { className: "inp", value: nb.day, onChange: (e) => setNb({ ...nb, day: e.target.value }), "aria-label": "Due day" }, Array.from({ length: 31 }, (_, k) => el("option", { key: k, value: k + 1 }, "Day " + (k + 1)))),
+          el(Q, { variant: "gold", disabled: !nb.name.trim() || !(Number(nb.amount) > 0), onClick: () => { A.addBill({ name: nb.name.trim(), amount: Number(nb.amount), day: Number(nb.day) }); setNb({ name: "", amount: "", day: "1" }); } }, "Add"))));
+    let savings = el("div", { className: "space-y-3 mt-3" },
+      (sv || []).map((g) => {
+        let k = SAVE_KINDS.find((x) => x.id === g.kind) || SAVE_KINDS[4], pct = Math.min(1, (Number(g.saved) || 0) / (Number(g.target) || 1));
+        return el("div", { key: g.id, className: "chart-card save-card" + (fg === g.id ? " focus" : "") },
+          el("div", { className: "flex items-center gap-2" }, el("span", { className: "save-ico", "aria-hidden": "true" }, k.icon), el("b", { className: "flex-1 min-w-0" }, g.name), el("span", { className: "tnum muted" }, money(g.saved) + " / " + money(g.target))),
+          el("div", { className: "save-bar", role: "progressbar", "aria-valuenow": Math.round(pct * 100), "aria-valuemin": 0, "aria-valuemax": 100, "aria-label": g.name }, el("span", { style: { width: pct * 100 + "%" } })),
+          el("div", { className: "muted text-[12px]" }, pct >= 1 ? "🎉 Goal reached!" : Math.round(pct * 100) + "% \xB7 " + k.grows + "."),
+          el("div", { className: "flex gap-2 mt-1" }, numInp(dep[g.id] || "", (v) => setDep({ ...dep, [g.id]: v }), "Add to it (R)"),
+            el(Q, { variant: "gold", disabled: !(Number(dep[g.id]) > 0), onClick: () => { A.deposit(g, Number(dep[g.id])); setDep({ ...dep, [g.id]: "" }); } }, "Save"),
+            el(Q, { variant: "ghost", onClick: () => A.delGoal(g) }, "Remove")));
+      }),
+      el("div", { className: "chart-card space-y-2" }, el("b", { className: "text-[14px]" }, "New savings goal"),
+        el("div", { className: "flex flex-wrap gap-1.5" }, SAVE_KINDS.map((k) => el("button", { key: k.id, type: "button", className: "chip-btn sm" + (ng.kind === k.id ? " on" : ""), "aria-pressed": ng.kind === k.id, onClick: () => setNg({ ...ng, kind: k.id }) }, k.icon + " " + k.label))),
+        el("div", { className: "muted text-[12px]" }, (SAVE_KINDS.find((k) => k.id === ng.kind) || {}).grows + "."),
+        el("div", { className: "grid grid-cols-2 gap-2" }, el("input", { className: "inp", value: ng.name, placeholder: ng.kind === "holiday" ? "e.g. Bali 2027" : ng.kind === "car" ? "e.g. New bakkie" : ng.kind === "house" ? "e.g. First home deposit" : "Name", onChange: (e) => setNg({ ...ng, name: e.target.value }) }), numInp(ng.target, (v) => setNg({ ...ng, target: v }), "Target (R)")),
+        el(Q, { variant: "gold", disabled: !ng.name.trim() || !(Number(ng.target) > 0), onClick: () => { A.addGoal({ name: ng.name.trim(), kind: ng.kind, target: Number(ng.target) }); setNg({ name: "", kind: "holiday", target: "" }); } }, "Create goal")));
+    let planEditor = editPlan && el("div", { className: "space-y-3 mt-3" },
+      el("div", { className: "chart-card space-y-2" }, el("b", { className: "text-[14px]" }, "Monthly income"),
+        editPlan.income.map((x, i2) => el("div", { key: x.id, className: "grid grid-cols-2 gap-2" }, el("input", { className: "inp", value: x.name, onChange: (e) => { let n2 = { ...editPlan }; n2.income[i2].name = e.target.value; setEditPlan(n2); } }), numInp(String(x.amount || ""), (v) => { let n2 = { ...editPlan }; n2.income[i2].amount = Number(v) || 0; setEditPlan(n2); }))),
+        el("button", { type: "button", className: "link-btn", onClick: () => setEditPlan({ ...editPlan, income: [...editPlan.income, { id: "i" + Date.now(), name: "Other income", amount: 0 }] }) }, "+ Add income")),
+      el("div", { className: "chart-card space-y-2" }, el("b", { className: "text-[14px]" }, "Planned spending per month"),
+        editPlan.cats.map((x, i2) => el("div", { key: x.id, className: "grid grid-cols-2 gap-2" }, el("input", { className: "inp", value: x.name, onChange: (e) => { let n2 = { ...editPlan }; n2.cats[i2].name = e.target.value; setEditPlan(n2); } }), numInp(String(x.planned || ""), (v) => { let n2 = { ...editPlan }; n2.cats[i2].planned = Number(v) || 0; setEditPlan(n2); }))),
+        el("button", { type: "button", className: "link-btn", onClick: () => setEditPlan({ ...editPlan, cats: [...editPlan.cats, { id: "c" + Date.now(), name: "New category", planned: 0 }] }) }, "+ Add category")),
+      el("div", { className: "flex gap-2 justify-end" }, el(Q, { variant: "ghost", onClick: () => setEditPlan(null) }, "Cancel"), el(Q, { variant: "gold", onClick: () => { A.savePlan(editPlan); setEditPlan(null); } }, "Save plan")));
+    return el(zt, { title: "Bank", sub: "Budget planner \xB7 " + new Date().toLocaleString("en", { month: "long", year: "numeric" }), color: "#C9A227", icon: el("span", { style: { fontSize: 18, color: "#fff" } }, "R"), onClose: close },
+      bld && el("div", { className: "site-banner" }, el("b", null, "Under construction"), el("span", null, "Set your monthly plan or log your first spend to open the bank.")),
+      el("div", { className: "seg", role: "tablist" }, [["overview", "Budget"], ["spending", "Spending"], ["bills", "Bills"], ["savings", "Savings"]].map(([k, lb]) =>
+        el("button", { key: k, type: "button", role: "tab", "aria-selected": tab === k, className: "seg-b" + (tab === k ? " on" : ""), onClick: () => (setTab(k), setEditPlan(null)) }, lb))),
+      editPlan ? planEditor : tab === "overview" ? overview : tab === "spending" ? spending : tab === "bills" ? bills : savings);
+  }
   var {
     useState: He,
     useEffect: at,
@@ -15333,9 +15546,10 @@ select.inp {
     onHabits: l,
     onEdit: d,
     noHabits: nh,
+    extra: ex = [],
   }) {
     let p = s.filter((c) => c.status === "done").length + (n && !nh ? 1 : 0),
-      u = s.length + (nh ? 0 : 1);
+      u = s.length + (nh ? 0 : 1) + ex.length;
     return React.createElement(
       "section",
       {
@@ -15404,7 +15618,10 @@ select.inp {
               ),
             );
           }),
-          nh && !s.length && React.createElement("div", { className: "quest-empty" }, "Nothing due today. Tap an empty plot to build something new."),
+          ex.map((x2) => React.createElement("div", { key: x2.id, className: "quest" },
+            React.createElement("button", { type: "button", className: "q-check", "aria-label": "Mark " + x2.title + " done", onClick: x2.onToggle }),
+            React.createElement("div", { className: "q-text" }, React.createElement("span", { className: "q-name" }, x2.title), React.createElement("span", { className: "q-meta" }, React.createElement("span", { className: "gdot", style: { background: "#C9A227" } }), x2.meta)))),
+          nh && !s.length && !ex.length && React.createElement("div", { className: "quest-empty" }, "Nothing due today. Tap an empty plot to build something new."),
           !nh && React.createElement(
             "div",
             { className: "quest" + (n ? " done" : "") },
@@ -15443,6 +15660,10 @@ select.inp {
   function Ho() {
     let { db: e, live: t, sandbox: sandbox, setSandbox: setSandbox } = jo(),
       isl = St(e, "settings/island"),
+      budgetDoc = St(e, "budget/plan"),
+      spendC = Ht(e, "spend"),
+      billsC = Ht(e, "bills"),
+      savingsC = Ht(e, "savings"),
       s = Ht(e, "tasks"),
       n = Ht(e, "workers"),
       o = Ht(e, "leads"),
@@ -15498,6 +15719,7 @@ select.inp {
         (s || []).forEach((t2) => t2.status === "done" && (m[t2.venture] = (m[t2.venture] || 0) + 1));
         ((u && u.entries) || []).length && (m.fitness = (m.fitness || 0) + 1);
         (l || []).length && (m.goals = (m.goals || 0) + 1);
+        (budgetDoc || (spendC || []).length || (billsC || []).length || (savingsC || []).length) && (m.bank = (m.bank || 0) + 1);
         return m;
       })(),
       // pre-layout fresh islands (a 'built' map) get packed into a layout on the fly
@@ -15581,7 +15803,8 @@ select.inp {
       (a, g) => a + wt.filter((F) => g && g[F.id]).length,
       0,
     );
-    (se.fitness != null && (se.fitness += Z.length * 15 + _.length * 5 + ke * 3),
+    (se.bank != null && (se.bank += (spendC || []).length * 2 + (billsC || []).reduce((a2, b2) => a2 + Object.keys(b2.paid || {}).length * 5, 0) + (savingsC || []).reduce((a2, g2) => a2 + ((g2.log || []).length) * 5, 0) + (budgetDoc ? 20 : 0)),
+      se.fitness != null && (se.fitness += Z.length * 15 + _.length * 5 + ke * 3),
       se.goals != null && (se.goals += G.filter((a) => a.progress >= 100).length * 40));
     let Ee = C.filter((a) => a.stage === "won").length,
       be = Object.fromEntries(Object.entries(se).map(([a, g]) => [a, ws(g)])),
@@ -15708,6 +15931,11 @@ select.inp {
       Me.forEach((a) => {
         a.id === "port" && (a.name = "Tender Port", a.level = Ke.filter((g) => g.type === "tender").length);
       }),
+      (savingsC || []).forEach((g2) => {
+        let o2 = townL.plots["sv:" + g2.id], pct = Math.min(1, (Number(g2.saved) || 0) / (Number(g2.target) || 1));
+        o2 && Me.push({ id: "sv:" + g2.id, kind: "saving", name: g2.name, color: "#C9A227", x: o2.sx, y: o2.sy, tier: 1, level: Math.round(pct * 100) + "%", open: 0, alert: !1, crew: [], data: { progress: pct, bar: pct }, sig: "sv" + g2.id + pct + g2.name });
+      }),
+      0,
       0);
     let
       Ps = Object.fromEntries(Me.map((a) => [a.id, a])),
@@ -16036,6 +16264,38 @@ select.inp {
         Fe.pop && Fe.pop();
         Re(c.group === "scenery" ? c.label + " placed." : a.name + ": building site ready. Finish its first task to open it." + (a.crew ? " The studio crew is waiting on the square." : ""), "gold");
       },
+      // bank: every write goes through U so failures surface like everything else
+      bankAct = {
+        savePlan: (pl) => U("budget/plan", () => e.doc("budget/plan").set(pl)),
+        addSpend: (x2) => { let id = Ze("sp"); U("spend/" + id, () => e.collection("spend").doc(id).set({ id, ...x2, d: ue, createdAt: Date.now() })); Fe.tap(); },
+        delSpend: (id) => U("spend/" + id, () => e.collection("spend").doc(id).delete()),
+        addBill: (x2) => { let id = Ze("bl"); U("bills/" + id, () => e.collection("bills").doc(id).set({ id, ...x2, paid: {}, createdAt: Date.now() })); },
+        toggleBill: (b2, mk) => { let paid = { ...(b2.paid || {}) }; paid[mk] ? delete paid[mk] : (paid[mk] = Date.now()); U("bills/" + b2.id, () => e.collection("bills").doc(b2.id).set({ ...b2, paid })); paid[mk] && (Fe.pop && Fe.pop(), Re(b2.name + " paid.", "gold")); },
+        delBill: (id) => U("bills/" + id, () => e.collection("bills").doc(id).delete()),
+        addGoal: (g2) => {
+          let id = Ze("sv"), type = { holiday: "airport", house: "dreamhouse", car: "dealership" }[g2.kind];
+          U("savings/" + id, () => e.collection("savings").doc(id).set({ id, ...g2, saved: 0, log: [], createdAt: Date.now() }));
+          if (type) {
+            let all = fresh ? baseLayout.parcels : [...World.classicPlan().parcels.map((p2) => { let m2 = baseLayout.moves && baseLayout.moves[p2.id]; return m2 && m2.at ? { ...p2, ...m2 } : p2; }), ...(baseLayout.extra || [])],
+              p2 = World.placeParcel(all, type, { id: "sv:" + id });
+            p2 ? saveLayout(fresh ? { ...baseLayout, parcels: [...baseLayout.parcels, { id: p2.id, type, at: p2.at, rot: p2.rot }] } : { ...baseLayout, extra: [...(baseLayout.extra || []), { id: p2.id, type, at: p2.at, rot: p2.rot }] })
+              : Re("No room on the island for it right now. Try Edit layout.", "bad");
+            Re(g2.name + ": " + ({ airport: "an airport", dreamhouse: "a plot for your house", dealership: "a dealership" }[type]) + " is going up on the island.", "gold");
+          }
+        },
+        deposit: (g2, amt) => {
+          let saved = (Number(g2.saved) || 0) + amt, was = (Number(g2.saved) || 0) >= g2.target;
+          U("savings/" + g2.id, () => e.collection("savings").doc(g2.id).set({ ...g2, saved, log: [...(g2.log || []), { d: ue, amount: amt }] }));
+          Fe.pop && Fe.pop();
+          !was && saved >= g2.target ? (Fe.level && Fe.level(), Re(g2.name + ": goal reached!", "gold")) : Re(money(amt) + " saved towards " + g2.name + ".", "gold");
+        },
+        delGoal: (g2) => {
+          U("savings/" + g2.id, () => e.collection("savings").doc(g2.id).delete());
+          let pid = "sv:" + g2.id;
+          fresh ? baseLayout.parcels.some((p2) => p2.id === pid) && saveLayout({ ...baseLayout, parcels: baseLayout.parcels.filter((p2) => p2.id !== pid) })
+            : (baseLayout.extra || []).some((p2) => p2.id === pid) && saveLayout({ ...baseLayout, extra: baseLayout.extra.filter((p2) => p2.id !== pid) });
+        },
+      },
       // layout editor: move / rotate / remove parcels and save them into the island's layout
       editParcels = planL.parcels.filter((p) => !p.auto).map((p) => ({ id: p.id, type: p.type, at: p.at, rot: p.rot || 0, shape: p.shape, harbour: p.harbour })),
       editMeta = Object.fromEntries(planL.parcels.map((p) => {
@@ -16244,7 +16504,9 @@ select.inp {
                 ? "fitness"
                 : a.type === "goals"
                   ? "goals"
-                  : null;
+                  : a.type === "bank"
+                    ? a.focus ? "sv:" + a.focus : "bank"
+                    : null;
         if (!g || !fe.current) return;
         let F = Os(g),
           S = window.innerWidth >= 768;
@@ -16255,6 +16517,8 @@ select.inp {
         );
       },
       lo = ds((a) => {
+        if (a === "bank") return Ie({ type: "bank" });
+        if (typeof a === "string" && a.startsWith("sv:")) return Ie({ type: "bank", tab: "savings", focus: a.slice(3) });
         Ie(
           a === "port" || a === "hub" || a === "marina"
             ? { type: "port", via: a }
@@ -16619,6 +16883,7 @@ select.inp {
           onEdit: Wt.onEdit,
           onHabits: () => Ie({ type: "fitness", tab: "habits" }),
           noHabits: !hasVenture("fitness"),
+          extra: (billsC || []).filter((b2) => !(b2.paid && b2.paid[monthKey()]) && new Date().getDate() >= b2.day).map((b2) => ({ id: "bill" + b2.id, title: "Pay " + b2.name, meta: "Bank \xB7 " + money(b2.amount) + (new Date().getDate() > b2.day ? " \xB7 late" : " \xB7 due today"), onToggle: () => bankAct.toggleBill(b2, monthKey()) })),
         }),
       ),
       React.createElement(
@@ -16849,6 +17114,8 @@ select.inp {
           onNew: () => M({ type: "lead", init: v.via === "marina" ? { type: "order" } : v.via === "port" ? { type: "tender" } : {} }),
           ..._n,
         }),
+      (v == null ? void 0 : v.type) === "bank" &&
+        React.createElement(BankDrawer, { key: "bank" + (v.tab || "") + (v.focus || ""), building: buildingIds.has("bank"), plan: budgetDoc, spend: spendC, bills: billsC, savings: savingsC, business: B, tab: v.tab, focus: v.focus, onClose: () => $(null), act: bankAct }),
       (v == null ? void 0 : v.type) === "fitness" &&
         React.createElement(Sn, {
           key: v.tab || "fit",

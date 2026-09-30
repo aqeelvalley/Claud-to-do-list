@@ -8118,6 +8118,116 @@
                 React.createElement("input", { type: "checkbox", checked: f.crew, onChange: (a) => setF({ ...f, crew: a.target.checked }) }),
                 React.createElement("span", null, React.createElement("b", null, "Hire the studio crew"), " \xB7 Scriptwriter, Image Gen, Voiceover, Editor, Thumbnail and Publisher, each with their own look.")))));
   }
+  /* ---------------- Bank: budget planner, spending, bills, savings goals ---------------- */
+  var SAVE_KINDS = [
+    { id: "holiday", label: "Holiday", icon: "✈", grows: "An airport: the plane loads up as you save" },
+    { id: "house", label: "House", icon: "⌂", grows: "Your dream house rises floor by floor" },
+    { id: "car", label: "Car", icon: "⛟", grows: "A dealership: your car gets built in the showroom" },
+    { id: "emergency", label: "Emergency fund", icon: "☂", grows: "A vault in the bank that fills up" },
+    { id: "general", label: "Something else", icon: "★", grows: "A vault in the bank that fills up" },
+  ];
+  var BUDGET_DEFAULT = { income: [{ id: "i1", name: "Salary", amount: 0 }], cats: [
+    { id: "home", name: "Rent / bond", planned: 0 }, { id: "food", name: "Groceries", planned: 0 }, { id: "transport", name: "Transport", planned: 0 },
+    { id: "bills", name: "Utilities & phone", planned: 0 }, { id: "subs", name: "Subscriptions", planned: 0 }, { id: "fun", name: "Eating out & fun", planned: 0 },
+    { id: "giving", name: "Giving", planned: 0 }, { id: "other", name: "Other", planned: 0 } ] };
+  var money = (v) => "R" + Math.round(Number(v) || 0).toLocaleString("en-ZA").replace(/,/g, " ");
+  var monthKey = (d = new Date()) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+  function BankDrawer({ building: bld, plan: pl, spend: sp, bills: bl, savings: sv, business: biz, tab: t0, focus: fg, onClose: close, act: A }) {
+    let [tab, setTab] = React.useState(t0 || "overview"),
+      plan = pl || BUDGET_DEFAULT,
+      mk = monthKey(),
+      mine = (sp || []).filter((x) => (x.d || "").slice(0, 7) === mk),
+      spentBy = {},
+      [q, setQ] = React.useState({ amount: "", cat: (plan.cats[0] || {}).id, note: "" }),
+      [nb, setNb] = React.useState({ name: "", amount: "", day: "1" }),
+      [ng, setNg] = React.useState({ name: "", kind: "holiday", target: "" }),
+      [dep, setDep] = React.useState({}),
+      [editPlan, setEditPlan] = React.useState(null);
+    mine.forEach((x) => (spentBy[x.cat] = (spentBy[x.cat] || 0) + (Number(x.amount) || 0)));
+    let income = plan.income.reduce((a, x) => a + (Number(x.amount) || 0), 0) + (biz || 0),
+      planned = plan.cats.reduce((a, x) => a + (Number(x.planned) || 0), 0),
+      spent = mine.reduce((a, x) => a + (Number(x.amount) || 0), 0),
+      day = new Date().getDate(), dim = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate(),
+      pace = planned ? (spent / planned) / (day / dim) : 0,
+      maxBar = Math.max(1, ...plan.cats.map((c) => Math.max(Number(c.planned) || 0, spentBy[c.id] || 0))),
+      el = React.createElement,
+      numInp = (v, f, ph) => el("input", { className: "inp", inputMode: "decimal", value: v, placeholder: ph || "0", onChange: (e) => f(e.target.value.replace(/[^0-9.]/g, "")) });
+    let overview = el("div", { className: "space-y-3 mt-3" },
+      el("div", { className: "grid grid-cols-3 gap-2" },
+        el("div", { className: "stat" }, el("div", { className: "stat-v" }, money(income)), el("div", { className: "stat-l" }, "Income")),
+        el("div", { className: "stat" }, el("div", { className: "stat-v" }, money(planned)), el("div", { className: "stat-l" }, "Planned")),
+        el("div", { className: "stat" }, el("div", { className: "stat-v" }, money(spent)), el("div", { className: "stat-l" }, "Spent so far"))),
+      biz > 0 && el("div", { className: "bank-note" }, "Includes ", el("b", null, money(biz)), " business income this month from won leads and the treasury."),
+      planned > 0 && el("div", { className: "bank-note" + (pace > 1.05 ? " warn" : " good") },
+        pace > 1.05 ? "⚠ Spending faster than planned: " + Math.round(pace * 100) + "% of the pace for day " + day + "." : "✔ On budget: you've used " + Math.round((spent / planned) * 100) + "% with " + (dim - day) + " days to go. Staying on budget earns XP.",
+        income > 0 && " Left to plan: " + money(income - planned) + "."),
+      el("div", { className: "chart-card" },
+        el("div", { className: "flex items-center justify-between mb-2" }, el("b", { className: "text-[14px]" }, "Where the money went \xB7 " + new Date().toLocaleString("en", { month: "long" })), el("button", { type: "button", className: "link-btn", onClick: () => setEditPlan(JSON.parse(JSON.stringify(plan))) }, "Edit plan")),
+        el("div", { className: "bars", role: "list" }, plan.cats.map((c) => {
+          let pv = Number(c.planned) || 0, sv2 = spentBy[c.id] || 0, over = pv > 0 && sv2 > pv;
+          return el("div", { key: c.id, className: "bar-row", role: "listitem", title: c.name + ": spent " + money(sv2) + (pv ? " of " + money(pv) + " planned" : " (no plan)") },
+            el("span", { className: "bar-name" }, c.name),
+            el("span", { className: "bar-track" },
+              el("span", { className: "bar-fill" + (over ? " over" : ""), style: { width: (sv2 / maxBar) * 100 + "%" } }),
+              pv > 0 && el("span", { className: "bar-plan", style: { left: (pv / maxBar) * 100 + "%" } })),
+            el("span", { className: "bar-val tnum" }, over ? "⚠ " + money(sv2) : money(sv2), pv ? el("small", null, " / " + money(pv)) : null));
+        })),
+        el("div", { className: "bar-legend" }, el("span", { className: "lg-fill" }), "spent", el("span", { className: "lg-plan" }), "planned")),
+      el("details", { className: "bank-table" }, el("summary", null, "Show as a table"),
+        el("table", null, el("thead", null, el("tr", null, el("th", null, "Category"), el("th", null, "Planned"), el("th", null, "Spent"), el("th", null, "Left"))),
+          el("tbody", null, plan.cats.map((c) => el("tr", { key: c.id }, el("td", null, c.name), el("td", null, money(c.planned)), el("td", null, money(spentBy[c.id] || 0)), el("td", null, money((Number(c.planned) || 0) - (spentBy[c.id] || 0)))))))));
+    let spending = el("div", { className: "space-y-3 mt-3" },
+      el("div", { className: "chart-card space-y-2" },
+        el("b", { className: "text-[14px]" }, "Log a spend"),
+        el("div", { className: "grid grid-cols-2 gap-2" }, numInp(q.amount, (v) => setQ({ ...q, amount: v }), "Amount (R)"), el("input", { className: "inp", value: q.note, placeholder: "What for? (optional)", onChange: (e) => setQ({ ...q, note: e.target.value }) })),
+        el("div", { className: "flex flex-wrap gap-1.5" }, plan.cats.map((c) => el("button", { key: c.id, type: "button", className: "chip-btn sm" + (q.cat === c.id ? " on" : ""), "aria-pressed": q.cat === c.id, onClick: () => setQ({ ...q, cat: c.id }) }, c.name))),
+        el(Q, { variant: "gold", disabled: !(Number(q.amount) > 0), onClick: () => { A.addSpend({ amount: Number(q.amount), cat: q.cat, note: q.note.trim() }); setQ({ ...q, amount: "", note: "" }); } }, "Add spend")),
+      el("div", { className: "list-card" }, mine.length ? [...mine].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).map((x) =>
+        el("div", { key: x.id, className: "row-li" }, el("span", { className: "tnum", style: { minWidth: 76 } }, money(x.amount)), el("span", { className: "flex-1 min-w-0" }, ((plan.cats.find((c) => c.id === x.cat) || {}).name || "Other") + (x.note ? " \xB7 " + x.note : "")), el("span", { className: "muted" }, x.d.slice(5)), el("button", { type: "button", className: "x-btn", "aria-label": "Delete", onClick: () => A.delSpend(x.id) }, "\xD7")))
+        : el("div", { className: "empty-li" }, "Nothing logged this month yet.")));
+    let bills = el("div", { className: "space-y-3 mt-3" },
+      el("div", { className: "list-card" }, (bl || []).length ? [...bl].sort((a, b) => a.day - b.day).map((b) => {
+        let paid = b.paid && b.paid[mk], late = !paid && day > b.day, due = !paid && day === b.day;
+        return el("div", { key: b.id, className: "row-li" },
+          el("button", { type: "button", className: "q-check" + (paid ? " on" : ""), "aria-label": paid ? "Mark unpaid" : "Mark paid", onClick: () => A.toggleBill(b, mk) }, paid ? "✓" : ""),
+          el("span", { className: "flex-1 min-w-0" }, el("b", null, b.name), el("span", { className: "muted" }, " \xB7 due on the " + b.day + ([, "st", "nd", "rd"][b.day % 10] && ![11, 12, 13].includes(b.day) ? [, "st", "nd", "rd"][b.day % 10] : "th"))),
+          el("span", { className: "tnum" + (late ? " late" : due ? " due" : "") }, (late ? "⚠ late \xB7 " : due ? "today \xB7 " : "") + money(b.amount)),
+          el("button", { type: "button", className: "x-btn", "aria-label": "Delete bill", onClick: () => A.delBill(b.id) }, "\xD7"));
+      }) : el("div", { className: "empty-li" }, "No bills yet. Unpaid bills show up in Today's quests on their due day.")),
+      el("div", { className: "chart-card space-y-2" }, el("b", { className: "text-[14px]" }, "Add a monthly bill"),
+        el("div", { className: "grid grid-cols-3 gap-2" }, el("input", { className: "inp col-span-3", value: nb.name, placeholder: "e.g. Internet", onChange: (e) => setNb({ ...nb, name: e.target.value }) }), numInp(nb.amount, (v) => setNb({ ...nb, amount: v }), "Amount"),
+          el("select", { className: "inp", value: nb.day, onChange: (e) => setNb({ ...nb, day: e.target.value }), "aria-label": "Due day" }, Array.from({ length: 31 }, (_, k) => el("option", { key: k, value: k + 1 }, "Day " + (k + 1)))),
+          el(Q, { variant: "gold", disabled: !nb.name.trim() || !(Number(nb.amount) > 0), onClick: () => { A.addBill({ name: nb.name.trim(), amount: Number(nb.amount), day: Number(nb.day) }); setNb({ name: "", amount: "", day: "1" }); } }, "Add"))));
+    let savings = el("div", { className: "space-y-3 mt-3" },
+      (sv || []).map((g) => {
+        let k = SAVE_KINDS.find((x) => x.id === g.kind) || SAVE_KINDS[4], pct = Math.min(1, (Number(g.saved) || 0) / (Number(g.target) || 1));
+        return el("div", { key: g.id, className: "chart-card save-card" + (fg === g.id ? " focus" : "") },
+          el("div", { className: "flex items-center gap-2" }, el("span", { className: "save-ico", "aria-hidden": "true" }, k.icon), el("b", { className: "flex-1 min-w-0" }, g.name), el("span", { className: "tnum muted" }, money(g.saved) + " / " + money(g.target))),
+          el("div", { className: "save-bar", role: "progressbar", "aria-valuenow": Math.round(pct * 100), "aria-valuemin": 0, "aria-valuemax": 100, "aria-label": g.name }, el("span", { style: { width: pct * 100 + "%" } })),
+          el("div", { className: "muted text-[12px]" }, pct >= 1 ? "🎉 Goal reached!" : Math.round(pct * 100) + "% \xB7 " + k.grows + "."),
+          el("div", { className: "flex gap-2 mt-1" }, numInp(dep[g.id] || "", (v) => setDep({ ...dep, [g.id]: v }), "Add to it (R)"),
+            el(Q, { variant: "gold", disabled: !(Number(dep[g.id]) > 0), onClick: () => { A.deposit(g, Number(dep[g.id])); setDep({ ...dep, [g.id]: "" }); } }, "Save"),
+            el(Q, { variant: "ghost", onClick: () => A.delGoal(g) }, "Remove")));
+      }),
+      el("div", { className: "chart-card space-y-2" }, el("b", { className: "text-[14px]" }, "New savings goal"),
+        el("div", { className: "flex flex-wrap gap-1.5" }, SAVE_KINDS.map((k) => el("button", { key: k.id, type: "button", className: "chip-btn sm" + (ng.kind === k.id ? " on" : ""), "aria-pressed": ng.kind === k.id, onClick: () => setNg({ ...ng, kind: k.id }) }, k.icon + " " + k.label))),
+        el("div", { className: "muted text-[12px]" }, (SAVE_KINDS.find((k) => k.id === ng.kind) || {}).grows + "."),
+        el("div", { className: "grid grid-cols-2 gap-2" }, el("input", { className: "inp", value: ng.name, placeholder: ng.kind === "holiday" ? "e.g. Bali 2027" : ng.kind === "car" ? "e.g. New bakkie" : ng.kind === "house" ? "e.g. First home deposit" : "Name", onChange: (e) => setNg({ ...ng, name: e.target.value }) }), numInp(ng.target, (v) => setNg({ ...ng, target: v }), "Target (R)")),
+        el(Q, { variant: "gold", disabled: !ng.name.trim() || !(Number(ng.target) > 0), onClick: () => { A.addGoal({ name: ng.name.trim(), kind: ng.kind, target: Number(ng.target) }); setNg({ name: "", kind: "holiday", target: "" }); } }, "Create goal")));
+    let planEditor = editPlan && el("div", { className: "space-y-3 mt-3" },
+      el("div", { className: "chart-card space-y-2" }, el("b", { className: "text-[14px]" }, "Monthly income"),
+        editPlan.income.map((x, i2) => el("div", { key: x.id, className: "grid grid-cols-2 gap-2" }, el("input", { className: "inp", value: x.name, onChange: (e) => { let n2 = { ...editPlan }; n2.income[i2].name = e.target.value; setEditPlan(n2); } }), numInp(String(x.amount || ""), (v) => { let n2 = { ...editPlan }; n2.income[i2].amount = Number(v) || 0; setEditPlan(n2); }))),
+        el("button", { type: "button", className: "link-btn", onClick: () => setEditPlan({ ...editPlan, income: [...editPlan.income, { id: "i" + Date.now(), name: "Other income", amount: 0 }] }) }, "+ Add income")),
+      el("div", { className: "chart-card space-y-2" }, el("b", { className: "text-[14px]" }, "Planned spending per month"),
+        editPlan.cats.map((x, i2) => el("div", { key: x.id, className: "grid grid-cols-2 gap-2" }, el("input", { className: "inp", value: x.name, onChange: (e) => { let n2 = { ...editPlan }; n2.cats[i2].name = e.target.value; setEditPlan(n2); } }), numInp(String(x.planned || ""), (v) => { let n2 = { ...editPlan }; n2.cats[i2].planned = Number(v) || 0; setEditPlan(n2); }))),
+        el("button", { type: "button", className: "link-btn", onClick: () => setEditPlan({ ...editPlan, cats: [...editPlan.cats, { id: "c" + Date.now(), name: "New category", planned: 0 }] }) }, "+ Add category")),
+      el("div", { className: "flex gap-2 justify-end" }, el(Q, { variant: "ghost", onClick: () => setEditPlan(null) }, "Cancel"), el(Q, { variant: "gold", onClick: () => { A.savePlan(editPlan); setEditPlan(null); } }, "Save plan")));
+    return el(zt, { title: "Bank", sub: "Budget planner \xB7 " + new Date().toLocaleString("en", { month: "long", year: "numeric" }), color: "#C9A227", icon: el("span", { style: { fontSize: 18, color: "#fff" } }, "R"), onClose: close },
+      bld && el("div", { className: "site-banner" }, el("b", null, "Under construction"), el("span", null, "Set your monthly plan or log your first spend to open the bank.")),
+      el("div", { className: "seg", role: "tablist" }, [["overview", "Budget"], ["spending", "Spending"], ["bills", "Bills"], ["savings", "Savings"]].map(([k, lb]) =>
+        el("button", { key: k, type: "button", role: "tab", "aria-selected": tab === k, className: "seg-b" + (tab === k ? " on" : ""), onClick: () => (setTab(k), setEditPlan(null)) }, lb))),
+      editPlan ? planEditor : tab === "overview" ? overview : tab === "spending" ? spending : tab === "bills" ? bills : savings);
+  }
   var {
     useState: He,
     useEffect: at,
@@ -8273,9 +8383,10 @@
     onHabits: l,
     onEdit: d,
     noHabits: nh,
+    extra: ex = [],
   }) {
     let p = s.filter((c) => c.status === "done").length + (n && !nh ? 1 : 0),
-      u = s.length + (nh ? 0 : 1);
+      u = s.length + (nh ? 0 : 1) + ex.length;
     return React.createElement(
       "section",
       {
@@ -8344,7 +8455,10 @@
               ),
             );
           }),
-          nh && !s.length && React.createElement("div", { className: "quest-empty" }, "Nothing due today. Tap an empty plot to build something new."),
+          ex.map((x2) => React.createElement("div", { key: x2.id, className: "quest" },
+            React.createElement("button", { type: "button", className: "q-check", "aria-label": "Mark " + x2.title + " done", onClick: x2.onToggle }),
+            React.createElement("div", { className: "q-text" }, React.createElement("span", { className: "q-name" }, x2.title), React.createElement("span", { className: "q-meta" }, React.createElement("span", { className: "gdot", style: { background: "#C9A227" } }), x2.meta)))),
+          nh && !s.length && !ex.length && React.createElement("div", { className: "quest-empty" }, "Nothing due today. Tap an empty plot to build something new."),
           !nh && React.createElement(
             "div",
             { className: "quest" + (n ? " done" : "") },
@@ -8383,6 +8497,10 @@
   function Ho() {
     let { db: e, live: t, sandbox: sandbox, setSandbox: setSandbox } = jo(),
       isl = St(e, "settings/island"),
+      budgetDoc = St(e, "budget/plan"),
+      spendC = Ht(e, "spend"),
+      billsC = Ht(e, "bills"),
+      savingsC = Ht(e, "savings"),
       s = Ht(e, "tasks"),
       n = Ht(e, "workers"),
       o = Ht(e, "leads"),
@@ -8438,6 +8556,7 @@
         (s || []).forEach((t2) => t2.status === "done" && (m[t2.venture] = (m[t2.venture] || 0) + 1));
         ((u && u.entries) || []).length && (m.fitness = (m.fitness || 0) + 1);
         (l || []).length && (m.goals = (m.goals || 0) + 1);
+        (budgetDoc || (spendC || []).length || (billsC || []).length || (savingsC || []).length) && (m.bank = (m.bank || 0) + 1);
         return m;
       })(),
       // pre-layout fresh islands (a 'built' map) get packed into a layout on the fly
@@ -8521,7 +8640,8 @@
       (a, g) => a + wt.filter((F) => g && g[F.id]).length,
       0,
     );
-    (se.fitness != null && (se.fitness += Z.length * 15 + _.length * 5 + ke * 3),
+    (se.bank != null && (se.bank += (spendC || []).length * 2 + (billsC || []).reduce((a2, b2) => a2 + Object.keys(b2.paid || {}).length * 5, 0) + (savingsC || []).reduce((a2, g2) => a2 + ((g2.log || []).length) * 5, 0) + (budgetDoc ? 20 : 0)),
+      se.fitness != null && (se.fitness += Z.length * 15 + _.length * 5 + ke * 3),
       se.goals != null && (se.goals += G.filter((a) => a.progress >= 100).length * 40));
     let Ee = C.filter((a) => a.stage === "won").length,
       be = Object.fromEntries(Object.entries(se).map(([a, g]) => [a, ws(g)])),
@@ -8648,6 +8768,11 @@
       Me.forEach((a) => {
         a.id === "port" && (a.name = "Tender Port", a.level = Ke.filter((g) => g.type === "tender").length);
       }),
+      (savingsC || []).forEach((g2) => {
+        let o2 = townL.plots["sv:" + g2.id], pct = Math.min(1, (Number(g2.saved) || 0) / (Number(g2.target) || 1));
+        o2 && Me.push({ id: "sv:" + g2.id, kind: "saving", name: g2.name, color: "#C9A227", x: o2.sx, y: o2.sy, tier: 1, level: Math.round(pct * 100) + "%", open: 0, alert: !1, crew: [], data: { progress: pct, bar: pct }, sig: "sv" + g2.id + pct + g2.name });
+      }),
+      0,
       0);
     let
       Ps = Object.fromEntries(Me.map((a) => [a.id, a])),
@@ -8976,6 +9101,38 @@
         Fe.pop && Fe.pop();
         Re(c.group === "scenery" ? c.label + " placed." : a.name + ": building site ready. Finish its first task to open it." + (a.crew ? " The studio crew is waiting on the square." : ""), "gold");
       },
+      // bank: every write goes through U so failures surface like everything else
+      bankAct = {
+        savePlan: (pl) => U("budget/plan", () => e.doc("budget/plan").set(pl)),
+        addSpend: (x2) => { let id = Ze("sp"); U("spend/" + id, () => e.collection("spend").doc(id).set({ id, ...x2, d: ue, createdAt: Date.now() })); Fe.tap(); },
+        delSpend: (id) => U("spend/" + id, () => e.collection("spend").doc(id).delete()),
+        addBill: (x2) => { let id = Ze("bl"); U("bills/" + id, () => e.collection("bills").doc(id).set({ id, ...x2, paid: {}, createdAt: Date.now() })); },
+        toggleBill: (b2, mk) => { let paid = { ...(b2.paid || {}) }; paid[mk] ? delete paid[mk] : (paid[mk] = Date.now()); U("bills/" + b2.id, () => e.collection("bills").doc(b2.id).set({ ...b2, paid })); paid[mk] && (Fe.pop && Fe.pop(), Re(b2.name + " paid.", "gold")); },
+        delBill: (id) => U("bills/" + id, () => e.collection("bills").doc(id).delete()),
+        addGoal: (g2) => {
+          let id = Ze("sv"), type = { holiday: "airport", house: "dreamhouse", car: "dealership" }[g2.kind];
+          U("savings/" + id, () => e.collection("savings").doc(id).set({ id, ...g2, saved: 0, log: [], createdAt: Date.now() }));
+          if (type) {
+            let all = fresh ? baseLayout.parcels : [...World.classicPlan().parcels.map((p2) => { let m2 = baseLayout.moves && baseLayout.moves[p2.id]; return m2 && m2.at ? { ...p2, ...m2 } : p2; }), ...(baseLayout.extra || [])],
+              p2 = World.placeParcel(all, type, { id: "sv:" + id });
+            p2 ? saveLayout(fresh ? { ...baseLayout, parcels: [...baseLayout.parcels, { id: p2.id, type, at: p2.at, rot: p2.rot }] } : { ...baseLayout, extra: [...(baseLayout.extra || []), { id: p2.id, type, at: p2.at, rot: p2.rot }] })
+              : Re("No room on the island for it right now. Try Edit layout.", "bad");
+            Re(g2.name + ": " + ({ airport: "an airport", dreamhouse: "a plot for your house", dealership: "a dealership" }[type]) + " is going up on the island.", "gold");
+          }
+        },
+        deposit: (g2, amt) => {
+          let saved = (Number(g2.saved) || 0) + amt, was = (Number(g2.saved) || 0) >= g2.target;
+          U("savings/" + g2.id, () => e.collection("savings").doc(g2.id).set({ ...g2, saved, log: [...(g2.log || []), { d: ue, amount: amt }] }));
+          Fe.pop && Fe.pop();
+          !was && saved >= g2.target ? (Fe.level && Fe.level(), Re(g2.name + ": goal reached!", "gold")) : Re(money(amt) + " saved towards " + g2.name + ".", "gold");
+        },
+        delGoal: (g2) => {
+          U("savings/" + g2.id, () => e.collection("savings").doc(g2.id).delete());
+          let pid = "sv:" + g2.id;
+          fresh ? baseLayout.parcels.some((p2) => p2.id === pid) && saveLayout({ ...baseLayout, parcels: baseLayout.parcels.filter((p2) => p2.id !== pid) })
+            : (baseLayout.extra || []).some((p2) => p2.id === pid) && saveLayout({ ...baseLayout, extra: baseLayout.extra.filter((p2) => p2.id !== pid) });
+        },
+      },
       // layout editor: move / rotate / remove parcels and save them into the island's layout
       editParcels = planL.parcels.filter((p) => !p.auto).map((p) => ({ id: p.id, type: p.type, at: p.at, rot: p.rot || 0, shape: p.shape, harbour: p.harbour })),
       editMeta = Object.fromEntries(planL.parcels.map((p) => {
@@ -9184,7 +9341,9 @@
                 ? "fitness"
                 : a.type === "goals"
                   ? "goals"
-                  : null;
+                  : a.type === "bank"
+                    ? a.focus ? "sv:" + a.focus : "bank"
+                    : null;
         if (!g || !fe.current) return;
         let F = Os(g),
           S = window.innerWidth >= 768;
@@ -9195,6 +9354,8 @@
         );
       },
       lo = ds((a) => {
+        if (a === "bank") return Ie({ type: "bank" });
+        if (typeof a === "string" && a.startsWith("sv:")) return Ie({ type: "bank", tab: "savings", focus: a.slice(3) });
         Ie(
           a === "port" || a === "hub" || a === "marina"
             ? { type: "port", via: a }
@@ -9559,6 +9720,7 @@
           onEdit: Wt.onEdit,
           onHabits: () => Ie({ type: "fitness", tab: "habits" }),
           noHabits: !hasVenture("fitness"),
+          extra: (billsC || []).filter((b2) => !(b2.paid && b2.paid[monthKey()]) && new Date().getDate() >= b2.day).map((b2) => ({ id: "bill" + b2.id, title: "Pay " + b2.name, meta: "Bank \xB7 " + money(b2.amount) + (new Date().getDate() > b2.day ? " \xB7 late" : " \xB7 due today"), onToggle: () => bankAct.toggleBill(b2, monthKey()) })),
         }),
       ),
       React.createElement(
@@ -9789,6 +9951,8 @@
           onNew: () => M({ type: "lead", init: v.via === "marina" ? { type: "order" } : v.via === "port" ? { type: "tender" } : {} }),
           ..._n,
         }),
+      (v == null ? void 0 : v.type) === "bank" &&
+        React.createElement(BankDrawer, { key: "bank" + (v.tab || "") + (v.focus || ""), building: buildingIds.has("bank"), plan: budgetDoc, spend: spendC, bills: billsC, savings: savingsC, business: B, tab: v.tab, focus: v.focus, onClose: () => $(null), act: bankAct }),
       (v == null ? void 0 : v.type) === "fitness" &&
         React.createElement(Sn, {
           key: v.tab || "fit",

@@ -404,7 +404,9 @@
           if (S.hover === lm.id) { ctx.strokeStyle = lm.color; ctx.lineWidth = 1.6; ctx.stroke(); }
           ctx.fillStyle = "rgba(90,78,122,0.16)"; ctx.beginPath(); ctx.moveTo(-4, 13); ctx.lineTo(4, 13); ctx.lineTo(0, 17); ctx.closePath(); ctx.fill();
           ctx.fillStyle = lm.color; ctx.beginPath(); ctx.arc(-wdt / 2 + 13, 0.5, 9, 0, TAU); ctx.fill();
-          ctx.fillStyle = "#FFF"; ctx.font = "700 11px Fredoka, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(String(lm.level), -wdt / 2 + 13, 1);
+          const lvs = String(lm.level); ctx.fillStyle = "#FFF"; ctx.font = lvs.length > 2 ? "700 7px Fredoka, sans-serif" : "700 11px Fredoka, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(lvs, -wdt / 2 + 13, 1);
+          // savings goals carry a loading bar under their name
+          if (lm.data && lm.data.bar != null) { const bw = wdt - 16, f = clamp(lm.data.bar, 0, 1); ctx.fillStyle = "rgba(70,61,99,0.18)"; roundRect(ctx, -bw / 2, 15, bw, 6, 3); ctx.fill(); if (f > 0) { ctx.fillStyle = f >= 1 ? "#7CB87A" : "#E9B949"; roundRect(ctx, -bw / 2, 15, Math.max(6, bw * f), 6, 3); ctx.fill(); } }
           ctx.fillStyle = "#4A4068"; ctx.font = "600 12.5px Fredoka, Nunito, sans-serif"; ctx.textAlign = "left"; ctx.fillText(lm.name, -wdt / 2 + 27, 1);
           if (lm.open > 0) { ctx.fillStyle = shade(lm.color, 0.78); roundRect(ctx, wdt / 2 - 27, -7.5, 20, 16, 8); ctx.fill(); ctx.fillStyle = shade(lm.color, -0.35); ctx.textAlign = "center"; ctx.font = "700 11px Fredoka, sans-serif"; ctx.fillText(String(lm.open), wdt / 2 - 17, 1); }
           if (lm.alert) { const bob = Math.sin(performance.now() / 240) * 1.5; ctx.fillStyle = "#D9534F"; ctx.strokeStyle = "#FFF8EC"; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.arc(wdt / 2 - 3, -17 + bob, 8.5, 0, TAU); ctx.fill(); ctx.stroke(); ctx.fillStyle = "#FFF"; ctx.font = "800 12px Fredoka, sans-serif"; ctx.textAlign = "center"; ctx.fillText("!", wdt / 2 - 3, -16.5 + bob); }

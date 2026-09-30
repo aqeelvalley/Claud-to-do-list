@@ -647,6 +647,9 @@
         } else if (w === "field") {
           put({ kind: "ground-track", ...whole });
           k.track = whole;
+        } else if (w === "runway") {
+          put({ kind: "ground-garden", ...whole });
+          plots[lm + ":runway"] = building(k, whole, { drawer: "runway", id: lm + ":runway", landmark: lm, H: 40, pad: 16, noDoor: true });
         } else if (w === "courtyard") {
           put({ kind: "ground-square", ...whole });
           [[I.a0 + 24, I.b0 + 24], [I.a1 - 24, I.b0 + 24], [I.a0 + 24, I.b1 - 24], [I.a1 - 24, I.b1 - 24]].forEach(([a, b]) => put({ kind: "prop", p: "planterTree", a, b }));

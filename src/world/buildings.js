@@ -218,10 +218,70 @@
     else { pn.box(0, 0, bx.h, o.w + 2, o.d + 2, 3, "#E4826A"); pn.sign({ ...bx, h: bx.h }, FACE[o.face] || "L", 0.5, 0.6, "STAGE 1", "#E4826A", "#FFF", 5, false); }
     pn.box(0, 0, bx.h, o.w, o.d, 2, shade(o.color || "#7E6BC4", 0.2));
   };
-  // savings buildings (drawn in full later in this build)
-  B.terminal = (pn, o) => { pn.box(0, 0, 0, o.w, o.d * 0.7, 34, "#EEF2F8"); facade(pn, { x: 0, y: 0, z: 0, w: o.w, d: o.d * 0.7, h: 34 }, 1, o, { pitch: 16 }); pn.box(0, 0, 34, o.w + 6, o.d * 0.7 + 6, 4, "#9EC1E6"); pn.cyl(o.w * 0.35, -o.d * 0.2, 38, 5, 26, "#F6F2EC"); pn.box(o.w * 0.35, -o.d * 0.2, 64, 16, 16, 8, "#9EC1E6"); };
-  B.dealership = (pn, o) => { pn.box(0, 0, 0, o.w * 0.9, o.d * 0.7, 30, "#E9F1F6"); pn.box(0, 0, 30, o.w * 0.92, o.d * 0.72, 4, "#E4826A"); facade(pn, { x: 0, y: 0, z: 0, w: o.w * 0.9, d: o.d * 0.7, h: 30 }, 1, o, { pitch: 30, shopfront: true }); };
-  B.dreamhouse = (pn, o) => B.house(pn, { ...o, wall: "#F7E1E6", roof: "#C98FA8", floors: 2, seed: 11 });
+  /* ---- savings goals that grow with the money saved (o.data.progress, 0..1) ---- */
+  const prog = (o) => clamp((o.data && o.data.progress) || 0, 0, 1);
+  // holiday: a small terminal, control tower and a departures board that fills up
+  B.terminal = (pn, o) => {
+    const w = Math.min(o.w, 150), d = Math.min(o.d * 0.6, 80), bx = { x: 0, y: 0, z: 0, w, d, h: 32 };
+    pn.box(0, 0, 0, w, d, 32, "#EEF2F8"); facade(pn, bx, 1, o, { pitch: 14, shopfront: true });
+    pn.box(0, 0, 32, w + 6, d + 6, 4, "#9EC1E6");
+    pn.cyl(w * 0.38, -d * 0.3, 36, 6, 34, "#F6F2EC"); pn.box(w * 0.38, -d * 0.3, 70, 18, 18, 10, "#7FB0DA"); pn.box(w * 0.38, -d * 0.3, 80, 20, 20, 2, "#EEF2F8");
+    // departures board: the loading bar
+    const fr = FACE[o.face] || "L", q = prog(o);
+    if (!pn.E) {
+      const pts = pn.faceQ(bx, fr, 0.12, 0.88, 0.62, 0.9, 0.8).map((p3) => pn.P(p3[0], p3[1], p3[2]));
+      const ctx = pn.ctx; ctx.beginPath(); pts.forEach(([x, y], k) => (k ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); ctx.fillStyle = "#463D63"; ctx.fill();
+      const f = pn.faceQ(bx, fr, 0.15, 0.15 + 0.7 * q, 0.68, 0.84, 0.9).map((p3) => pn.P(p3[0], p3[1], p3[2]));
+      ctx.beginPath(); f.forEach(([x, y], k) => (k ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); ctx.fillStyle = q >= 1 ? "#9BC98A" : "#F0C06A"; ctx.fill();
+    }
+  };
+  // the runway wing: the plane rolls down the runway as the goal fills, and lifts off at 100%
+  B.runway = (pn, o) => {
+    const alongA = o.w >= o.d, L = alongA ? o.w : o.d, Wd = Math.min(alongA ? o.d : o.w, 70);
+    const R4 = (u0, u1, v0, v1, z, c) => pn.poly(alongA ? [[u0, v0, z], [u1, v0, z], [u1, v1, z], [u0, v1, z]] : [[v0, u0, z], [v1, u0, z], [v1, u1, z], [v0, u1, z]], c);
+    R4(-L / 2 + 6, L / 2 - 6, -Wd / 2, Wd / 2, 0.4, "#8E8CAA");
+    for (let u = -L / 2 + 20; u < L / 2 - 20; u += 30) R4(u, u + 14, -1.2, 1.2, 0.6, "#FBF4EA");
+    [-1, 1].forEach((sd) => { for (let u = -L / 2 + 12; u < L / 2 - 8; u += 22) { const p3 = alongA ? [u, sd * (Wd / 2 - 3), 0.7] : [sd * (Wd / 2 - 3), u, 0.7]; if (pn.E) pn.glow(p3[0], p3[1], 2, 3, "#FFE7A8", 0.6); else pn.box(p3[0], p3[1], 0.5, 2, 2, 1, "#F0C06A"); } });
+    const q = prog(o), u = -L / 2 + 34 + q * (L - 80), z = q >= 1 ? 26 : 0;
+    const at = (du, dv, dz) => (alongA ? [u + du, dv, z + dz] : [dv, u + du, z + dz]);
+    const bxA = (du, dv, dz, lu, lv, h, c) => { const [x, y, zz] = at(du, dv, dz); pn.box(x, y, zz, alongA ? lu : lv, alongA ? lv : lu, h, c); };
+    pn.poly([at(-4, -22, 5), at(6, -22, 5), at(10, 22, 5), at(0, 22, 5)].map((p3) => p3), "#E4E8F0"); // wings (under the body)
+    bxA(0, 0, 3, 46, 8, 7, "#FBFCFF");
+    bxA(-2, 0, 6, 40, 8.4, 1.6, "#E4826A");
+    pn.poly([at(-20, 0, 10), at(-12, 0, 10), at(-20, 0, 22)], "#E4826A");
+    bxA(-20, 0, 9, 6, 16, 1.2, "#E4E8F0");
+    if (q < 1) [[-10, -4], [-10, 4], [14, 0]].forEach(([du, dv]) => { const [x, y] = at(du, dv, 0); pn.cyl(x, y, 0, 1.3, 3, "#3E3A52"); });
+  };
+  // car: a showroom with the car being put together on a turntable out front
+  B.dealership = (pn, o) => {
+    const w = Math.min(o.w, 130), d = Math.min(o.d * 0.55, 80), bx = { x: 0, y: -o.d * 0.18, z: 0, w, d, h: 34 };
+    pn.box(bx.x, bx.y, 0, w, d, 34, "#E9F1F6");
+    const fr = FACE[o.face] || "L";
+    for (let k = 0; k < 4; k++) pn.windowQ(bx, fr, 0.06 + k * 0.23, 0.25 + k * 0.23, 0.12, 0.86);
+    pn.box(bx.x, bx.y, 34, w + 4, d + 4, 5, "#E4826A");
+    pn.sign({ ...bx, z: 34, h: 5 }, fr, 0.5, 0.5, "MOTORS", "#E4826A", "#FFF", 4.6, false);
+    const cx = 0, cy = o.d * 0.26, q = prog(o);
+    pn.cyl(cx, cy, 0, 24, 2, "#D9D4E4", { top: "#ECE8F4" });
+    const car = pen(pn.ctx, pn.P(cx, cy, 2)[0], pn.P(cx, cy, 2)[1], { emit: pn.E });
+    if (q < 0.34) { [[-10, -5], [10, -5], [-10, 5], [10, 5]].forEach(([x, y]) => car.cyl(x, y, 0, 2.6, 2.4, "#3E3A52")); car.box(0, 0, 2.4, 28, 11, 2, "#A9A3BC"); crate(pn, cx + 26, cy - 14, 0, 8); }
+    else drawVehicle(car, "sedan", q < 0.67 ? "#B8B4C8" : "#E4826A", 0.55, 0);
+    if (q >= 1 && !pn.E) { const [x, y] = pn.P(cx, cy, 22); const ctx = pn.ctx; ctx.fillStyle = "#F0C06A"; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 7, y - 4); ctx.lineTo(x - 7, y + 4); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 7, y - 4); ctx.lineTo(x + 7, y + 4); ctx.closePath(); ctx.fill(); }
+    if (q >= 1 && pn.E) pn.glow(cx, cy, 14, 16, "#FFF1C4", 1);
+  };
+  // house: the slab, then walls, a second floor and the roof go up as the deposit grows
+  B.dreamhouse = (pn, o) => {
+    const q = prog(o), w = Math.min(o.w * 0.6, 96), d = Math.min(o.d * 0.5, 70);
+    pn.box(0, 0, 0, w + 10, d + 10, 3, "#D9CDBE");
+    if (q >= 1) { B.house(pn, { ...o, w: w + 10, d: d + 10, wall: "#F7E1E6", roof: "#C98FA8", floors: 2, seed: 11 }); pn.sign({ x: 0, y: o.d * 0.36, z: 8, w: 30, d: 2, h: 10 }, "L", 0.5, 0.5, "HOME", "#9BC98A", "#FFF", 5, false); pn.box(-12, o.d * 0.36, 0, 1.5, 1.5, 12, "#8E86A8"); pn.box(12, o.d * 0.36, 0, 1.5, 1.5, 12, "#8E86A8"); return; }
+    const fl = q < 0.2 ? 0 : q < 0.5 ? 1 : 2, h = fl * 20;
+    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sy]) => pn.box(sx * w / 2, sy * d / 2, 3, 3, 3, 8, "#C9A07A"));
+    if (fl) { pn.box(0, 0, 3, w, d, h, "#F7E1E6"); facade(pn, { x: 0, y: 0, z: 3, w, d, h }, fl, o, { pitch: 20 }); }
+    if (q >= 0.8) pn.gable(0, 0, 3 + h, w, d, 22, "#C98FA8", "a", "#F7E1E6", 4);
+    const sc = "#D9A441", top = 3 + h + 10;
+    for (let k = 0; k <= 4; k++) { const u = -w / 2 + (k * w) / 4; pn.line([u, d / 2 + 5, 0], [u, d / 2 + 5, top], sc, 1); pn.line([w / 2 + 5, -d / 2 + (k * d) / 4, 0], [w / 2 + 5, -d / 2 + (k * d) / 4, top], sc, 1); }
+    for (let z = 10; z <= top; z += 12) { pn.line([-w / 2, d / 2 + 5, z], [w / 2 + 5, d / 2 + 5, z], sc, 1.2); pn.line([w / 2 + 5, -d / 2, z], [w / 2 + 5, d / 2 + 5, z], sc, 1.2); }
+    crate(pn, -w / 2 - 14, d / 2 + 16, 0, 9); crate(pn, -w / 2 - 2, d / 2 + 20, 0, 7, "#B98759");
+  };
   /* user-created sections pick a building style from their kind */
   B.section = (pn, o) => {
     const k = o.sKind;
