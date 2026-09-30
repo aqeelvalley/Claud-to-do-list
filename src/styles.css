@@ -2593,8 +2593,8 @@ select.inp {
 @keyframes agStep { from { transform: scaleY(0.82) skewX(-8deg); } to { transform: scaleY(1) skewX(8deg); } }
 
 /* ---- building interiors ---- */
-.interior { position: fixed; inset: 0; z-index: 26; animation: enterIn 0.45s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
-@keyframes enterIn { 0% { opacity: 0; transform: scale(1.12); } to { opacity: 1; transform: none; } }
+.interior { position: fixed; inset: 0; z-index: 26; animation: enterIn 0.55s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+@keyframes enterIn { 0% { opacity: 0; transform: scale(0.12); filter: blur(6px); } 55% { opacity: 1; filter: none; } to { opacity: 1; transform: none; } }
 .interior-bg { position: absolute; inset: 0; background: radial-gradient(90% 80% at 35% 45%, color-mix(in srgb, var(--tint) 22%, #2a3437) 0%, #1c2528 70%, #141b1d 100%); }
 .interior-bg::after { content: ""; position: absolute; inset: 0; background: radial-gradient(60% 50% at 35% 40%, rgba(255, 220, 160, 0.16), transparent 70%); }
 .interior-top { position: absolute; left: 16px; top: calc(env(safe-area-inset-top, 0px) + 16px); z-index: 2; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
@@ -2656,3 +2656,14 @@ select.inp {
 .crew-working { margin-left: auto; font: 700 10.5px Fredoka, sans-serif; color: #1d7064; background: #e3f3ef; padding: 1px 7px; border-radius: 999px; }
 .crew-card-foot { display: flex; align-items: center; gap: 8px; justify-content: space-between; margin-top: 10px; }
 @media (max-width: 767px) { .crew-card { left: 8px; right: 8px; width: auto; bottom: calc(env(safe-area-inset-bottom, 0px) + 84px); } }
+
+.note-t.scr { fill: #8FF0C0; font-family: ui-monospace, Menlo, monospace; font-weight: 600; }
+.note-w { font: 700 3.8px Fredoka, sans-serif; fill: #fff; }
+.board-t { font: 700 8px Fredoka, sans-serif; fill: #44545A; letter-spacing: 0.06em; }
+.tr-t { font: 700 8px Fredoka, sans-serif; fill: #6e4e0b; }
+.plq-t { font: 700 6px Fredoka, sans-serif; fill: #fbe9c8; }
+.blink-slow { animation: blink 2.6s steps(1) infinite; }
+.spin-slow { animation: spin 0.6s linear infinite; transform-box: view-box; }
+.flame-in { animation: flame 0.4s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: center bottom; }
+.beam-spin { animation: beamSpin 6s linear infinite; transform-box: view-box; }
+@keyframes beamSpin { 0% { transform: scaleX(1); opacity: 0.9; } 50% { transform: scaleX(-1); opacity: 0.5; } 100% { transform: scaleX(1); opacity: 0.9; } }

@@ -9389,9 +9389,14 @@
                 status: a.stage === "quoted" ? "doing" : "todo",
                 _lead: a,
               })),
-          F = [...new Set(["me", ...g.filter((a) => a.status !== "done").map((a) => a.assignee)])]
+          onSite = k.id ? Ce.filter((a) => a.base === k.id) : [],
+          F = [...new Set(["me", ...onSite.map((a) => a.id), ...g.filter((a) => a.status !== "done").map((a) => a.assignee)])]
             .map((a) => Qe[a])
-            .filter(Boolean);
+            .filter(Boolean),
+          org = (() => {
+            let P0 = Ps[k.id || "port"];
+            return P0 && fe.current ? fe.current.toScreen(P0.x, P0.y - 30) : null;
+          })();
         return React.createElement(Inside.Interior, {
           key: k.name,
           ...k,
@@ -9401,6 +9406,10 @@
           onTask: (a) => (a._lead ? _n.onEdit(a._lead) : Wt.onEdit(a)),
           onClose: () => $(null),
           onAdd: k.id ? () => Yt(k.id) : () => M({ type: "lead", init: {} }),
+          origin: org,
+          goals: G,
+          treasury: { sum: B, target: h.target },
+          workingIds: Object.fromEntries(onSite.map((a) => [a.id, a])),
         });
       })(),
       rt &&
