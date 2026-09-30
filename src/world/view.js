@@ -27,6 +27,7 @@
       else if (o.p === "stall") { pn.box(0, 0, 0, 22, 12, 10, "#B98759"); [[-10, -5], [10, -5], [-10, 5], [10, 5]].forEach(([x, y]) => pn.line([x, y, 10], [x, y, 22], "#6F5A45", 1)); pn.box(0, 0, 22, 26, 16, 2, o.c); pn.box(-4, 2, 10, 6, 5, 3, "#E0474C"); pn.box(4, 2, 10, 6, 5, 3, "#F2C14E"); pn.glow(0, 0, 20, 10, "#FFE3A0", 1); }
       else if (o.p === "umbrella") umbrellaTable(pn, o.c);
       else if (o.p === "rock") Bt2(pn, o.s || 1);
+      else if (o.p === "hay") { pn.cyl(0, 0, 0, 5, 6, "#E3C46B", { top: "#EFD68A" }); pn.cyl(9, 3, 0, 5, 6, "#D9B95C", { top: "#E8CE7E" }); }
     }
   }
 

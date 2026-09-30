@@ -122,7 +122,7 @@
           const lat = Math.abs(da * p.hb - db * p.ha);
           if (lat > 6.5) continue;
           // two cars sharing a junction: the lower id has right of way
-          if (c.mode === "turn" && q.c.mode === "turn" && q.c.turnNode === c.turnNode && q.c.id > c.id) continue;
+          if (c.mode === "turn" && q.c.mode === "turn" && q.c.turnNode === c.turnNode && q.c.fromE !== c.fromE && q.c.id > c.id) continue;
           if (c.mode === "turn" && q.c.claim === c.turnNode && q.c.mode === "lane") continue;
           const gap = fwd - (c.L + q.c.L) / 2;
           target = Math.min(target, Math.max(0, (gap - 5) * 1.6));
@@ -245,9 +245,11 @@
     }
 
     /* ---- animals ---- */
-    const park = T.blocks.find((k) => k.pond);
+    const park = T.blocks.flatMap((k) => (k.zones ? k.zones : [k])).find((k) => k.pond);
     if (park) for (let k = 0; k < 4; k++) S.animals.push({ kind: "duck", a: park.pond.a, b: park.pond.b, home: park.pond, tgt: null, wait: R() * 3, col: k === 3 ? "#8A6A3A" : "#FFFFFF", phase: 0 });
-    const sq = T.blocks.find((k) => k.pigeons);
+    const allZones = T.blocks.flatMap((k) => (k.zones ? k.zones : [k]));
+    allZones.filter((k) => k.pasture).forEach((k) => { for (let n = 0; n < 5; n++) S.animals.push({ kind: n % 3 === 2 ? "cow" : "sheep", a: k.pasture.a + (R() - 0.5) * 40, b: k.pasture.b + (R() - 0.5) * 30, home: k.pasture, wait: R() * 4, phase: 0 }); });
+    const sq = allZones.find((k) => k.pigeons);
     if (sq) for (let k = 0; k < 7; k++) S.animals.push({ kind: "pigeon", a: sq.pigeons.a + (R() - 0.5) * 60, b: sq.pigeons.b + (R() - 0.5) * 30, home: { a: sq.pigeons.a, b: sq.pigeons.b, ra: 40, rb: 22 }, wait: R() * 3, phase: 0 });
     T.blocks.filter((k) => k.kind === "block" && ["houses", "houses2", "beachHouses", "home", "park"].includes(k.type)).forEach((k, n) => {
       if (n % 2) return;
@@ -279,7 +281,8 @@
       leads.forEach((l) => (l.type === "tender" ? port : marina).push(l));
       S.boats = [
         ...marina.slice(0, T.docks.marina.length).map((l, k) => ({ lead: l, kind: "launch", ...T.docks.marina[k], color: l.color, flag: l.color, docked: true })),
-        ...port.slice(0, T.docks.port.length).map((l, k) => ({ lead: l, kind: "cargo", ...T.docks.port[k], yaw: 0, color: "#2F4E5A", flag: l.color, docked: true })),
+        ...port.slice(0, T.docks.port.length).map((l, k) => ({ lead: l, kind: "cargo", ...T.docks.port[k], color: "#2F4E5A", flag: l.color, docked: true })),
+        ...(T.docks.tugs || []).map((t) => ({ ...t, docked: true })),
         ...S.traffic,
       ];
     };
@@ -300,7 +303,7 @@
     }
 
     /* ---- crew agents ---- */
-    const squareNode = (() => { const sqb = T.blocks.find((k) => k.type === "square"); return sqb ? ringNodes.reduce((best, n) => (Math.hypot(n.a - (sqb.a0 + sqb.a1) / 2, n.b - (sqb.b0 + sqb.b1) / 2) < Math.hypot(best.a - (sqb.a0 + sqb.a1) / 2, best.b - (sqb.b0 + sqb.b1) / 2) ? n : best), ringNodes[0]) : ringNodes[0]; })();
+    const squareNode = (() => { const sqb = T.blocks.flatMap((k) => (k.zones ? k.zones : [k])).find((k) => k.type === "square"); return sqb ? ringNodes.reduce((best, n) => (Math.hypot(n.a - (sqb.a0 + sqb.a1) / 2, n.b - (sqb.b0 + sqb.b1) / 2) < Math.hypot(best.a - (sqb.a0 + sqb.a1) / 2, best.b - (sqb.b0 + sqb.b1) / 2) ? n : best), ringNodes[0]) : ringNodes[0]; })();
     const doorOf = (landmark) => { const o = T.objs.find((x) => x.landmark === landmark && x.doorNode); return o ? o.doorNode : null; };
     S.syncCrew = (workers) => {
       const seen = new Set();

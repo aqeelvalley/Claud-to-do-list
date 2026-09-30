@@ -52,7 +52,15 @@
       for (let k = 0; k < 14; k++) { const p = pts[(r() * n) | 0], d = 30 + r() * 40, [x, y] = P(p.a - p.na * d, p.b - p.nb * d, 0.25); ctx.fillStyle = "rgba(170,214,138,0.5)"; ctx.beginPath(); ctx.ellipse(x, y, 30 + r() * 30, 12 + r() * 10, 0, 0, TAU); ctx.fill(); }
     });
     // piers and breakwaters
-    T.piers.forEach((p) => pn.box((p.a0 + p.a1) / 2, (p.b0 + p.b1) / 2, -SEA_DROP, p.a1 - p.a0, p.b1 - p.b0, SEA_DROP, "#BFB6A6", { left: "#B4A995", right: "#9E937F", top: "#C9C0AF" }));
+    T.piers.forEach((p) => {
+      const jetty = p.type === "jetty";
+      pn.box((p.a0 + p.a1) / 2, (p.b0 + p.b1) / 2, -SEA_DROP, p.a1 - p.a0, p.b1 - p.b0, SEA_DROP, jetty ? "#BDBAB2" : "#BFB6A6", jetty ? { left: "#A9A59B", right: "#8E8A80", top: "#CBC7BD" } : { left: "#B4A995", right: "#9E937F", top: "#C9C0AF" });
+      if (jetty) {
+        [p.a0 + 3, p.a1 - 3].forEach((a) => { pn.line([a, p.b0 + 8, 0.2], [a, p.b1 - 3, 0.2], "#E9B949", 1.4); for (let b = p.b0 + 24; b < p.b1; b += 34) pn.cyl(a + (a < (p.a0 + p.a1) / 2 ? -1 : 1), b, 0, 1.8, 3.4, "#3B4A50"); });
+        for (let b = p.b0 + 14; b < p.b1; b += 14) pn.line([p.a0 + 6, b, 0.2], [p.a1 - 6, b, 0.2], "rgba(90,90,90,0.12)", 0.6);
+        [p.a0 - 1, p.a1 + 1].forEach((a) => { for (let b = p.b0 + 30; b < p.b1; b += 50) pn.box(a + (a < p.a0 ? -2 : 2), b, -8, 3, 12, 8, "#2B2F33"); });
+      }
+    });
     // coastal footpaths
     T.paths.forEach((pp) => {
       screenPath(pp.pts, 0.4, false);
@@ -96,6 +104,7 @@
         return;
       }
       if (n.bend) { const w = n.edges[0].w; pn.poly(arcBand(n, RC - w / 2, RC + w / 2, 0.5).poly, road, null); return; }
+      if (n.through) { const w = n.w; pn.poly([[n.a - w / 2, n.b - w / 2, 0.5], [n.a + w / 2, n.b - w / 2, 0.5], [n.a + w / 2, n.b + w / 2, 0.5], [n.a - w / 2, n.b + w / 2, 0.5]], road, null); return; }
       const wa = n.wa || n.w, wb = n.wb || n.w;
       pn.poly([[n.a - wa / 2 - CURB, n.b - wb / 2 - CURB, 0.5], [n.a + wa / 2 + CURB, n.b - wb / 2 - CURB, 0.5], [n.a + wa / 2 + CURB, n.b + wb / 2 + CURB, 0.5], [n.a - wa / 2 - CURB, n.b + wb / 2 + CURB, 0.5]], road, null);
     });
@@ -138,6 +147,12 @@
         if (path) pn.poly(path, "#E9DBC0", null);
       }
       if (o.kind === "ground-garden") pn.poly(rectPts(o, 0.2), "#A5D28C", null);
+      if (o.kind === "ground-field") {
+        pn.poly(rectPts(o, 0.2), o.c, shade(o.c, -0.2), 1);
+        if (o.dir === "a") for (let b = o.b0 + 6; b < o.b1; b += 7) pn.line([o.a0 + 3, b, 0.3], [o.a1 - 3, b, 0.3], shade(o.c, -0.14), 1.4);
+        else for (let a = o.a0 + 6; a < o.a1; a += 7) pn.line([a, o.b0 + 3, 0.3], [a, o.b1 - 3, 0.3], shade(o.c, -0.14), 1.4);
+        [[o.a0, o.b1, o.a1, o.b1], [o.a1, o.b0, o.a1, o.b1]].forEach(([a0, b0, a1, b1]) => { pn.line([a0, b0, 3], [a1, b1, 3], "#B98759", 0.9); const L = Math.hypot(a1 - a0, b1 - b0); for (let t = 0; t <= L; t += 12) { const u = t / L; pn.line([lerp(a0, a1, u), lerp(b0, b1, u), 0.3], [lerp(a0, a1, u), lerp(b0, b1, u), 4.5], "#8A6240", 1); } });
+      }
       if (o.kind === "ground-park") {
         pn.poly(rectPts(o, 0.2), "#8CC578", null);
         const ma = (o.a0 + o.a1) / 2, mb = (o.b0 + o.b1) / 2;

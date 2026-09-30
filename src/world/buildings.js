@@ -429,3 +429,44 @@
     pn.line([0, 0, 120], [0, 0, 128], "#44545A", 1.2);
     pn.glow(0, 0, 111, 26, "#FFF1B8", 3);
   };
+
+  /* downtown glass tower with a stone podium and a rooftop crown */
+  B.tower = (pn, o) => {
+    const r = rng(o.seed || 7), fl = o.floors || 10;
+    const w = Math.max(40, Math.min(o.w - 6, 64 + r() * 20)), d = Math.max(36, Math.min(o.d - 6, 56 + r() * 20));
+    const pod = { x: 0, y: 0, z: 0, w: w + 12, d: d + 12, h: 26 };
+    pn.box(0, 0, 0, pod.w, pod.d, pod.h, "#D8D2C6");
+    pn.windowQ(pod, "L", 0.1, 0.9, 0.12, 0.7, false, "#EDE7DB");
+    pn.windowQ(pod, "R", 0.1, 0.9, 0.12, 0.7, false, "#EDE7DB");
+    const f = FACE[o.face] || "L";
+    pn.door(pod, f, 0.5, 0.16, 0.6, "#44545A");
+    const H = fl * 16;
+    const bx = { x: 0, y: 0, z: 26, w, d, h: H };
+    const glass = o.glass || "#6D98C0";
+    pn.box(0, 0, 26, w, d, H, glass, { left: glass, right: shade(glass, -0.22), top: shade(glass, 0.3) });
+    ["L", "R"].forEach((fc) => {
+      const len = fc === "L" ? w : d, cols = Math.max(3, Math.round(len / 11));
+      for (let k = 0; k < fl; k++) for (let c = 0; c < cols; c++) pn.windowQ(bx, fc, c / cols + 0.06, (c + 1) / cols - 0.06, k / fl + 0.1, (k + 1) / fl - 0.12, false, shade(glass, 0.5));
+    });
+    // reflective diagonal sheen
+    pn.poly([[-w / 2, d / 2 + 1, 26 + H * 0.2], [-w / 2 + w * 0.35, d / 2 + 1, 26 + H * 0.9], [-w / 2 + w * 0.5, d / 2 + 1, 26 + H * 0.9], [-w / 2 + w * 0.15, d / 2 + 1, 26 + H * 0.2]], "rgba(255,255,255,0.12)", null);
+    const top = 26 + H;
+    const crown = r();
+    if (crown < 0.4) { pn.box(0, 0, top, w * 0.6, d * 0.6, 14, shade(glass, -0.1)); antenna(pn, 0, 0, top + 14, 30); }
+    else if (crown < 0.7) { pn.box(0, 0, top, w, d, 3, "#9AA7AE"); pn.cyl(0, 0, top + 3, Math.min(w, d) * 0.3, 1, "#3B4A50", { top: "#3B4A50" }); const [x, y] = pn.P(0, 0, top + 4.2); if (!pn.E) { pn.ctx.fillStyle = "#F2C14E"; pn.ctx.font = "700 9px Fredoka, sans-serif"; pn.ctx.textAlign = "center"; pn.ctx.fillText("H", x, y + 3); } pn.glow(w * 0.4, d * 0.4, top + 4, 5, "#FF5A4A", 1); }
+    else { parapet(pn, bx.z ? { ...bx, h: top } : bx, shade(glass, -0.2)); rooftopAC(pn, -w * 0.2, -d * 0.2, top); rooftopAC(pn, w * 0.15, 0, top); waterTank(pn, w * 0.2, -d * 0.25, top); }
+  };
+  /* red farm barn with a silo */
+  B.barn = (pn, o) => {
+    const w = Math.min(o.w - 40, 90), d = Math.min(o.d - 14, 56);
+    const bx = { x: -10, y: 0, z: 0, w, d, h: 30 };
+    pn.box(bx.x, 0, 0, w, d, 30, "#B8433F");
+    for (let k = 1; k < 14; k++) pn.line(pn.faceP(bx, "L", k / 14, 0), pn.faceP(bx, "L", k / 14, 1), "rgba(80,20,15,0.3)", 0.8);
+    pn.poly(pn.faceQ(bx, "L", 0.35, 0.65, 0, 0.8, 0.5), "#8E2F2C", "#FFF8EC", 1.4);
+    pn.line(pn.faceP(bx, "L", 0.35, 0, 1), pn.faceP(bx, "L", 0.65, 0.8, 1), "#FFF8EC", 1.4); pn.line(pn.faceP(bx, "L", 0.65, 0, 1), pn.faceP(bx, "L", 0.35, 0.8, 1), "#FFF8EC", 1.4);
+    pn.windowQ(bx, "R", 0.35, 0.65, 0.45, 0.8);
+    pn.gable(bx.x, 0, 30, w, d, 22, "#5F6B72", "a", "#B8433F", 4);
+    const sx = w / 2 + 6, sy = -d / 4;
+    const c = pn.cyl(sx, sy, 0, 12, 62, "#C9CED0", { bands: [[20, 22, "#9AA7AE"], [42, 44, "#9AA7AE"]], noTop: true });
+    if (!pn.E) { pn.ctx.beginPath(); pn.ctx.ellipse(c.cx, c.cyt, c.rx, c.ry * 3.2, 0, Math.PI, 0); pn.ctx.fillStyle = "#8C969B"; pn.ctx.fill(); } else { pn.ctx.beginPath(); pn.ctx.ellipse(c.cx, c.cyt, c.rx, c.ry * 3.2, 0, Math.PI, 0); pn.fillPath(); }
+  };

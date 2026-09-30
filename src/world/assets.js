@@ -276,6 +276,13 @@
       ctx.beginPath(); ctx.arc(2.6, -3.6, 1.5, 0, TAU); ctx.fill();
       ctx.fillStyle = "#F2A541"; ctx.beginPath(); ctx.moveTo(3.9, -3.7); ctx.lineTo(5.6, -3.2); ctx.lineTo(3.9, -2.9); ctx.fill();
       ctx.fillStyle = "#1a1a1a"; ctx.fillRect(2.9, -4.1, 0.5, 0.5);
+    } else if (kind === "sheep" || kind === "cow") {
+      const cow = kind === "cow", L = cow ? 7 : 5;
+      ctx.fillStyle = "rgba(0,0,0,0.18)"; ctx.beginPath(); ctx.ellipse(0, 0.3, L + 1, 1.6, 0, 0, TAU); ctx.fill();
+      ctx.strokeStyle = cow ? "#4A3B33" : "#3B3B3B"; ctx.lineWidth = 1.2;
+      [[-L * 0.6, 1], [L * 0.5, -1]].forEach(([lx, sd]) => { ctx.beginPath(); ctx.moveTo(lx, -3.4); ctx.lineTo(lx + sw * sd, 0); ctx.stroke(); ctx.beginPath(); ctx.moveTo(lx + 1.3, -3.4); ctx.lineTo(lx + 1.3 - sw * sd, 0); ctx.stroke(); });
+      if (cow) { ctx.fillStyle = "#FBF8F1"; ctx.beginPath(); ctx.ellipse(0, -6, L, 3.2, 0, 0, TAU); ctx.fill(); ctx.fillStyle = "#3B302A"; ctx.beginPath(); ctx.arc(-2, -7, 1.8, 0, TAU); ctx.fill(); ctx.beginPath(); ctx.arc(2.6, -5.4, 1.4, 0, TAU); ctx.fill(); ctx.fillStyle = "#FBF8F1"; ctx.beginPath(); ctx.ellipse(L + 1, -7, 2.4, 2, 0, 0, TAU); ctx.fill(); ctx.fillStyle = "#F2B6B0"; ctx.fillRect(L + 1.6, -6.6, 2, 1.4); }
+      else { ctx.fillStyle = "#FBF8F1"; [[-2.4, -5.2, 3.2], [1, -6, 3.4], [3.2, -4.8, 2.6]].forEach(([x, y, r]) => { ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); }); ctx.fillStyle = "#3B3B3B"; ctx.beginPath(); ctx.ellipse(5.6, -5.6, 1.9, 1.6, 0, 0, TAU); ctx.fill(); }
     } else if (kind === "pigeon") {
       const hop = moving ? Math.abs(Math.sin(phase)) * 1.2 : 0;
       ctx.fillStyle = "#8C94A0"; ctx.beginPath(); ctx.ellipse(0, -1.8 - hop, 2.2, 1.3, 0, 0, TAU); ctx.fill();
