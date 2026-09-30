@@ -8238,11 +8238,22 @@
       [K, de] = He(null),
       [we, ee] = He(null),
       [ce, $e] = He(() => On("valley-quests", window.innerWidth >= 900)),
+      [lightMode, setLightMode] = He(() => On("valley-light", "auto")),
+      [crewCard, setCrewCard] = He(null),
+      [, setCrewTick] = He(0),
       [z, ne] = He(!0),
       fe = Lt(null);
     (at(() => {
       Rn("valley-quests", ce);
     }, [ce]),
+      at(() => {
+        Rn("valley-light", lightMode);
+      }, [lightMode]),
+      at(() => {
+        if (!crewCard) return;
+        let a = setInterval(() => setCrewTick((g) => g + 1), 1e3);
+        return () => clearInterval(a);
+      }, [crewCard]),
       at(() => {
         let a = setTimeout(() => ne(!1), 9e3);
         return () => clearTimeout(a);
@@ -8269,26 +8280,9 @@
             .map((a) => ({ ...a })),
         [i],
       ),
-      cityL = _t(
-        () =>
-          City.layout(
-            pe.reduce((a, g) => Math.max(a, g.slot + 1), 0),
-            (l || []).filter((a) => a.progress >= 100).length,
-          ),
-        [
-          pe.map((a) => a.slot).join(","),
-          (l || []).filter((a) => a.progress >= 100).length,
-        ],
-      ),
       Ge = _t(
-        () => [
-          ...Qs.map((a) => ({ ...a, plot: cityL.plots[a.id] || a.plot })),
-          ...pe.map((a) => ({
-            ...a,
-            plot: cityL.plots["slot:" + a.slot] || Us(a.slot),
-          })),
-        ],
-        [pe, cityL],
+        () => [...Qs, ...pe.map((a) => ({ ...a, plot: Us(a.slot) }))],
+        [pe],
       ),
       te = _t(() => Object.fromEntries(Ge.map((a) => [a.id, a])), [Ge]),
       ue = Be(),
@@ -8323,6 +8317,10 @@
       be = Object.fromEntries(Object.entries(se).map(([a, g]) => [a, ws(g)])),
       Oe = H >= 0.66 ? 3 : H >= 0.33 ? 2 : 1,
       je = ws(Object.values(se).reduce((a, g) => a + g, 0) + Ee * 40, 60),
+      townL = _t(
+        () => World.buildTown({ sections: pe, islandLevel: je.level }),
+        [pe.map((a) => [a.id, a.slot, a.kind, a.color, a.name].join(":")).join("|"), je.level],
+      ),
       { streak: Ve, activeToday: Xe } = sn(r == null ? void 0 : r.days),
       Ye = nn(xe, ue),
       Ue = wt.every((a) => Ae[ue] && Ae[ue][a.id]),
@@ -8358,8 +8356,8 @@
         kind: a.kind,
         name: a.name,
         color: a.color,
-        x: a.plot.x,
-        y: a.plot.y,
+        x: (townL.plots[a.id] || { sx: 0 }).sx,
+        y: (townL.plots[a.id] || { sy: 0 }).sy,
         tier: Je,
         level: X.level,
         open: F,
@@ -8397,8 +8395,8 @@
       kind: "hub",
       name: Se.hub.name,
       color: Se.hub.color,
-      x: cityL.plots.hub.x,
-      y: cityL.plots.hub.y,
+      x: townL.plots.hub.sx,
+      y: townL.plots.hub.sy,
       tier: 1,
       level: q.length,
       open: 0,
@@ -8412,8 +8410,8 @@
         kind: "port",
         name: Se.port.name,
         color: Se.port.color,
-        x: cityL.plots.port.x,
-        y: cityL.plots.port.y,
+        x: townL.plots.port.sx,
+        y: townL.plots.port.sy,
         tier: 1,
         level: Ke.length,
         open: 0,
@@ -8421,8 +8419,26 @@
         crew: [],
         data: gt,
         sig: JSON.stringify(["port", gt, It]),
+      }),
+      Me.push({
+        id: "marina",
+        kind: "port",
+        name: "Marina",
+        color: "#2A9D8F",
+        x: townL.plots.marina.sx,
+        y: townL.plots.marina.sy,
+        tier: 1,
+        level: Ke.filter((a) => a.type !== "tender").length,
+        open: 0,
+        alert: !1,
+        crew: [],
+        data: null,
+        sig: "marina",
+      }),
+      Me.forEach((a) => {
+        a.id === "port" && (a.name = "Tender Port", a.level = Ke.filter((g) => g.type === "tender").length);
       }));
-    let ze = cityL.blobs,
+    let
       Ps = Object.fromEntries(Me.map((a) => [a.id, a])),
       Os = (a) => {
         var g;
@@ -8893,7 +8909,7 @@
       },
       lo = ds((a) => {
         Ie(
-          a === "port" || a === "hub"
+          a === "port" || a === "hub" || a === "marina"
             ? { type: "port" }
             : a === "fitness"
               ? { type: "fitness" }
@@ -8925,7 +8941,7 @@
         S = te[F] || pe.find((dt) => dt.id === F);
       (W.current.add(F),
         de({ id: F, k: 0 }),
-        fe.current && fe.current.flyTo(S.plot.x, S.plot.y),
+        fe.current && townL.plots[F] && fe.current.flyTo(townL.plots[F].sx, townL.plots[F].sy),
         setTimeout(() => Fe.build(), 250));
       let X = performance.now(),
         Je = (dt) => {
@@ -9016,40 +9032,54 @@
           ),
         ),
       );
+    const assignCrew = async (id, lmId) => {
+      let wk = Qe[id],
+        nm = wk ? wk.name : "Crew",
+        tg = lmId ? (Ps[lmId] || {}).name || lmId : null;
+      (Re(tg ? `${nm} is heading to ${tg}` : `${nm} is off duty, wandering the town`), Fe.pop());
+      if (!n || !n.length)
+        for (let S of ks) await U("workers/" + S.id, () => e.collection("workers").doc(S.id).set(S));
+      U("workers/" + id, () => e.collection("workers").doc(id).update({ base: lmId || "" }));
+    };
+    const LIGHTS = ["auto", "day", "golden", "night"],
+      LIGHT_NAMES = { auto: "Real time", day: "Day", golden: "Golden hour", night: "Night" };
     let rt = v && v.type === "section" ? te[v.id] : null,
       po = !!v;
     return React.createElement(
       "div",
       { className: "app" },
-      React.createElement(gn, {
+      React.createElement(World.WorldMap, {
         ref: fe,
-        blobs: ze,
-        city: cityL,
-        landmarks: Me,
+        town: townL,
+        landmarks: Object.fromEntries(Me.map((a) => [a.id, a])),
+        leads: Ke.map((a) => ({ id: a.id, type: a.type, color: (kt[a.type] || {}).color || "#1F7A8C" })),
+        workers: Ce,
+        lightMode: lightMode,
+        paused: !!v,
         onPlot: (a) => {
-          a.content.startsWith("free:")
+          a.free
             ? M({ type: "section" })
             : (Fe.tap(),
               Re(
-                (() => {
-                  let g = a.cs + 1 - G.filter((F) => F.progress >= 100).length;
-                  return `${a.content.slice(3)} on ${a.isle.name} is under construction. Complete ${g} more goal${g === 1 ? "" : "s"} to finish it.`;
-                })(),
+                `${a.name} is under construction. It opens when the island reaches level ${a.level} (now ${je.level}).`,
               ));
         },
         onAgent: (a) => {
           (Fe.tap(),
             Re(
               a.type === "car"
-                ? `${a.name} \xB7 cruising, no job assigned yet`
+                ? `${a.name} \xB7 on the road. No job yet.`
                 : a.type === "person"
-                  ? `${a.name} \xB7 out for a walk. Idle agent, ready for a job.`
-                  : `A ${a.kind} going about its day`,
+                  ? `${a.name} \xB7 out and about. A townsperson, not on your crew.`
+                  : a.type === "boat"
+                    ? "A boat passing the islands"
+                    : `A ${a.kind} going about its day`,
             ));
         },
+        onCrew: (a) => (Fe.tap(), setCrewCard(a)),
+        onAssign: assignCrew,
         onOpen: lo,
         onShip: () => Ie({ type: "port" }),
-        risingId: we,
         reserveRight: ce ? 330 : 0,
       }),
       React.createElement("div", {
@@ -9229,7 +9259,7 @@
         React.createElement(
           "div",
           { className: "hint" },
-          "Drag to explore \xB7 scroll or pinch to zoom \xB7 tap a building",
+          "Tap a building to go inside \xB7 drag crew onto a building",
         ),
       React.createElement(
         "div",
@@ -9260,6 +9290,18 @@
             onClick: () => fe.current.fit(),
           },
           React.createElement(Nn, { size: 18 }),
+        ),
+        React.createElement(
+          Pe,
+          {
+            label: "Lighting: " + LIGHT_NAMES[lightMode] + ". Tap to change.",
+            className: "map-btn light-btn",
+            onClick: () => {
+              let a = LIGHTS[(LIGHTS.indexOf(lightMode) + 1) % LIGHTS.length];
+              (setLightMode(a), Re("Lighting: " + LIGHT_NAMES[a]), Fe.tap());
+            },
+          },
+          React.createElement("span", { className: "light-ico", "data-mode": lightMode }),
         ),
         React.createElement(
           Pe,
@@ -9467,6 +9509,61 @@
           onCancel: () => M(null),
           onConfirm: E.onYes,
         }),
+      crewCard &&
+        Qe[crewCard] &&
+        (() => {
+          let wk = Qe[crewCard],
+            info = (fe.current && fe.current.crewInfo(crewCard)) || {},
+            jobs = xe.filter((a) => a.assignee === crewCard && a.status !== "done"),
+            where = info.base ? (Ps[info.base] || {}).name || info.base : null,
+            stat =
+              info.status === "working"
+                ? `Working at ${where}`
+                : info.status === "walking"
+                  ? `Walking to ${where}`
+                  : info.status === "carried"
+                    ? "Being carried"
+                    : "Idle, wandering the town";
+          return React.createElement(
+            "div",
+            { className: "crew-card hud-card", role: "dialog", "aria-label": wk.name },
+            React.createElement(
+              "div",
+              { className: "crew-card-head" },
+              React.createElement("span", { className: "crew-av", style: { background: wk.color } }, wk.name[0]),
+              React.createElement(
+                "div",
+                { className: "min-w-0 flex-1" },
+                React.createElement("div", { className: "crew-card-name" }, wk.name),
+                React.createElement("div", { className: "crew-card-role" }, wk.kind === "human" ? "You \xB7 crew lead" : "Agent \xB7 " + wk.name + " role"),
+              ),
+              React.createElement(Pe, { label: "Close", onClick: () => setCrewCard(null) }, React.createElement(mt, { size: 16 })),
+            ),
+            React.createElement("div", { className: "crew-card-status" }, React.createElement("span", { className: "crew-dot " + (info.status || "idle") }), stat),
+            React.createElement("div", { className: "lbl mt-2" }, "Job queue \xB7 ", jobs.length),
+            jobs.length
+              ? React.createElement(
+                  "div",
+                  { className: "crew-jobs" },
+                  jobs.slice(0, 5).map((a) =>
+                    React.createElement(
+                      "button",
+                      { key: a.id, type: "button", className: "crew-job", onClick: () => M({ type: "task", init: a }) },
+                      React.createElement("span", { className: "gdot", style: { background: (te[a.venture] || {}).color || "#999" } }),
+                      React.createElement("span", { className: "truncate" }, a.title),
+                      info.base === a.venture && React.createElement("span", { className: "crew-working" }, "working"),
+                    ),
+                  ),
+                )
+              : React.createElement("div", { className: "empty sm" }, "No jobs yet. Assign tasks to ", wk.name, " and they'll show here."),
+            React.createElement(
+              "div",
+              { className: "crew-card-foot" },
+              React.createElement("span", { className: "meta-txt" }, "Drag them onto a building to send them to work"),
+              info.base && React.createElement(Q, { className: "sm", onClick: () => (fe.current && fe.current.crewInfo && assignCrew(crewCard, null), fe.current && fe.current.sendCrew && fe.current.sendCrew(crewCard, null)) }, "Off duty"),
+            ),
+          );
+        })(),
       React.createElement("div", { id: "fx-layer", "aria-hidden": "true" }),
     );
   }
