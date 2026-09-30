@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFE3C4"/><stop offset="0.55" stop-color="#F6C9B8"/><stop offset="1" stop-color="#C9B6E4"/></linearGradient>
+    <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7CC2CB"/><stop offset="1" stop-color="#4A93A8"/></linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#sky)"/>
+  <circle cx="690" cy="330" r="128" fill="#F2A65A"/>
+  <rect y="600" width="1024" height="424" fill="url(#sea)"/>
+  <!-- island: flat isometric slab -->
+  <path d="M170 640 L512 470 L854 640 L512 810 Z" fill="#9BD08A"/>
+  <path d="M170 640 L512 810 L512 870 L170 700 Z" fill="#E8C79A"/>
+  <path d="M854 640 L512 810 L512 870 L854 700 Z" fill="#D4AE7E"/>
+  <!-- roads -->
+  <path d="M341 555 L683 725" stroke="#B7AEDB" stroke-width="34" stroke-linecap="round"/>
+  <!-- house -->
+  <path d="M430 610 L520 565 L610 610 L520 655 Z" fill="#FFF6EC"/>
+  <path d="M430 610 L430 530 L520 575 L520 655 Z" fill="#F5E6D6"/>
+  <path d="M610 610 L610 530 L520 575 L520 655 Z" fill="#E8D5C2"/>
+  <path d="M420 535 L475 455 L575 505 L520 585 Z" fill="#E4826A"/>
+  <path d="M620 535 L565 455 L475 455 L520 505 L575 505 L520 585 Z" fill="#C9674F"/>
+  <rect x="548" y="560" width="30" height="42" transform="skewY(-26.5) translate(0 280)" fill="#6F78B8"/>
+  <!-- palm -->
+  <path d="M300 640 C300 560 310 500 330 440" stroke="#9C6B45" stroke-width="18" fill="none" stroke-linecap="round"/>
+  <path d="M330 440 C280 410 230 420 205 450 C255 440 290 450 330 440 Z M330 440 C370 400 430 405 455 435 C405 430 370 440 330 440 Z M330 440 C300 395 305 350 325 330 C330 370 335 400 330 440 Z M330 440 C375 450 410 480 415 515 C385 485 360 465 330 440 Z" fill="#5CB88A"/>
+  <!-- tree -->
+  <circle cx="700" cy="610" r="48" fill="#6FBF86"/><rect x="692" y="640" width="16" height="36" fill="#9C6B45"/>
+  <!-- waves -->
+  <path d="M120 900 q40 -24 80 0 t80 0" stroke="#E6F7F5" stroke-width="16" fill="none" stroke-linecap="round" opacity="0.8"/>
+  <path d="M760 930 q40 -24 80 0 t80 0" stroke="#E6F7F5" stroke-width="16" fill="none" stroke-linecap="round" opacity="0.8"/>
+</svg>

@@ -8272,7 +8272,10 @@
       [st, setSt] = React.useState(""), [mOff, setMOff] = React.useState(0), [f, setF] = React.useState({ name: "", kcal: "", meal: "Breakfast" }), [tg, setTg] = React.useState(""),
       eaten = (today.kcal || []).reduce((a, x) => a + (Number(x.kcal) || 0), 0),
       steps = Number(today.steps) || 0,
-      numInp = (v, fn, ph) => el("input", { className: "inp", inputMode: "numeric", value: v, placeholder: ph, onChange: (e) => fn(e.target.value.replace(/[^0-9]/g, "")) });
+      numInp = (v, fn, ph) => el("input", { className: "inp", inputMode: "numeric", value: v, placeholder: ph, onChange: (e) => fn(e.target.value.replace(/[^0-9]/g, "")) }),
+      phoneH = !!(window.LLPlatform && window.LLPlatform.health), [sy, setSy] = React.useState("");
+    // already connected: pull the latest from Apple Health whenever the Health Centre opens
+    React.useEffect(() => { phoneH && rd && cfg.phone && A.syncPhone && A.syncPhone(!0); }, [rd]);
     if (!rd) return el(zt, { title: "Health Centre", sub: "Loading your private health space…", color: "#5CB88A", icon: el("span", { style: { color: "#fff", fontSize: 18 } }, "+"), onClose: close });
     // ---- today: steps ----
     let todayTab = el("div", { className: "space-y-3 mt-3" },
@@ -8286,10 +8289,14 @@
         el("div", { className: "flex gap-2 flex-wrap" }, numInp(st, setSt, "Steps so far today"), el(Q, { variant: "gold", disabled: !st, onClick: () => { A.setSteps(Number(st), cfg.stepTarget); setSt(""); } }, "Save"),
           [1000, 2500, 5000].map((n2) => el("button", { key: n2, type: "button", className: "chip-btn sm", onClick: () => A.setSteps(steps + n2, cfg.stepTarget) }, "+" + n2 / 1000 + "k"))),
         el("div", { className: "muted text-[12px]" }, "Reach your goal and the Gym's steps habit ticks itself.")),
-      el("div", { className: "chart-card phone-src" },
+      phoneH ? el("div", { className: "chart-card phone-src space-y-2" },
+        el("b", { className: "text-[14px]" }, "Apple Health"),
+        today.phone ? el("div", { className: "muted text-[12.5px]" }, "Today from Apple Health: " + (today.phone.steps || 0).toLocaleString("en-ZA").replace(/,/g, " ") + " steps \xB7 " + (today.phone.activeKcal || 0) + " active kcal" + ((today.phone.workouts || []).length ? " \xB7 " + today.phone.workouts.map((w2) => w2.kind + " " + w2.minutes + " min").join(", ") : "")) : null,
+        el("p", { className: "muted text-[12.5px]" }, "LifeList only reads steps, active calories, workouts and your cycle. It never writes anything to Apple Health, and it all stays on this iPhone." + (cfg.phone ? " If nothing comes through, allow LifeList in Settings \u203A Health \u203A Data Access." : "")),
+        el(Q, { variant: cfg.phone ? "ghost" : "gold", disabled: !!sy, onClick: async () => { setSy("1"); try { await A.syncPhone(); } finally { setSy(""); } } }, sy ? "Reading Apple Health\u2026" : cfg.phone ? "Sync now" : "Connect Apple Health"))
+      : el("div", { className: "chart-card phone-src" },
         el("b", { className: "text-[14px]" }, "Phone health data"),
-        el("p", { className: "muted text-[12.5px]" }, "In the App Store and Play Store version, steps, workouts and cycle data can come straight from Apple Health or Google Health Connect, with your permission. In the browser, type them in here."),
-        el(Q, { variant: "ghost", disabled: !0 }, "Connect Apple Health / Health Connect (in the app)")),
+        el("p", { className: "muted text-[12.5px]" }, "In the LifeList iPhone app, steps, workouts and cycle data can come straight from Apple Health (read-only, with your permission). In the browser, type them in here.")),
       el(Q, { variant: "ghost", onClick: gym }, "Open the Gym →"));
     // ---- calories ----
     let last7 = Array.from({ length: 7 }, (_, k) => addDays(td, k - 6)).map((k) => ({ k, v: ((byDay[k] || {}).kcal || []).reduce((a, x) => a + (Number(x.kcal) || 0), 0) })),
@@ -8470,6 +8477,11 @@
     useRef: Lt,
     useCallback: ds,
   } = React;
+  // in the iPhone app the little sounds come with a tap you can feel
+  window.LLPlatform && window.LLPlatform.native && ["tap", "pop", "coin", "level", "build"].forEach((k) => {
+    let f = Fe[k];
+    f && (Fe[k] = (...a) => { window.LLPlatform.haptic(k === "tap" ? "light" : k === "level" || k === "coin" ? "success" : "medium"); return f(...a); });
+  });
   function jo() {
     let [e, t] = He({ db: void 0, live: !1 }),
       [sb, setSb] = He(null); // sandbox: an empty, unsaved island to try the new-player start
@@ -9407,6 +9419,38 @@
           startPeriod: (d2, past) => { let id = Ze("pd"), pl = (hCfg && hCfg.periodLen) || 5, en = past ? [addDays(d2, pl - 1), ue].sort()[0] : null; U("cycle/" + id, () => e.collection(hBase + "/health/cycle").doc(id).set({ id, start: d2, end: en })); Re(past ? "Period logged." : "Period started. Tap 'Period ended' when it's over."); },
           endPeriod: (p2, d2) => U("cycle/" + p2.id, () => e.collection(hBase + "/health/cycle").doc(p2.id).set({ ...p2, end: d2 })),
           delPeriod: (id) => U("cycle/" + id, () => e.collection(hBase + "/health/cycle").doc(id).delete()),
+          // Apple Health (iPhone app only): read steps, active energy, workouts and cycle into the
+          // Health Centre. Read-only - nothing is ever written back to Apple Health.
+          syncPhone: async (quiet) => {
+            let H = window.LLPlatform && window.LLPlatform.health;
+            if (!H || !hBase) return;
+            try {
+              if (!(await H.available())) return quiet || Re("Apple Health isn't available on this device.", "bad");
+              await H.connect();
+              let dly = await H.daily(14), wos = await H.workouts(14), flow = await H.cycle(240),
+                keys = new Set([...Object.keys(dly.steps || {}), ...Object.keys(dly.activeKcal || {}), ...wos.map((w2) => w2.day)]), n3 = 0;
+              for (let k2 of keys) {
+                let cur = (hDays || []).find((x) => x.id === k2) || { id: k2, d: k2 },
+                  nx = { ...cur, phone: { steps: (dly.steps || {})[k2] || 0, activeKcal: (dly.activeKcal || {})[k2] || 0, workouts: wos.filter((w2) => w2.day === k2).map((w2) => ({ id: w2.id, kind: w2.kind, minutes: w2.minutes, kcal: w2.kcal })), at: Date.now() } };
+                // Health's step count wins unless you typed in more yourself
+                (dly.steps || {})[k2] != null && (nx.steps = Math.max(Number(cur.steps) || 0, dly.steps[k2]));
+                JSON.stringify(nx.phone.workouts) === JSON.stringify((cur.phone || {}).workouts) && nx.steps === cur.steps && (cur.phone || {}).activeKcal === nx.phone.activeKcal || (n3++, await e.collection(hBase + "/health/days").doc(k2).set(nx));
+              }
+              let target = (hCfg && hCfg.stepTarget) || 1e4, st2 = (dly.steps || {})[ue] || 0;
+              st2 >= target && !(Ae[ue] && Ae[ue].steps) && eo("steps", ue, !0);
+              // cycle: runs of flow days become periods, skipping any you've already logged
+              let fd = [...new Set(flow.map((x) => x.day))].sort(), runs = [];
+              fd.forEach((k2) => { let r2 = runs[runs.length - 1]; r2 && diffDays(k2, r2.end) <= 2 ? (r2.end = k2) : runs.push({ start: k2, end: k2 }); });
+              let added = 0;
+              for (let r2 of runs) {
+                if ((hCycle || []).some((x) => Math.abs(diffDays(x.start, r2.start)) <= 4)) continue;
+                let id = "ah-" + r2.start, open2 = diffDays(ue, r2.end) <= 1;
+                await e.collection(hBase + "/health/cycle").doc(id).set({ id, start: r2.start, end: open2 ? null : r2.end, src: "apple-health" }); added++;
+              }
+              await e.doc(hBase + "/healthcfg").set({ ...(hCfg || {}), phone: !0, phoneSyncAt: Date.now() });
+              quiet || Re("Apple Health synced: " + st2.toLocaleString("en-ZA").replace(/,/g, " ") + " steps today" + (wos.length ? ", " + wos.length + " workout" + (wos.length > 1 ? "s" : "") : "") + (added ? ", " + added + " period" + (added > 1 ? "s" : "") : "") + ".", "gold");
+            } catch (er) { quiet || Re("Couldn't read Apple Health" + (er && er.message ? ": " + er.message : "."), "bad"); }
+          },
         };
       })(),
       // bank: every write goes through U so failures surface like everything else
@@ -9751,6 +9795,27 @@
       (async () => { try { let u2 = window.claude && window.claude.use ? await window.claude.use("user") : null; let id = u2 ? await u2.id() : null; on && setUid(id || null); } catch { on && setUid(null); } })();
       return () => { on = !1; };
     }, [t, sandbox]);
+    // iPhone app: reminders on the phone for bills, tasks with a due date, repeating tasks and the focus timer
+    let remindKey = window.LLPlatform && window.LLPlatform.native ? JSON.stringify([(billsC || []).map((b2) => [b2.id, b2.name, b2.day, b2.amount, b2.paid]), (s || []).filter((t2) => t2.status !== "done" || t2.repeat).map((t2) => [t2.id, t2.title, t2.due, t2.repeat, t2.status]), focus && [focus.since, focus.dur, focus.used, focus.paused]]) : "";
+    at(() => {
+      if (!remindKey || sandbox) return;
+      let tm = setTimeout(() => {
+        let at9 = (d2, h = 9) => { let x = new Date(d2); x.setHours(h, 0, 0, 0); return x.getTime(); }, list = [], now = new Date();
+        (billsC || []).forEach((b2) => {
+          for (let m2 = 0; m2 < 2; m2++) {
+            let due = new Date(now.getFullYear(), now.getMonth() + m2, Math.min(b2.day || 1, 28)), mk = due.getFullYear() + "-" + String(due.getMonth() + 1).padStart(2, "0");
+            b2.paid && b2.paid[mk] || list.push({ key: "bill:" + b2.id + ":" + mk, at: at9(due), title: "Pay " + b2.name, body: money(b2.amount) + " is due today." });
+          }
+        });
+        (s || []).forEach((t2) => { t2.due && !t2.repeat && t2.status !== "done" && list.push({ key: "due:" + t2.id, at: at9(new Date(t2.due + "T12:00")), title: "Due today: " + t2.title, body: "Tap to open your island." }); });
+        let reps = (s || []).filter((t2) => t2.repeat);
+        if (reps.length) for (let d3 = 1; d3 <= 3; d3++) { let day = new Date(now.getTime() + d3 * 864e5), n4 = reps.filter((t2) => repeatsToday(t2, day)).length; n4 && list.push({ key: "rep:" + dayKey(day), at: at9(day, 8), title: n4 + " repeating task" + (n4 > 1 ? "s" : "") + " today", body: "Keep the streak going on your island." }); }
+        focus && !focus.paused && list.push({ key: "focus", at: focus.since + Math.max(0, focus.dur - (focus.used || 0)) * 1e3, title: "Focus session done", body: focus.task.title + ": nice work. Come back for your XP." });
+        list.sort((a2, b3) => a2.at - b3.at);
+        window.LLPlatform.notify.sync(list);
+      }, 1500);
+      return () => clearTimeout(tm);
+    }, [remindKey, sandbox]);
     // repeating tasks come back: a done repeating task from an earlier day reopens on its next day
     at(() => {
       if (!k || !t && !sandbox) return;
@@ -10297,7 +10362,7 @@
           onMove: (tk, due) => (U("tasks/" + tk.id, () => e.collection("tasks").doc(tk.id).set({ ...tk, due, updatedAt: Date.now() })), Fe.tap(), Re(tk.title + (due ? " moved to " + new Date(due + "T12:00").toLocaleDateString("en", { weekday: "long" }) : " moved to anytime") + ".")) }),
       (v == null ? void 0 : v.type) === "health" &&
         React.createElement(HealthDrawer, { key: "health" + (v.tab || ""), tab: v.tab, ready: !!hBase, building: buildingIds.has("health"), days: hDays || [], cycle: hCycle || [], cfg: hCfg, today: ue,
-          workoutsWeek: Z.filter((w2) => w2.d && Math.round((new Date(ue + "T12:00") - new Date(w2.d + "T12:00")) / 864e5) < 7).length,
+          workoutsWeek: Z.filter((w2) => w2.d && Math.round((new Date(ue + "T12:00") - new Date(w2.d + "T12:00")) / 864e5) < 7).length + (hDays || []).filter((x) => x.phone && diffDays(ue, x.id) < 7 && diffDays(ue, x.id) >= 0).reduce((a2, x) => a2 + (x.phone.workouts || []).length, 0),
           onClose: () => $(null), onGym: () => Ie({ type: "fitness" }), act: healthAct }),
       (v == null ? void 0 : v.type) === "bank" &&
         React.createElement(BankDrawer, { key: "bank" + (v.tab || "") + (v.focus || ""), building: buildingIds.has("bank"), plan: budgetDoc, spend: spendC, bills: billsC, savings: savingsC, business: B, tab: v.tab, focus: v.focus, onClose: () => $(null), act: bankAct }),

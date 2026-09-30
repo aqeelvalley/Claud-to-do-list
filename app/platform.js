@@ -153,13 +153,14 @@ window.LLPlatform = {
     sync: async (list) => {
       if (!native) return false;
       try {
+        const now = Date.now();
+        const items = list.filter((n) => n && n.at > now + 5000).slice(0, 60).map((n) => ({ id: hashId(n.key), title: n.title, body: n.body || "", schedule: { at: new Date(n.at), allowWhileIdle: true }, extra: { key: n.key } }));
         let perm = await LocalNotifications.checkPermissions();
-        if (perm.display === "prompt" || perm.display === "prompt-with-rationale") perm = await LocalNotifications.requestPermissions();
+        // only ask for permission once there's actually something to remind you about
+        if (items.length && (perm.display === "prompt" || perm.display === "prompt-with-rationale")) perm = await LocalNotifications.requestPermissions();
         if (perm.display !== "granted") return false;
         const pending = await LocalNotifications.getPending();
         if (pending.notifications.length) await LocalNotifications.cancel({ notifications: pending.notifications.map((n) => ({ id: n.id })) });
-        const now = Date.now();
-        const items = list.filter((n) => n && n.at > now + 5000).slice(0, 60).map((n) => ({ id: hashId(n.key), title: n.title, body: n.body || "", schedule: { at: new Date(n.at), allowWhileIdle: true }, extra: { key: n.key } }));
         if (items.length) await LocalNotifications.schedule({ notifications: items });
         return true;
       } catch (e) { console.warn("LifeList: notifications", e); return false; }
