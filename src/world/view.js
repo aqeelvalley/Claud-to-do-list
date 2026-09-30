@@ -37,6 +37,7 @@
     const { town: T, landmarks, onOpen, onShip, onPlot, onAgent, onCrew, onAssign, lightMode = "auto", leads = [], workers = [], reserveRight = 0 } = props;
     const wrap = React.useRef(null), cvs = React.useRef(null);
     const st = React.useRef(null);
+    const prevRef = React.useRef(null); // the island as it was, kept for the transition to the new one
     const cb = React.useRef({});
     cb.current = { onOpen, onShip, onPlot, onAgent, onCrew, onAssign, landmarks, lightMode, reserveRight, paused: props.paused, opening: props.opening, edit: props.edit, onEditMove: props.onEditMove, onEditSelect: props.onEditSelect, onEditInvalid: props.onEditInvalid };
 
@@ -89,6 +90,37 @@
       };
       S.fly = fly; S.fitView = fitView; S.clampCam = clampCam;
       fitView(false);
+
+      /* ---- the island never just appears: it rises from the sea, or grows where it changed ---- */
+      const prev = prevRef.current;
+      prevRef.current = null;
+      const keyOf = (d) => d.kind + "|" + (d.o.drawer || d.o.t || d.o.p || d.o.vk || "") + "|" + Math.round(d.o.a / 6) + "," + Math.round(d.o.b / 6);
+      if (prev) Object.assign(S.cam, prev.cam), clampCam();
+      if (!reduce) {
+        const centre = (list) => { const n = list.length || 1; return [list.reduce((a, d) => a + d.sx, 0) / n, list.reduce((a, d) => a + d.sy, 0) / n]; };
+        let intro = null;
+        if (!prev) intro = { mode: "rise" };
+        else {
+          const pk = new Set(prev.drawables.map(keyOf)), nk = new Set(drawables.map(keyOf));
+          const fresh = drawables.filter((d) => !pk.has(keyOf(d))), gone = prev.drawables.filter((d) => !nk.has(keyOf(d)));
+          const pi = prev.intro, running = pi && (pi.el || 0) < pi.end;
+          if (fresh.length > drawables.length * 0.5) { intro = { mode: "rise" }; fitView(false); }
+          else if (!fresh.length && !gone.length && running && pi.mode === "rise") intro = { mode: "rise", el: pi.el, last: pi.last }; // same island rebuilt mid-rise: carry on
+          else if (fresh.length + gone.length) {
+            const [cx, cy] = centre(fresh.length ? fresh : gone);
+            const far = Math.max(120, ...[...fresh, ...gone].map((d) => Math.hypot(d.sx - cx, (d.sy - cy) * 2)));
+            intro = { mode: "grow", cx, cy, R: far + 140, gone, prev };
+            fresh.forEach((d) => (d._ap = 0.1 + 1.25 * Math.min(1, Math.hypot(d.sx - cx, (d.sy - cy) * 2) / (far + 140))));
+          }
+        }
+        if (intro && intro.mode === "rise") {
+          const [cx, cy] = [(T.bbox.x0 + T.bbox.x1) / 2, (T.bbox.y0 + T.bbox.y1) / 2];
+          const far = Math.max(1, ...drawables.map((d) => Math.hypot(d.sx - cx, (d.sy - cy) * 2)));
+          Object.assign(intro, { cx, cy, R: far });
+          drawables.forEach((d) => (d._ap = 0.8 + 1.5 * (Math.hypot(d.sx - cx, (d.sy - cy) * 2) / far) + (d.kind === "tree" ? 0.15 : 0)));
+        }
+        if (intro) { intro.el = intro.el || 0; intro.end = intro.mode === "rise" ? 3.6 : 2.3; S.intro = intro; }
+      }
 
       /* ---- sprite helpers ---- */
       const hourNow = () => { const m = cb.current.lightMode; if (m === "day") return 12.5; if (m === "golden") return 17.9; if (m === "night") return 22; const d = new Date(); return d.getHours() + d.getMinutes() / 60; };
@@ -183,11 +215,44 @@
         });
         // ground chunks
         const r = Math.min(2, sc);
-        for (let cy = Math.floor(vy0 / CH) - 1; cy <= Math.floor(vy1 / CH); cy++)
-          for (let cx = Math.floor(vx0 / CH); cx <= Math.floor(vx1 / CH); cx++) {
-            if ((cx + 1) * CH < S.bounds.x0 || cx * CH > S.bounds.x1 || (cy + 1) * CH < S.bounds.y0 - 100 || cy * CH > S.bounds.y1 + 100) continue;
-            ctx.drawImage(chunk(cx, cy, r).cv, cx * CH, cy * CH, CH, CH);
+        const drawChunks = (chunkFn, B) => {
+          for (let cy = Math.floor(vy0 / CH) - 1; cy <= Math.floor(vy1 / CH); cy++)
+            for (let cx = Math.floor(vx0 / CH); cx <= Math.floor(vx1 / CH); cx++) {
+              if ((cx + 1) * CH < B.x0 || cx * CH > B.x1 || (cy + 1) * CH < B.y0 - 100 || cy * CH > B.y1 + 100) continue;
+              ctx.drawImage(chunkFn(cx, cy, r).cv, cx * CH, cy * CH, CH, CH);
+            }
+        };
+        // the intro keeps its own clock (at most 50 ms per frame) so slow first frames can't skip it
+        const IN = S.intro;
+        if (IN) { const nw = performance.now(); IN.el = (IN.el || 0) + (IN.last ? Math.min(0.05, (nw - IN.last) / 1000) : 0); IN.last = nw; }
+        const age = IN ? IN.el : 99;
+        if (IN && age > IN.end) { S.intro = null; drawables.forEach((d) => { d._ap = null; d._hid = false; }); }
+        if (IN && age <= IN.end && IN.mode === "rise") {
+          // ripples spread over the sea, then the land lifts out of it
+          const e = clamp(age / 1.2, 0, 1), eb = 1 + 2.2 * Math.pow(e - 1, 3) + 1.2 * Math.pow(e - 1, 2);
+          for (let k = 0; k < 4; k++) {
+            const q = ((age * 0.55 + k / 4) % 1), rr = IN.R * (0.55 + q * 0.9);
+            ctx.strokeStyle = `rgba(236,250,248,${0.45 * (1 - q) * clamp(2.6 - age, 0, 1)})`; ctx.lineWidth = 3 / cam.s;
+            ctx.beginPath(); ctx.ellipse(IN.cx, IN.cy + 20, rr, rr / 2, 0, 0, TAU); ctx.stroke();
           }
+          ctx.save(); ctx.globalAlpha = clamp(e * 1.4, 0, 1);
+          ctx.translate(IN.cx, IN.cy); ctx.scale(0.9 + 0.1 * eb, 0.9 + 0.1 * eb); ctx.translate(-IN.cx, -IN.cy + (1 - eb) * 90);
+          drawChunks(chunk, S.bounds); ctx.restore();
+        } else if (IN && age <= IN.end && IN.mode === "grow") {
+          // the old ground stays until the new one spreads out from where the change is
+          const rr = IN.R * (1 - Math.pow(1 - clamp(age / 1.35, 0, 1), 3));
+          drawChunks(IN.prev.chunk, IN.prev.bounds);
+          ctx.save(); ctx.beginPath(); ctx.ellipse(IN.cx, IN.cy, Math.max(1, rr), Math.max(1, rr / 2), 0, 0, TAU); ctx.clip();
+          drawChunks(chunk, S.bounds); ctx.restore();
+          if (age < 1.6) { ctx.strokeStyle = `rgba(255,248,236,${0.8 * (1 - age / 1.6)})`; ctx.lineWidth = 4 / cam.s; ctx.setLineDash([10 / cam.s, 8 / cam.s]); ctx.beginPath(); ctx.ellipse(IN.cx, IN.cy, Math.max(1, rr), Math.max(1, rr / 2), 0, 0, TAU); ctx.stroke(); ctx.setLineDash([]); }
+          // what was removed sinks back into the ground
+          IN.gone.forEach((d) => {
+            const p = clamp(age / 0.7, 0, 1); if (p >= 1) return;
+            const s2 = IN.prev.spriteFor(d, sc, ""); if (!s2) return;
+            ctx.save(); ctx.beginPath(); ctx.rect(d.sx - s2.ox - 4, d.sy - s2.oy - 4, s2.w + 8, s2.oy + 6); ctx.clip();
+            ctx.globalAlpha = 1 - p; ctx.drawImage(s2.cv, d.sx - s2.ox, d.sy - s2.oy + p * s2.oy, s2.w, s2.h); ctx.restore();
+          });
+        } else drawChunks(chunk, S.bounds);
         // collect dynamic drawables
         const dyn = [];
         sim.cars.forEach((c) => dyn.push({ kind: "car", c, depth: c.a + c.b, sx: c.a - c.b, sy: (c.a + c.b) / 2 }));
@@ -209,10 +274,29 @@
         // colour pass
         list.forEach((d) => {
           if (d.bnd) {
+            ctx.globalAlpha = 1;
             const s = spriteFor(d, sc, lightState(d));
             d._s = s;
-            const op = cb.current.opening, age = op && d.o.landmark === op.id ? (performance.now() - op.t) / 1000 : 99;
-            if (age < 3.4) {
+            const op = cb.current.opening, oage = op && d.o.landmark === op.id ? (performance.now() - op.t) / 1000 : 99;
+            const loc = IN && d._ap != null ? age - d._ap : 99;
+            d._hid = loc < 0;
+            if (loc < 0) return;
+            if (loc < 0.55) {
+              // growing in: buildings rise from the ground up with a puff of dust; trees and props pop
+              const p = clamp(loc / 0.55, 0, 1), e = 1 - Math.pow(1 - p, 3);
+              if (d.kind === "building") {
+                const y0 = d.sy - s.oy;
+                ctx.save(); ctx.beginPath(); ctx.rect(d.sx - s.ox - 4, y0 + s.h * (1 - e) - 2, s.w + 8, s.h * e + 4); ctx.clip();
+                ctx.drawImage(s.cv, d.sx - s.ox, d.sy - s.oy, s.w, s.h); ctx.restore();
+                for (let q = 0; q < 6; q++) { const th = (q / 6) * TAU, rr = 8 + p * 22; ctx.fillStyle = `rgba(240,232,220,${0.45 * (1 - p)})`; ctx.beginPath(); ctx.ellipse(d.sx + Math.cos(th) * rr, d.sy + Math.sin(th) * rr * 0.5, 7, 4, 0, 0, TAU); ctx.fill(); }
+              } else {
+                const k = p < 0.7 ? e * 1.12 : 1 + 0.12 * (1 - (p - 0.7) / 0.3);
+                ctx.save(); ctx.translate(d.sx, d.sy); ctx.scale(k, k); ctx.drawImage(s.cv, -s.ox, -s.oy, s.w, s.h); ctx.restore();
+              }
+              return;
+            }
+            if (oage < 3.4) {
+              const age = oage;
               // just opened: the building rises out of the ground, dust at the base, confetti on top
               const p = clamp(age / 2.4, 0, 1), e = 1 - Math.pow(1 - p, 3), y0 = d.sy - s.oy;
               ctx.save(); ctx.beginPath(); ctx.rect(d.sx - s.ox - 4, y0 + s.h * (1 - e) - 2, s.w + 8, s.h * e + 4); ctx.clip();
@@ -223,6 +307,8 @@
             if (S.hover && d.o.landmark && S.hover === d.o.landmark) { ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 0.14; ctx.drawImage(s.cv, d.sx - s.ox, d.sy - s.oy, s.w, s.h); ctx.restore(); }
             return;
           }
+          if (IN && IN.mode === "rise" && age < 2.9 && d.kind !== "bnd") { if (age < 2.3) return; ctx.globalAlpha = (age - 2.3) / 0.6; }
+          else ctx.globalAlpha = 1;
           if (d.kind === "car") { const c = d.c, s = carSprite(c.kind, c.color, c.yaw, Math.floor(c.wheel) % 3, sc, false); d._s = s; ctx.drawImage(s.cv, d.sx - s.ox, d.sy - s.oy, s.w, s.h); return; }
           if (d.kind === "boat") { const b = d.b, s = boatSprite(b, sc, false); d._s = s; const bob = Math.sin(time * 1.6 + d.sx * 0.01) * 1.2; ctx.drawImage(s.cv, d.sx - s.ox, d.sy - s.oy + bob, s.w, s.h); return; }
           if (d.kind === "ped") {
@@ -252,8 +338,9 @@
           if (d.kind === "animal" && d.m.kind === "builder") { const m = d.m; drawPerson(ctx, d.sx, d.sy, m.look, ((m.da || 1) - (m.db || 0)) < 0 ? -1 : 1, true, m.phase, m.moving, 0.95, m.moving ? null : { kind: "hammer" }, time); return; }
           if (d.kind === "animal") { const m = d.m; drawAnimal(ctx, m.kind, d.sx, d.sy, ((m.da || 1) - (m.db || 0)) < 0 ? -1 : 1, m.phase, m.col, m.moving, time); return; }
         });
+        ctx.globalAlpha = 1;
         // effects: chimney smoke, flare, fountain, dolphins
-        fx(time);
+        if (!IN || IN.mode !== "rise" || age > 2.6) fx(time);
         // ---- lighting ----
         const tint = tintColor(L);
         if (tint !== "#FFFFFF") {
@@ -276,6 +363,7 @@
             const s = d._s;
             if (!s) return;
             let es = null;
+            if (d._hid) return;
             if (d.bnd) { if (d.kind === "lamp" && (hash("l" + d.o.idx) % 100) / 100 > q * 1.4) es = null; else es = emitFor(d, sc, q, s, lightState(d)); }
             else if (d.kind === "car") es = carSprite(d.c.kind, d.c.color, d.c.yaw, 0, sc, true);
             else if (d.kind === "boat") es = boatSprite(d.b, sc, true);
@@ -388,6 +476,7 @@
       /* ---- nameplates & crew chips (screen-steady size) ---- */
       const plates = () => {
         if (cb.current.edit) return;
+        if (S.intro && S.intro.mode === "rise" && (S.intro.el || 0) < 2.7) return;
         const ls = clamp(1 / S.cam.s, 0.45, 3.4);
         const lms = cb.current.landmarks;
         S.plates = [];
@@ -575,6 +664,7 @@
       window.addEventListener("resize", onResize);
       raf = requestAnimationFrame(frame);
       return () => {
+        prevRef.current = { chunk, spriteFor, drawables, bounds: S.bounds, cam: { ...S.cam }, intro: S.intro };
         S.stopped = true; cancelAnimationFrame(raf); cancelAnimationFrame(flyRaf);
         el.removeEventListener("pointerdown", onDown); el.removeEventListener("pointermove", onMove);
         el.removeEventListener("pointerup", onUp); el.removeEventListener("pointercancel", onUp);
