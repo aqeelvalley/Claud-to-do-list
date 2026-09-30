@@ -82,10 +82,29 @@ jobs:
           xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
             -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build/dev \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build | tail -n 60
-      - name: Package LifeList.ipa
+      # Give every binary a full (ad-hoc) signature with its entitlements. The linker's minimal
+      # signature leaves re-signers like Sideloadly too little room, and the widget extension came
+      # out with a broken signature (killed on launch with CODESIGNING "Invalid Page").
+      - name: Sign ad-hoc so Sideloadly can re-sign cleanly
         run: |
+          set -e
           mkdir -p Payload
           cp -R build/dev/Build/Products/Release-iphoneos/App.app Payload/
+          APP=Payload/App.app
+          SIGN=(codesign --force --sign - --timestamp=none --generate-entitlement-der)
+          if [ -d "$APP/Frameworks" ]; then
+            find "$APP/Frameworks" -maxdepth 1 \( -name "*.framework" -o -name "*.dylib" \) -print0 | xargs -0 -I{} "${SIGN[@]}" {}
+          fi
+          for EX in "$APP"/PlugIns/*.appex; do
+            [ -d "$EX" ] || continue
+            if [ -d "$EX/Frameworks" ]; then find "$EX/Frameworks" -maxdepth 1 -name "*.framework" -print0 | xargs -0 -I{} "${SIGN[@]}" {}; fi
+            "${SIGN[@]}" --entitlements ios/App/LifeListWidget/LifeListWidget.entitlements "$EX"
+          done
+          "${SIGN[@]}" --entitlements ios/App/App/App.entitlements "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          codesign -d --entitlements - "$APP/PlugIns/LifeListWidgetExtension.appex" | tail -n 20
+      - name: Package LifeList.ipa
+        run: |
           zip -qry LifeList.ipa Payload
           ls -la LifeList.ipa
       - uses: actions/upload-artifact@v4
