@@ -38,7 +38,7 @@
     cinema: { name: "Cinema", level: 7, kind: "cinema" },
     fabyard: { name: "Fabrication Yard", level: 4, kind: "fabyard" },
   };
-  const SECTION_LOTS = [["houses2", 1], ["beachHouses", 3], ["houses", 2], ["apartments", 3], ["shops", 3], ["beachHouses", 0], ["houses2", 3], ["houses", 0]];
+  const SECTION_LOTS = [["houses2", 1], ["beachHouses", 2], ["houses", 1], ["apartments", 3], ["shops", 2], ["beachHouses", 0], ["houses2", 2], ["houses", 0]];
 
   /* ---- geometry helpers ---- */
   /* clockwise rounded rectangle in (a,b) with outward normals and a side tag */
@@ -199,6 +199,25 @@
       const ma = lerp(I.a0, I.a1, 0.36 + r() * 0.28), mb = lerp(I.b0, I.b1, 0.36 + r() * 0.28);
       return [{ a0: I.a0, a1: ma - 7, b0: I.b0, b1: mb - 7 }, { a0: ma + 7, a1: I.a1, b0: I.b0, b1: mb - 7 }, { a0: I.a0, a1: ma - 7, b0: mb + 7, b1: I.b1 }, { a0: ma + 7, a1: I.a1, b0: mb + 7, b1: I.b1 }];
     };
+    /* varied plots: a front row and a back row, each cut into 1-3 lots of
+       random width, so every lot still touches a street */
+    const rowLots = (k, minN = 3) => {
+      const I = inner(k), r = rng(hash("rows" + k.id));
+      const cut = lerp(I.b0, I.b1, 0.34 + r() * 0.32);
+      const rows = [[I.b0, cut - 7], [cut + 7, I.b1]];
+      const out = [];
+      rows.forEach(([b0, b1], ri) => {
+        const n = 1 + ((r() * 3) | 0) + (ri === 1 && out.length + 1 < minN ? 1 : 0);
+        const cuts = [];
+        for (let k2 = 0; k2 < n; k2++) cuts.push(0.75 + r() * 0.9);
+        const tot = cuts.reduce((x, y) => x + y, 0);
+        let a = I.a0;
+        cuts.forEach((c, k2) => { const w = ((I.a1 - I.a0) - 14 * (n - 1)) * (c / tot); out.push({ a0: a, a1: a + w, b0, b1 }); a += w + 14; });
+      });
+      while (out.length < minN) { const big = out.reduce((x, y) => (y.a1 - y.a0 > x.a1 - x.a0 ? y : x)); const m = (big.a0 + big.a1) / 2; out.splice(out.indexOf(big), 1, { ...big, a1: m - 7 }, { ...big, a0: m + 7 }); }
+      // back row first so indexes are stable: order by row then a
+      return out.sort((x, y) => x.b0 - y.b0 || x.a0 - y.a0);
+    };
     const face = (lot, k) => {
       const I = inner(k);
       if (Math.abs(lot.b1 - I.b1) < 1) return "+b"; if (Math.abs(lot.a1 - I.a1) < 1) return "+a";
@@ -266,9 +285,10 @@
         put({ kind: "ground-garden", ...Q[0] });
         scatter(Q[0], 5, null, ["tree", "pine"], hash(k.id));
       } else if (t === "houses" || t === "houses2" || t === "beachHouses") {
-        Q.forEach((lot, q) => filler(k, lot, "house", q));
+        const lots = rowLots(k, 3);
+        lots.forEach((lot, q) => { const small = lot.a1 - lot.a0 < 70 || lot.b1 - lot.b0 < 70; filler(k, lot, "house", q); if (!small && lot.a1 - lot.a0 > 130) scatter({ a0: lot.a1 - 50, a1: lot.a1, b0: lot.b0, b1: lot.b1 }, 2, null, ["tree"], hash(k.id + q)); });
       } else if (t === "shops") {
-        Q.forEach((lot, q) => filler(k, lot, q === 0 ? "apartment" : "shop", q));
+        rowLots(k, 3).forEach((lot, q) => filler(k, lot, q === 0 ? "apartment" : "shop", q));
       } else if (t === "park" || t === "garden") {
         const pond = t === "park" ? { a: ma + 30, b: mb - 20, ra: 46, rb: 32 } : null;
         put({ kind: "ground-park", ...whole, pond, garden: t === "garden" });

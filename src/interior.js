@@ -5,7 +5,7 @@
    */
   var Inside = (() => {
     const h = React.createElement;
-    const W = 230, D = 210, H = 118; // room size in iso units
+    let W = 230, D = 210, H = 118; // room size in iso units (set per building)
     const P = (a, b, z = 0) => ye(a, b, z);
     const pts = (arr) => J(arr);
     const R = (v) => Math.round(v * 10) / 10;
@@ -289,7 +289,7 @@
             items: [
               [60, 60, h(Treadmill, { a: 60, b: 60 })],
               [60, 110, h(Treadmill, { a: 60, b: 110 })],
-              [40, 175, h(Weights, { a: 30, b: 175, c })],
+              [40, 140, h(Weights, { a: 30, b: 140, c })],
               [160, 80, h(Rug, { a: 160, b: 90, ra: 40, rb: 26, c: "#2A9D8F" })],
               [200, 190, h(Plant, { a: 200, b: 190 })],
             ],
@@ -308,8 +308,31 @@
             ],
             label: "Lamp room & treasury",
           };
-        case "port":
+        case "marina":
+          return {
+            wall: "#F4EEE3", floor: "#C49A6C", board: "cork", boardTitle: "ORDERS & SPONSORS",
+            items: [
+              [120, 60, h(Desk, { a: 120, b: 60, c: "#9C6B45", screen: "#7FD1DC" })],
+              [60, 140, h(Rug, { a: 100, b: 130, c: "#1F7A8C" })],
+              [16, 150, h(Shelf, { a: 16, b: 150, c: "#9C6B45", items: ["#1F7A8C", "#F6EDDF", "#E0474C", "#E9B949"] })],
+              [180, 150, h(Plant, { a: 180, b: 150, s: 1.2 })],
+              [150, 120, h(Bollard, { a: 150, b: 120 })],
+            ],
+            label: "Harbour office",
+          };
         case "hub":
+          return {
+            wall: "#E3E1D8", floor: "#B7B0A2", board: "white", boardTitle: "LEADS IN PROGRESS",
+            items: [
+              [60, 60, h(Crates, { a: 60, b: 60 })],
+              [60, 150, h(Crates, { a: 60, b: 150 })],
+              [150, 60, h(Desk, { a: 150, b: 60, screen: "#7FD1DC" })],
+              [200, 150, h(Crates, { a: 200, b: 160 })],
+              [130, 130, h(Bollard, { a: 130, b: 130 })],
+            ],
+            label: "Warehouse floor",
+          };
+        case "port":
           return {
             wall: "#E3EEF0", floor: "#B7B0A2", board: "white", boardTitle: "TENDERS & RFQs", view: "sea",
             items: [
@@ -331,9 +354,9 @@
               [110, 110, h(Rug, { a: 110, b: 110, c: T(c, 0.1) })],
               [40, 110, h(Sofa, { a: 40, b: 110, c })],
               [150, 50, h(Bed, { a: 150, b: 45, c: T(c, 0.25) })],
-              [16, 185, h(Shelf, { a: 16, b: 185 })],
+              [16, 160, h(Shelf, { a: 16, b: 160 })],
               [120, 110, h(Table, { a: 120, b: 110, chairs: T(c, -0.1) })],
-              [200, 180, h(Plant, { a: 200, b: 180, s: 1.2 })],
+              [200, 165, h(Plant, { a: 200, b: 165, s: 1.2 })],
             ],
             label: kind === "cottage" ? "Living room" : "Main room",
           };
@@ -471,12 +494,125 @@
       );
     }
 
+    /* each building's shell: size, roof, wall finish and openings */
+    const SHELLS = {
+      refinery: { W: 240, D: 210, H: 118, roof: "flat", tex: "concrete" },
+      drafting: { W: 236, D: 200, H: 112, roof: "flat", tex: "glass" },
+      office: { W: 236, D: 200, H: 112, roof: "flat", tex: "glass" },
+      maker: { W: 270, D: 200, H: 96, roof: "saw", tex: "corrugated" },
+      mill: { W: 270, D: 200, H: 88, roof: "gable", rise: 70, tex: "planks", open: "barn" },
+      cafe: { W: 210, D: 175, H: 100, roof: "flat", tex: "brick", open: "shopfront" },
+      film: { W: 240, D: 220, H: 124, roof: "flat", tex: "acoustic" },
+      gym: { W: 280, D: 180, H: 104, roof: "flat", tex: "mirror", open: "tall" },
+      port: { W: 230, D: 200, H: 104, roof: "flat", tex: "corrugated" },
+      hub: { W: 270, D: 210, H: 96, roof: "gable", rise: 30, tex: "corrugated", open: "roller" },
+      marina: { W: 210, D: 180, H: 96, roof: "gable", rise: 44, tex: "planks", open: "porthole" },
+      cottage: { W: 226, D: 196, H: 90, roof: "gable", rise: 64, tex: "timber", open: "cottage", fire: true },
+      house: { W: 220, D: 190, H: 96, roof: "gable", rise: 50, tex: "plaster" },
+      townhall: { W: 250, D: 210, H: 124, roof: "flat", tex: "plaster" },
+    };
+    SHELLS.shop = SHELLS.cafe; SHELLS.tower = SHELLS.office; SHELLS.farm = SHELLS.mill;
+    const lerp2 = (x, y, t) => x + (y - x) * t;
+    function Shell({ sh, wall, color }) {
+      const rise = sh.rise || 0, out = [];
+      const add = (el) => out.push(h("g", { key: out.length }, el));
+      const poly = (p3, fill, st, sw = 1) => h("polygon", { points: pts(p3), fill, stroke: st, strokeWidth: st ? sw : 0 });
+      const lineW = (p0, p1, c, w = 1) => { const [x0, y0] = P(...p0), [x1, y1] = P(...p1); return h("line", { x1: R(x0), y1: R(y0), x2: R(x1), y2: R(y1), stroke: c, strokeWidth: w }); };
+      const dark = sh.tex === "acoustic", glass = sh.tex === "glass";
+      const wL = dark ? "#2E3338" : glass ? "#DDE6EA" : wall, wR = dark ? "#262B30" : glass ? "#D0DADF" : T(wall, -0.06);
+      // left wall (a=0); with a gable roof it is the gable end and rises to a peak
+      add(poly(rise ? [[0, 0, 0], [0, D, 0], [0, D, H], [0, D / 2, H + rise], [0, 0, H]] : [[0, 0, 0], [0, D, 0], [0, D, H], [0, 0, H]], wL, T(wL, -0.2)));
+      add(poly([[0, 0, 0], [W, 0, 0], [W, 0, H], [0, 0, H]], wR, T(wR, -0.2)));
+      // wall finishes
+      const texL = [], texR = [];
+      if (sh.tex === "planks" || sh.tex === "timber") {
+        for (let z = 8; z < H; z += sh.tex === "planks" ? 8 : 200) { texR.push(lineW([0, 0.5, z], [W, 0.5, z], "rgba(90,50,20,0.25)", 0.8)); texL.push(lineW([0.5, 0, z], [0.5, D, z], "rgba(90,50,20,0.25)", 0.8)); }
+        if (sh.tex === "timber") { for (let a = 30; a < W; a += 50) texR.push(lineW([a, 0.5, 0], [a, 0.5, H], "#9C6B45", 3)); for (let b = 30; b < D; b += 50) texL.push(lineW([0.5, b, 0], [0.5, b, H], "#9C6B45", 3)); texR.push(lineW([0, 0.5, H * 0.6], [W, 0.5, H * 0.6], "#9C6B45", 2.4)); }
+      } else if (sh.tex === "corrugated") {
+        for (let a = 4; a < W; a += 5) texR.push(lineW([a, 0.5, 0], [a, 0.5, H], "rgba(60,70,80,0.16)", 0.9));
+        for (let b = 4; b < D; b += 5) texL.push(lineW([0.5, b, 0], [0.5, b, H + (rise ? rise * (1 - Math.abs(b - D / 2) / (D / 2)) : 0)], "rgba(60,70,80,0.16)", 0.9));
+      } else if (sh.tex === "brick") {
+        for (let z = 6, row = 0; z < H; z += 6, row++) { texR.push(lineW([0, 0.5, z], [W, 0.5, z], "rgba(140,60,40,0.18)", 0.7)); for (let a = row % 2 ? 7 : 0; a < W; a += 14) texR.push(lineW([a, 0.5, z - 6], [a, 0.5, z], "rgba(140,60,40,0.15)", 0.6)); }
+        for (let z = 6; z < H; z += 6) texL.push(lineW([0.5, 0, z], [0.5, D, z], "rgba(140,60,40,0.18)", 0.7));
+      } else if (sh.tex === "acoustic") {
+        for (let a = 16; a < W - 20; a += 26) for (let z = 16; z < H - 10; z += 26) texR.push(poly([[a, 0.6, z], [a + 20, 0.6, z], [a + 20, 0.6, z + 20], [a, 0.6, z + 20]], "#3B4046", "#1F2226", 0.6));
+        texR.push(poly([[0, 0.5, H - 8], [W, 0.5, H - 8], [W, 0.5, H], [0, 0.5, H]], "#E0474C"));
+        texL.push(poly([[0.5, 0, H - 8], [0.5, D, H - 8], [0.5, D, H], [0.5, 0, H]], "#E0474C"));
+      } else if (sh.tex === "concrete") {
+        for (let a = 60; a < W; a += 60) texR.push(lineW([a, 0.5, 0], [a, 0.5, H], "rgba(80,90,100,0.18)", 1));
+        texR.push(lineW([0, 0.5, H / 2], [W, 0.5, H / 2], "rgba(80,90,100,0.14)", 1));
+      } else if (sh.tex === "glass") {
+        const view = [];
+        for (let a = 0; a < W; a += 34) view.push(poly([[a + 4, 0.3, 0], [a + 30, 0.3, 0], [a + 30, 0.3, 30 + ((a * 7) % 50)], [a + 4, 0.3, 30 + ((a * 7) % 50)]], "rgba(120,150,170,0.45)"));
+        texR.push(poly([[0, 0.2, 8], [W, 0.2, 8], [W, 0.2, H - 6], [0, 0.2, H - 6]], "#A9D6E6"), ...view);
+        for (let a = 0; a <= W; a += 34) texR.push(lineW([a, 0.8, 0], [a, 0.8, H], "#B7C4CA", 2.2));
+        [H * 0.5].forEach((z) => texR.push(lineW([0, 0.8, z], [W, 0.8, z], "#B7C4CA", 2)));
+      } else if (sh.tex === "mirror") {
+        texL.push(poly([[0.5, 10, 8], [0.5, 60, 8], [0.5, 60, H - 14], [0.5, 10, H - 14]], "#CFE3EA", "#9AA7AE", 2));
+        texL.push(poly([[0.6, 16, 30], [0.6, 30, 30], [0.6, 30, H - 30], [0.6, 16, H - 30]], "rgba(255,255,255,0.45)"));
+      }
+      out.push(...texL.map((e, k) => h("g", { key: "tl" + k }, e)), ...texR.map((e, k) => h("g", { key: "tr" + k }, e)));
+      // openings on the right wall
+      const win = (a0, a1, z0, z1, frame = T(wall, -0.25)) => [poly([[a0 - 3, 0, z0 - 3], [a1 + 3, 0, z0 - 3], [a1 + 3, 0, z1 + 3], [a0 - 3, 0, z1 + 3]], frame), poly([[a0, 0, z0], [a1, 0, z0], [a1, 0, z1], [a0, 0, z1]], "#9ED8E6"), poly([[a0, 0, (z0 + z1) / 2], [a1, 0, (z0 + z1) / 2], [a1, 0, (z0 + z1) / 2 + 1.5], [a0, 0, (z0 + z1) / 2 + 1.5]], "#FFFFFF"), poly([[(a0 + a1) / 2, 0, z0], [(a0 + a1) / 2 + 1.5, 0, z0], [(a0 + a1) / 2 + 1.5, 0, z1], [(a0 + a1) / 2, 0, z1]], "#FFFFFF")];
+      const shaft = (a0, a1, z0, z1) => poly([[a0, 0, z0], [a1, 0, z0], [a1 + 40, 90, 0], [a0 + 40, 90, 0]], "url(#shaftG)");
+      const o = sh.open;
+      if (o === "shopfront") {
+        add(h("g", null, ...win(24, W - 24, 10, 76, "#6E4A33")));
+        for (let k = 0; k < 8; k++) add(poly([[24 + k * (W - 48) / 8, 0.3, 76], [24 + (k + 1) * (W - 48) / 8, 0.3, 76], [24 + (k + 1) * (W - 48) / 8, 0.3, 66], [24 + k * (W - 48) / 8, 0.3, 66]], k % 2 ? "#FFF8EC" : "#D9734E"));
+        add(shaft(40, W - 40, 10, 76));
+      } else if (o === "barn") {
+        add(h("g", null, ...win(24, 70, 40, 76)));
+        add(poly([[110, 0, 0], [200, 0, 0], [200, 0, 76], [110, 0, 76]], "#7E5337", "#5A3A22", 2));
+        add(lineW([110, 0.6, 0], [200, 0.6, 76], "#E9D2A6", 2.2)); add(lineW([110, 0.6, 76], [200, 0.6, 0], "#E9D2A6", 2.2)); add(lineW([155, 0.6, 0], [155, 0.6, 76], "#5A3A22", 1.4));
+        add(shaft(24, 70, 40, 76));
+      } else if (o === "roller") {
+        add(poly([[150, 0, 0], [230, 0, 0], [230, 0, 72], [150, 0, 72]], "#9AA7AE", "#6E777C", 2));
+        for (let z = 6; z < 72; z += 6) add(lineW([150, 0.6, z], [230, 0.6, z], "#7E878C", 0.8));
+        add(h("g", null, ...win(30, 110, 50, 80)));
+      } else if (o === "tall") {
+        for (let k = 0; k < 5; k++) { const a0 = 20 + k * 50; add(h("g", null, ...win(a0, a0 + 36, 14, 92, "#DDE3E6"))); add(shaft(a0, a0 + 36, 14, 92)); }
+      } else if (o === "porthole") {
+        [70, 150].forEach((a) => { const [x, y] = P(a, 0, 62); add(h("g", null, h("ellipse", { cx: R(x), cy: R(y), rx: 16, ry: 20, fill: "#B98759" }), h("ellipse", { cx: R(x), cy: R(y), rx: 12, ry: 15, fill: "#9ED8E6" }), h("path", { d: `M${R(x - 12)},${R(y + 4)} q12,-5 24,0`, stroke: "#2FA7B5", strokeWidth: 3, fill: "none" }))); });
+        const [lx, ly] = P(110, 0, 70); add(h("g", null, h("circle", { cx: R(lx), cy: R(ly), r: 12, fill: "none", stroke: "#E0474C", strokeWidth: 5 }), h("circle", { cx: R(lx), cy: R(ly), r: 12, fill: "none", stroke: "#FFF8EC", strokeWidth: 5, strokeDasharray: "6 6" })));
+      } else if (o === "cottage") {
+        add(h("g", null, ...win(24, 64, 34, 70))); add(h("g", null, ...win(160, 200, 34, 70)));
+        [24, 160].forEach((a) => { add(poly([[a - 6, 0.4, 72], [a + 8, 0.4, 72], [a + 4, 0.4, 30], [a - 6, 0.4, 30]], "#C2577A")); add(poly([[a + 32, 0.4, 72], [a + 46, 0.4, 72], [a + 46, 0.4, 30], [a + 36, 0.4, 30]], "#C2577A")); });
+      } else if (!sh.noWin && sh.tex !== "glass" && sh.tex !== "acoustic" && !sh.view) {
+        [[36, 86], [120, 170]].forEach(([a0, a1]) => { add(h("g", null, ...win(a0, a1, 44, 96))); add(shaft(a0, a1, 44, 96)); });
+      }
+      if (sh.fire) {
+        add(poly([[92, 0, 0], [138, 0, 0], [138, 0, 58], [92, 0, 58]], "#B5654A", "#8A4A33", 1.5));
+        add(poly([[102, 0.4, 4], [128, 0.4, 4], [128, 0.4, 34], [102, 0.4, 34]], "#2B1D14"));
+        const [fx, fy] = P(115, 0.5, 8); add(h("g", { className: "flame-in" }, h("ellipse", { cx: R(fx), cy: R(fy - 6), rx: 7, ry: 10, fill: "#F08A4B" }), h("ellipse", { cx: R(fx), cy: R(fy - 4), rx: 3.5, ry: 6, fill: "#FFE3A0" })));
+        add(poly([[86, 0, 58], [144, 0, 58], [144, 8, 62], [86, 8, 62]], "#9C6B45"));
+      }
+      // roof inside: the back slope and rafters of a gable, or sawtooth skylights
+      if (sh.roof === "gable") {
+        add(poly([[0, 0, H], [W, 0, H], [W, D / 2, H + rise], [0, D / 2, H + rise]], sh.tex === "corrugated" ? "#C9CED0" : "#C99D6C", "rgba(60,40,22,0.3)"));
+        for (let a = 20; a < W; a += 36) add(lineW([a, 0, H], [a, D / 2, H + rise], sh.tex === "corrugated" ? "#8C969B" : "#7E5337", 3.2));
+        add(lineW([0, D / 2, H + rise], [W, D / 2, H + rise], sh.tex === "corrugated" ? "#6E777C" : "#6E4A33", 4));
+      } else if (sh.roof === "saw") {
+        const n = 4, tw = W / n, rz = 30;
+        for (let k = 0; k < n; k++) {
+          const a0 = k * tw, a1 = a0 + tw;
+          add(poly([[a0, 0, H], [a0, D * 0.55, H], [a0, D * 0.55, H + rz], [a0, 0, H + rz]], "rgba(158,216,230,0.85)", "#6E8184"));
+          add(poly([[a0, 0, H + rz], [a1, 0, H], [a1, D * 0.55, H], [a0, D * 0.55, H + rz]], k % 2 ? "#8FB8AF" : "#9CC2B9", "rgba(40,80,70,0.3)"));
+          add(poly([[a0, 0, H], [a0 + 40, 90, 0], [a0 + 70, 90, 0], [a0 + 30, 0, H]], "url(#shaftG)"));
+        }
+      }
+      return h("g", null, out);
+    }
+
     function Room({ kind, color, name, sub, level, tasks, crew, onTask, workingIds = {} }) {
       const rc = recipe(kind, color);
+      const sh = { ...(SHELLS[kind] || SHELLS.house), ...(rc.view ? { view: true } : {}) };
+      W = sh.W; D = sh.D; H = sh.H;
+      const top = H + (sh.rise || 0) + (sh.roof === "saw" ? 30 : 0);
       const board = rc.board || "cork";
       const wall = rc.wall, wallR = T(wall, -0.06), floor = rc.floor;
       const open = tasks.filter((t) => t.status !== "done");
-      const notes = open.slice(0, 9);
+      const rows = Math.max(1, Math.min(3, Math.floor((H - 40) / 30)));
+      const notes = open.slice(0, rows * 3);
       const people = crew.slice(0, SPOTS.length);
       // planks
       const planks = [];
@@ -484,9 +620,6 @@
         const p0 = P(0, k, 0), p1 = P(W, k, 0);
         planks.push(h("line", { key: k, x1: R(p0[0]), y1: R(p0[1]), x2: R(p1[0]), y2: R(p1[1]) }));
       }
-      // window on right wall (plane b=0)
-      const win = (a0, a1) => pts([[a0, 0, 44], [a1, 0, 44], [a1, 0, 96], [a0, 0, 96]]);
-      const shaft = (a0, a1) => pts([[a0, 0, 44], [a1, 0, 44], [a1 + 40, 90, 0], [a0 + 40, 90, 0]]);
       const items = [...rc.items.map(([a, bb, el], n) => ({ d: a + bb, el: h("g", { key: "i" + n }, el) })),
         ...people.map((w, n) => {
           const [a, bb] = SPOTS[n];
@@ -499,36 +632,29 @@
               h("text", { y: 2, textAnchor: "middle", className: "crew-t" }, w.name))) };
         })].sort((x, y) => x.d - y.d);
       const plaque = P(W - 40, 0, 104);
-      return h("svg", { className: "room", viewBox: "-250 -150 500 380", preserveAspectRatio: "xMidYMid meet", role: "img", "aria-label": `Inside ${name}` },
+      const vb = [-D - 30, -top - 40, W + D + 60, top + (W + D) / 2 + 80];
+      return h("svg", { className: "room", viewBox: vb.join(" "), preserveAspectRatio: "xMidYMid meet", role: "img", "aria-label": `Inside ${name}` },
         h("defs", null,
           h("linearGradient", { id: "shaftG", x1: "0", y1: "0", x2: "0", y2: "1" },
             h("stop", { offset: "0", stopColor: "#FFF3C8", stopOpacity: "0.55" }),
             h("stop", { offset: "1", stopColor: "#FFF3C8", stopOpacity: "0" }))),
-        h("ellipse", { cx: 0, cy: 225, rx: 250, ry: 22, fill: "rgba(0,0,0,0.18)" }),
+        h("ellipse", { cx: (W - D) / 2, cy: (W + D) / 2 + 12, rx: (W + D) / 2 + 20, ry: 22, fill: "rgba(0,0,0,0.18)" }),
         // floor slab edge
         h("polygon", { points: pts([[0, D, 0], [W, D, 0], [W, D, -10], [0, D, -10]]), fill: T(floor, -0.3) }),
         h("polygon", { points: pts([[W, 0, 0], [W, D, 0], [W, D, -10], [W, 0, -10]]), fill: T(floor, -0.4) }),
         h("polygon", { points: pts([[0, 0, 0], [W, 0, 0], [W, D, 0], [0, D, 0]]), fill: floor }),
         h("g", { stroke: T(floor, -0.12), strokeWidth: 0.8 }, planks),
-        // walls
-        h("polygon", { points: pts([[0, 0, 0], [0, D, 0], [0, D, H], [0, 0, H]]), fill: wall, stroke: T(wall, -0.2), strokeWidth: 1 }),
-        h("polygon", { points: pts([[0, 0, 0], [W, 0, 0], [W, 0, H], [0, 0, H]]), fill: wallR, stroke: T(wall, -0.2), strokeWidth: 1 }),
+        // walls, finishes, openings and roof, shaped like the building outside
+        h(Shell, { sh, wall, color }),
         h("polygon", { points: pts([[0, 0, 0], [0, D, 0], [0, D, 7], [0, 0, 7]]), fill: T(color, 0.25) }),
         h("polygon", { points: pts([[0, 0, 0], [W, 0, 0], [W, 0, 7], [0, 0, 7]]), fill: T(color, 0.15) }),
         // top trim
-        h("polygon", { points: pts([[0, D, H], [0, 0, H], [W, 0, H], [W, -6, H], [-6, -6, H], [-6, D, H]]), fill: T(color, -0.1) }),
+        !sh.rise && sh.roof !== "saw" && h("polygon", { points: pts([[0, D, H], [0, 0, H], [W, 0, H], [W, -6, H], [-6, -6, H], [-6, D, H]]), fill: T(color, -0.1) }),
         rc.green && h("polygon", { points: pts([[24, 0, 0], [200, 0, 0], [200, 0, 100], [24, 0, 100]]), fill: "#56B870" }),
         rc.green && h("polygon", { points: pts([[24, 0, 0], [200, 0, 0], [200, 30, 0], [24, 30, 0]]), fill: "#4CA864" }),
         rc.view && h(ViewWindow, { view: rc.view, wall }),
-        // windows + light shafts
-        !rc.green && !rc.view && [[36, 86], [120, 170]].map(([a0, a1], n) => h("g", { key: "w" + n },
-          h("polygon", { points: win(a0 - 3, a1 + 3), fill: T(wall, -0.25) }),
-          h("polygon", { points: win(a0, a1), fill: "#9ED8E6" }),
-          h("polygon", { points: pts([[a0, 0, 70], [a1, 0, 70], [a1, 0, 71.5], [a0, 0, 71.5]]), fill: "#FFFFFF" }),
-          h("polygon", { points: pts([[(a0 + a1) / 2, 0, 44], [(a0 + a1) / 2 + 1.5, 0, 44], [(a0 + a1) / 2 + 1.5, 0, 96], [(a0 + a1) / 2, 0, 96]]), fill: "#FFFFFF" }),
-          h("polygon", { points: shaft(a0, a1), fill: "url(#shaftG)", className: "shaft" }))),
         // task board: pinboard, whiteboard or wall screens
-        h("polygon", { points: pts([[0, D - 10, H - 14], [0, D - 10 - 128, H - 14], [0, D - 10 - 128, H - 14 - 96], [0, D - 10, H - 14 - 96]]), fill: board === "screens" ? "#2A363C" : board === "white" ? "#F7F7F2" : "#C9A171", stroke: board === "screens" ? "#1B2428" : board === "white" ? "#9AA7AE" : "#9C6B45", strokeWidth: 2.5 }),
+        h("polygon", { points: pts([[0, D - 10, H - 14], [0, D - 10 - 128, H - 14], [0, D - 10 - 128, Math.max(6, H - 14 - 96)], [0, D - 10, Math.max(6, H - 14 - 96)]]), fill: board === "screens" ? "#2A363C" : board === "white" ? "#F7F7F2" : "#C9A171", stroke: board === "screens" ? "#1B2428" : board === "white" ? "#9AA7AE" : "#9C6B45", strokeWidth: 2.5 }),
         rc.boardTitle && h("g", { transform: `matrix(1,-0.5,0,1,${R(P(0, D - 14, H - 4)[0])},${R(P(0, D - 14, H - 4)[1])})` }, h("text", { className: "board-t" }, rc.boardTitle)),
         board === "white" && h("polygon", { points: pts([[0, D - 30, H - 111], [0, D - 110, H - 111], [0, D - 110, H - 108], [0, D - 30, H - 108]]), fill: "#9AA7AE" }),
         notes.map((t, n) => h(Note, { key: t.id, task: t, style: board, u: (n % 3) * 40 + 4, v: Math.floor(n / 3) * 30 + 6, onClick: () => onTask(t), working: workingIds[t.assignee] })),

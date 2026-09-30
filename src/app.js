@@ -8910,7 +8910,7 @@
       lo = ds((a) => {
         Ie(
           a === "port" || a === "hub" || a === "marina"
-            ? { type: "port" }
+            ? { type: "port", via: a }
             : a === "fitness"
               ? { type: "fitness" }
               : a === "goals"
@@ -9378,11 +9378,20 @@
             : v.type === "goals"
               ? (k = { kind: "lighthouse", color: te.goals.color, name: te.goals.name, id: "goals" })
               : v.type === "port" &&
-                (k = { kind: "port", color: "#1F7A8C", name: "Port & Logistics Hub", id: null });
+                (k =
+                  v.via === "marina"
+                    ? { kind: "marina", color: "#2A9D8F", name: "Marina", id: null, via: "marina" }
+                    : v.via === "hub"
+                      ? { kind: "hub", color: "#C9A227", name: "Logistics Hub", id: null, via: "hub" }
+                      : { kind: "port", color: "#1F7A8C", name: "Tender Port", id: null, via: "port" });
         if (!k) return null;
         let g = k.id
             ? xe.filter((a) => a.venture === k.id)
-            : C.filter((a) => a.stage === "new" || a.stage === "qualifying" || a.stage === "quoted").map((a) => ({
+            : C.filter((a) =>
+                k.via === "hub"
+                  ? a.stage === "qualifying" || a.stage === "quoted"
+                  : a.stage === "new" && (k.via === "marina" ? a.type !== "tender" : a.type === "tender"),
+              ).map((a) => ({
                 id: a.id,
                 title: a.title,
                 priority: a.stage === "new" ? "high" : "med",

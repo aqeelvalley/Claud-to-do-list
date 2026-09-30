@@ -33,8 +33,9 @@
   const B = {};
   B.house = (pn, o) => {
     const r = rng(o.seed || 1);
-    const w = Math.min(o.w - 22, 64), d = Math.min(o.d - 22, 52), fl = o.floors || 1;
-    const off = { "+a": [o.w / 2 - w / 2 - 8, 0], "+b": [0, o.d / 2 - d / 2 - 8], "-a": [-(o.w / 2 - w / 2 - 8), 0], "-b": [0, -(o.d / 2 - d / 2 - 8)] }[o.face];
+    const w = Math.max(30, Math.min(o.w - 22, 40 + r() * 36)), d = Math.max(28, Math.min(o.d - 22, 36 + r() * 26)), fl = o.floors || 1;
+    const sb = 6 + r() * 14, side = (r() - 0.5) * Math.max(0, o.w - w - 24);
+    const off = { "+a": [o.w / 2 - w / 2 - sb, (r() - 0.5) * Math.max(0, o.d - d - 24)], "+b": [side, o.d / 2 - d / 2 - sb], "-a": [-(o.w / 2 - w / 2 - sb), 0], "-b": [side, -(o.d / 2 - d / 2 - sb)] }[o.face] || [0, 0];
     const bx = { x: off[0], y: off[1], z: 0, w, d, h: fl * FLOOR + 2 };
     pn.box(bx.x, bx.y, 0, w + 3, d + 3, 3, "#C9B79A");
     pn.box(bx.x, bx.y, 0, w, d, bx.h, o.wall);

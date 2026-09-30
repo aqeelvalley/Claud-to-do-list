@@ -121,10 +121,17 @@
     // lot grounds: gardens, paths, parking, park, square, track
     T.objs.forEach((o) => {
       if (o.kind === "building" && o.drawer === "house" || o.drawer === "cottage" || (o.drawer === "section" && o.sKind !== "shop")) {
-        const r = { a0: o.a - o.w / 2, a1: o.a + o.w / 2, b0: o.b - o.d / 2, b1: o.b + o.d / 2 };
-        pn.poly(rectPts(r, 0.2), "#A5D28C", null);
-        // hedge along the back edges
-        pn.poly([[r.a0, r.b0, 0.3], [r.a1, r.b0, 0.3], [r.a1, r.b0 + 4, 0.3], [r.a0, r.b0 + 4, 0.3]], "#5E9E5A", null);
+        const r = o.lot ? { a0: o.lot.a0 + 2, a1: o.lot.a1 - 2, b0: o.lot.b0 + 2, b1: o.lot.b1 - 2 } : { a0: o.a - o.w / 2, a1: o.a + o.w / 2, b0: o.b - o.d / 2, b1: o.b + o.d / 2 };
+        const shadeL = ["#A5D28C", "#9FCE86", "#AAD693", "#A2D08A"][hash(o.id || "x") % 4];
+        pn.poly(rectPts(r, 0.2), shadeL, null);
+        // hedges round the plot, a picket fence along the street side
+        const hedge = (p0, p1) => { pn.line(p0, p1, "#4F8A4C", 4.2, "round"); pn.line([p0[0], p0[1], p0[2] + 1.5], [p1[0], p1[1], p1[2] + 1.5], "#6CAB5C", 2.4, "round"); };
+        const front = o.face;
+        const sides = { "-b": [[r.a0, r.b0, 0.4], [r.a1, r.b0, 0.4]], "+a": [[r.a1, r.b0, 0.4], [r.a1, r.b1, 0.4]], "+b": [[r.a1, r.b1, 0.4], [r.a0, r.b1, 0.4]], "-a": [[r.a0, r.b1, 0.4], [r.a0, r.b0, 0.4]] };
+        Object.entries(sides).forEach(([f, [p0, p1]]) => {
+          if (f === front) { pn.line([p0[0], p0[1], 3], [p1[0], p1[1], 3], "#FFF8EC", 0.9); const L = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]); for (let t = 0; t <= L; t += 5) { const u = t / L; pn.line([lerp(p0[0], p1[0], u), lerp(p0[1], p1[1], u), 0.4], [lerp(p0[0], p1[0], u), lerp(p0[1], p1[1], u), 4], "#F6EDDF", 0.8); } }
+          else hedge(p0, p1);
+        });
         // path to the door
         const f = o.face, cx = o.a, cy = o.b;
         const path = f === "+b" ? [[cx - 4, cy, 0.4], [cx + 4, cy, 0.4], [cx + 4, r.b1, 0.4], [cx - 4, r.b1, 0.4]] : f === "+a" ? [[cx, cy - 4, 0.4], [r.a1, cy - 4, 0.4], [r.a1, cy + 4, 0.4], [cx, cy + 4, 0.4]] : null;
