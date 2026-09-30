@@ -2710,6 +2710,11 @@ select.inp {
 .chip-btn.on { border-color: var(--terra); color: var(--ink); background: #fdefe9; }
 .site-banner { display: grid; gap: 2px; margin: 0 0 12px; padding: 10px 12px; border-radius: 12px; background: repeating-linear-gradient(135deg, #fbf1d9 0 12px, #f7e8c4 12px 24px); color: #6b5a2a; font-size: 12.5px; line-height: 1.4; }
 .site-banner b { font: 600 14px Fredoka, sans-serif; color: #5a4a1e; }
+.edit-bar { position: absolute; left: 50%; transform: translateX(-50%); top: calc(env(safe-area-inset-top, 0px) + 84px); z-index: 24; display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 14px; border-radius: 18px; max-width: calc(100vw - 32px); }
+.edit-txt { display: grid; gap: 1px; min-width: 0; margin-right: 6px; }
+.edit-txt b { font: 600 14.5px Fredoka, sans-serif; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.edit-txt span { font-size: 12px; color: var(--ink2); }
+@media (max-width: 767px) { .edit-bar { top: calc(env(safe-area-inset-top, 0px) + 150px); flex-wrap: wrap; } }
 </style>
 <div id="root"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
@@ -2915,6 +2920,7 @@ select.inp {
     { type: "farm", id: null, label: "Farm", blurb: "Fields, a barn and a few animals", color: "#C9B458", group: "scenery" },
     { type: "garden", id: null, label: "Garden", blurb: "Orchard rows and a stall", color: "#B7D8A4", group: "scenery" },
   ];
+  var CLASSIC_LABEL = { farm: "Farm", park: "Park", houses: "Houses", houses2: "Houses", beachHouses: "Beach houses", parking: "Parking", square: "Town square", garden: "Garden", downtown: "Downtown", apartments: "Apartments", "cs:learning": "Learning centre", "cs:townhall": "Town hall", "cs:cinema": "Cinema", home: "Home", marina: "Marina", goals: "Lookout", section: "District" };
   var FAITH_STYLES = [
     { id: "mosque", label: "Mosque" }, { id: "church", label: "Church" }, { id: "temple", label: "Temple" },
     { id: "synagogue", label: "Synagogue" }, { id: "gurdwara", label: "Gurdwara" }, { id: "garden", label: "Prayer garden" }, { id: "chapel", label: "Chapel" },
@@ -7332,7 +7338,7 @@ select.inp {
       while (q.length) { const [i, j] = q.pop().split(",").map(Number); [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([di, dj]) => { const k = i + di + "," + (j + dj); if (occ.has(k) && !seen.has(k)) { seen.add(k); q.push(k); } }); }
       if (seen.size !== keys.length) return { ok: false, why: "Every building needs to join the rest of the island." };
     }
-    for (const p of parcels) if ((PARCELS[p.type] || {}).coastal && !coastSide(p, occ)) return { ok: false, why: PARCELS[p.type].label + " has to sit on the coast." };
+    for (const p of parcels) if (((PARCELS[p.type] || {}).coastal || p.harbour) && !coastSide(p, occ)) return { ok: false, why: ((PARCELS[p.type] || {}).label || "The harbour") + " has to sit on the coast, with open water on one side." };
     return { ok: true, occ };
   }
   /* the open side of a coastal parcel's main cell, preferring the sides that face the viewer */
@@ -7382,8 +7388,10 @@ select.inp {
   }
 
   /* the original Valley Isle as a plan: same streets, same buildings, now movable */
+  const CL_OFF = [6, 5]; // where the original streets sit inside the full-size grid
   function classicPlan() {
-    const A = [100, 420, 720, 1010, 1380], B = [100, 400, 720, 1000, 1330, 1640];
+    const pad = (core, off) => { const out = core.slice(); for (let k = 0; k < off; k++) out.unshift(out[0] - 300); while (out.length < FRESH_N + 1) out.push(out[out.length - 1] + 300); return out; };
+    const A = pad([100, 420, 720, 1010, 1380], CL_OFF[0]), B = pad([100, 400, 720, 1000, 1330, 1640], CL_OFF[1]);
     const T = [
       ["farm", "park", "houses", "gym", "beachHouses"],
       ["freelance", "home", "maker", "parking", "cs:learning"],
@@ -7391,17 +7399,16 @@ select.inp {
       ["houses2", "downtown", "mill", "cs:townhall", "cs:cinema"],
     ];
     const parcels = [];
-    T.forEach((col, i) => col.forEach((t, j) => parcels.push({ id: "c" + i + j, type: t, at: [i, j], rot: 0, shape: [[0, 0]], classic: true })));
+    T.forEach((col, i) => col.forEach((t, j) => parcels.push({ id: "c" + i + j, type: t, at: [i + CL_OFF[0], j + CL_OFF[1]], rot: 0, shape: [[0, 0]], classic: true })));
     parcels.find((p) => p.type === "marina").harbour = { kind: "marina", side: "+b" };
     parcels.find((p) => p.type === "cs:cinema").harbour = { kind: "lighthouse", side: "+b" };
     const joins = [["c03", "c13"], ["c20", "c21"], ["c23", "c33"], ["c30", "c31"], ["c01", "c02"]];
-    return { A, B, parcels, joins, main: { a: [2], b: [2] }, roundabout: [2, 2], work: true, classic: true };
+    return { A, B, parcels, joins, main: { a: [2 + CL_OFF[0]], b: [2 + CL_OFF[1]] }, roundabout: [2 + CL_OFF[0], 2 + CL_OFF[1]], work: true, classic: true };
   }
   /* a stored layout (settings/island.layout) as a plan */
   function layoutPlan(layout, sections = []) {
     const { A, B } = freshLines(layout.seed || 7);
     let parcels = (layout.parcels || []).map((p) => ({ ...p, cells: undefined }));
-    parcels = fillHoles(parcels);
     parcels.forEach((p) => { if (p.type === "marina") p.harbour = { kind: "marina" }; if (p.type === "goals") p.harbour = { kind: "lighthouse" }; });
     return { A, B, parcels, joins: [], main: null, roundabout: "auto", work: !!layout.work, seed: layout.seed || 7 };
   }
@@ -8112,7 +8119,7 @@ select.inp {
       return I;
     };
 
-    const life = makeIsle("life", plan, { bridgeEast: !!plan.work, seed: hash("coast-life" + (plan.seed || "")), name: "Life Island", color: "#6DAE5B" });
+    const life = makeIsle("life", { ...plan, parcels: fillHoles(plan.parcels) }, { bridgeEast: !!plan.work, seed: hash("coast-life" + (plan.seed || "")), name: "Life Island", color: "#6DAE5B" });
     let bridgeE = null, work = null;
     if (plan.work && life.bridgePt) {
       const [bi, bj] = life.bridgePt, aw = life.A[bi] + 520, by = life.B[bj];
@@ -8222,7 +8229,7 @@ select.inp {
     const pier = (r, type = "pier") => { const p = { ...r, type }; piers.push(p); return p; };
     life.parcels.filter((p) => p.harbour).forEach((p) => {
       const occ = new Map([...life.cellP.keys()].map((k) => [k, 1]));
-      const side = p.harbour.side || coastSide(p, occ);
+      const side = coastSide({ ...p, side: p.harbour.side }, occ);
       if (!side) return;
       const [i, j] = p.cells[0], A = life.A, B = life.B, ca0 = A[i], ca1 = A[i + 1], cb0 = B[j], cb1 = B[j + 1];
       const L = side[1] === "b" ? ca1 - ca0 : cb1 - cb0, E = 15 + VERGE + 60;
@@ -10049,7 +10056,7 @@ select.inp {
     const wrap = React.useRef(null), cvs = React.useRef(null);
     const st = React.useRef(null);
     const cb = React.useRef({});
-    cb.current = { onOpen, onShip, onPlot, onAgent, onCrew, onAssign, landmarks, lightMode, reserveRight, paused: props.paused, opening: props.opening };
+    cb.current = { onOpen, onShip, onPlot, onAgent, onCrew, onAssign, landmarks, lightMode, reserveRight, paused: props.paused, opening: props.opening, edit: props.edit, onEditMove: props.onEditMove, onEditSelect: props.onEditSelect, onEditInvalid: props.onEditInvalid };
 
     /* one-time engine setup per town */
     React.useEffect(() => {
@@ -10317,7 +10324,54 @@ select.inp {
         }
         // gulls above everything
         sim.gulls.forEach((gl) => { const a = gl.cx + Math.cos(gl.t) * gl.r, b = gl.cy + Math.sin(gl.t) * gl.r * 0.6; drawAnimal(ctx, "gull", a - b, (a + b) / 2 - gl.z, Math.cos(gl.t + 1.57) < 0 ? -1 : 1, time * 7 + gl.cx, null); });
+        if (cb.current.edit) drawEdit(time);
         plates(time);
+      };
+      /* ---- layout editor overlay: the grid, every parcel's cells, and the one being dragged ---- */
+      const cellOfWorld = (wx, wy) => {
+        const ed = cb.current.edit; if (!ed) return null;
+        const a = wy + wx / 2, b = wy - wx / 2, find = (L, v) => { for (let i = 0; i < L.length - 1; i++) if (v >= L[i] && v < L[i + 1]) return i; return -1; };
+        const i = find(ed.A, a), j = find(ed.B, b);
+        return i < 0 || j < 0 ? null : [i, j];
+      };
+      const drawEdit = (time) => {
+        const ed = cb.current.edit, { A, B } = ed, cam = S.cam;
+        const quad = (i, j) => [[A[i], B[j]], [A[i + 1], B[j]], [A[i + 1], B[j + 1]], [A[i], B[j + 1]]].map(([a, b]) => [a - b, (a + b) / 2]);
+        const path = (pts) => { ctx.beginPath(); pts.forEach(([x, y], k) => (k ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); };
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = "rgba(248,240,236,0.42)"; ctx.fillRect(0, 0, cv.width, cv.height);
+        ctx.setTransform(S.dpr * cam.s, 0, 0, S.dpr * cam.s, S.dpr * cam.tx, S.dpr * cam.ty);
+        const occ = new Map(); ed.parcels.forEach((p) => cellsOf(p).forEach((c) => occ.set(c.join(","), p)));
+        const all = [...occ.keys()].map((k) => k.split(",").map(Number));
+        const i0 = Math.max(0, Math.min(...all.map((c) => c[0])) - 3), i1 = Math.min(A.length - 2, Math.max(...all.map((c) => c[0])) + 3), j0 = Math.max(0, Math.min(...all.map((c) => c[1])) - 3), j1 = Math.min(B.length - 2, Math.max(...all.map((c) => c[1])) + 3);
+        ctx.lineWidth = 1 / cam.s; ctx.strokeStyle = "rgba(110,98,150,0.28)";
+        for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) { path(quad(i, j)); ctx.stroke(); }
+        const ghost = S.ghost;
+        ed.parcels.forEach((p) => {
+          if (ghost && ghost.id === p.id) return;
+          const meta = ed.meta[p.id] || {}, col = meta.color || "#9F98B8", sel = ed.selected === p.id;
+          cellsOf(p).forEach(([i, j]) => { path(quad(i, j)); ctx.fillStyle = col + (sel ? "88" : "4A"); ctx.fill(); });
+          cellsOf(p).forEach(([i, j]) => {
+            const edges = [[[i, j], [i + 1, j], [i, j - 1]], [[i + 1, j], [i + 1, j + 1], [i + 1, j]], [[i + 1, j + 1], [i, j + 1], [i, j + 1]], [[i, j + 1], [i, j], [i - 1, j]]];
+            edges.forEach(([g0, g1, nb]) => { if (occ.get(nb.join(",")) === p) return; const P0 = [A[g0[0]] - B[g0[1]], (A[g0[0]] + B[g0[1]]) / 2], P1 = [A[g1[0]] - B[g1[1]], (A[g1[0]] + B[g1[1]]) / 2]; ctx.beginPath(); ctx.moveTo(...P0); ctx.lineTo(...P1); ctx.strokeStyle = sel ? "#463D63" : col; ctx.lineWidth = (sel ? 3 : 2) / cam.s; ctx.stroke(); });
+          });
+        });
+        if (ghost) {
+          const bob = 0.5 + 0.5 * Math.sin(time * 6);
+          ghost.cells.forEach(([i, j]) => { path(quad(i, j)); ctx.fillStyle = ghost.ok ? `rgba(120,200,150,${0.45 + 0.15 * bob})` : `rgba(228,130,106,${0.45 + 0.15 * bob})`; ctx.fill(); ctx.strokeStyle = ghost.ok ? "#4E9A6E" : "#C0604C"; ctx.lineWidth = 2.5 / cam.s; ctx.stroke(); });
+        }
+        // names on the parcels
+        const ls = clamp(1 / cam.s, 0.5, 3);
+        ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.font = `600 ${12 * ls}px Fredoka, sans-serif`;
+        ed.parcels.forEach((p) => {
+          const cells = ghost && ghost.id === p.id ? ghost.cells : cellsOf(p), c0 = cells[0], q = quad(c0[0], c0[1]);
+          const x = (q[0][0] + q[2][0]) / 2, y = (q[0][1] + q[2][1]) / 2, meta = ed.meta[p.id] || {};
+          if (!meta.name) return;
+          const tw = ctx.measureText(meta.name).width + 12 * ls;
+          ctx.fillStyle = "rgba(255,248,240,0.94)"; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x - tw / 2, y - 9 * ls, tw, 18 * ls, 9 * ls) : ctx.rect(x - tw / 2, y - 9 * ls, tw, 18 * ls); ctx.fill();
+          ctx.fillStyle = "#463D63"; ctx.fillText(meta.name, x, y + 0.5 * ls);
+        });
+        ctx.restore();
       };
 
       const fx = (time) => {
@@ -10351,6 +10405,7 @@ select.inp {
 
       /* ---- nameplates & crew chips (screen-steady size) ---- */
       const plates = () => {
+        if (cb.current.edit) return;
         const ls = clamp(1 / S.cam.s, 0.45, 3.4);
         const lms = cb.current.landmarks;
         S.plates = [];
@@ -10431,8 +10486,16 @@ select.inp {
         if (ptr.map.size === 1) {
           ptr.moved = false; ptr.start = { x, y, tx: S.cam.tx, ty: S.cam.ty };
           const w0 = toWorld(x, y);
-          const c = hitCrew(w0.x, w0.y);
-          ptr.crew = c || null;
+          ptr.parcel = null;
+          if (cb.current.edit) {
+            const cell = cellOfWorld(w0.x, w0.y), ed = cb.current.edit;
+            const p = cell && ed.parcels.find((q) => cellsOf(q).some((c) => c[0] === cell[0] && c[1] === cell[1]));
+            ptr.parcel = p && !p.locked ? { p, grab: cell } : null;
+            ptr.crew = null;
+          } else {
+            const c = hitCrew(w0.x, w0.y);
+            ptr.crew = c || null;
+          }
         }
         if (ptr.map.size === 2) { const [p, q] = [...ptr.map.values()]; ptr.pinch = { d: Math.hypot(p.x - q.x, p.y - q.y), s: S.cam.s }; ptr.moved = true; ptr.crew = null; if (S.drag) cancelDrag(); }
         try { el.setPointerCapture(e.pointerId); } catch {}
@@ -10457,7 +10520,18 @@ select.inp {
             ptr.moved = true;
             if (ptr.crew) { const w = ptr.crew; w.carried = true; w.hidden = false; if (w.onCross) { w.onCross.peds--; w.onCross = null; } S.drag = { w }; w.crew.status = "carried"; el.style.cursor = "grabbing"; }
           }
-          if (S.drag) {
+          if (ptr.parcel && ptr.moved) {
+            const ed = cb.current.edit, w0 = toWorld(x, y), cell = cellOfWorld(w0.x, w0.y);
+            if (cell && ed) {
+              const p = ptr.parcel.p, at = [p.at[0] + cell[0] - ptr.parcel.grab[0], p.at[1] + cell[1] - ptr.parcel.grab[1]];
+              if (!S.ghost || S.ghost.at[0] !== at[0] || S.ghost.at[1] !== at[1]) {
+                const moved = { ...p, at };
+                const chk = ed.check(ed.parcels.map((q) => (q.id === p.id ? moved : q)));
+                S.ghost = { id: p.id, at, rot: p.rot || 0, cells: cellsOf(moved), ok: chk.ok, why: chk.why };
+              }
+            }
+            if (x < 40) S.cam.tx += 6; if (x > S.w - 40) S.cam.tx -= 6; if (y < 60) S.cam.ty += 6; if (y > S.h - 90) S.cam.ty -= 6;
+          } else if (S.drag) {
             const w0 = toWorld(x, y + 14);
             const a = w0.y + w0.x / 2, b = w0.y - w0.x / 2;
             S.drag.w.a = a; S.drag.w.b = b;
@@ -10479,6 +10553,15 @@ select.inp {
         if (ptr.map.size < 2) ptr.pinch = null;
         if (ptr.map.size === 1) { const [p] = [...ptr.map.values()]; ptr.start = { x: p.x, y: p.y, tx: S.cam.tx, ty: S.cam.ty }; }
         if (!was || ptr.map.size > 0) return;
+        if (ptr.parcel) {
+          const pp = ptr.parcel, g = S.ghost;
+          ptr.parcel = null; S.ghost = null;
+          if (!ptr.moved) { cb.current.onEditSelect && cb.current.onEditSelect(pp.p.id); return; }
+          if (g && g.ok && (g.at[0] !== pp.p.at[0] || g.at[1] !== pp.p.at[1])) cb.current.onEditMove && cb.current.onEditMove(pp.p.id, g.at, g.rot);
+          else if (g && !g.ok) cb.current.onEditInvalid && cb.current.onEditInvalid(g.why);
+          return;
+        }
+        if (cb.current.edit) { if (!ptr.moved) cb.current.onEditSelect && cb.current.onEditSelect(null); return; }
         if (S.drag) {
           const w = S.drag.w; w.carried = false; S.drag = null;
           const w0 = toWorld(x, y);
@@ -15382,6 +15465,8 @@ select.inp {
       [ce, $e] = He(() => On("valley-quests", window.innerWidth >= 900)),
       [lightMode, setLightMode] = He(() => On("valley-light", "auto")),
       [crewCard, setCrewCard] = He(null),
+      [editing, setEditing] = He(!1),
+      [editSel, setEditSel] = He(null),
       [, setCrewTick] = He(0),
       [z, ne] = He(!0),
       fe = Lt(null);
@@ -15460,7 +15545,8 @@ select.inp {
         let st = (p) => ({ ...p, status: buildingIds.has(lmOf(p)) ? "building" : "open" });
         if (fresh) return World.layoutPlan({ ...baseLayout, parcels: baseLayout.parcels.map(st) });
         let cp = World.classicPlan();
-        cp.parcels.forEach((p) => { let m = baseLayout.moves && baseLayout.moves[p.id]; m && ((p.at = m.at), (p.rot = m.rot || 0)); });
+        cp.parcels.forEach((p) => { let m = baseLayout.moves && baseLayout.moves[p.id]; m && m.at && ((p.at = m.at), (p.rot = m.rot || 0)); });
+        cp.parcels = cp.parcels.filter((p) => !(baseLayout.moves && baseLayout.moves[p.id] && baseLayout.moves[p.id].removed));
         (baseLayout.extra || []).forEach((p) => cp.parcels.push(st(p)));
         return cp;
       }, [planKey]),
@@ -15950,6 +16036,33 @@ select.inp {
         Fe.pop && Fe.pop();
         Re(c.group === "scenery" ? c.label + " placed." : a.name + ": building site ready. Finish its first task to open it." + (a.crew ? " The studio crew is waiting on the square." : ""), "gold");
       },
+      // layout editor: move / rotate / remove parcels and save them into the island's layout
+      editParcels = planL.parcels.filter((p) => !p.auto).map((p) => ({ id: p.id, type: p.type, at: p.at, rot: p.rot || 0, shape: p.shape, harbour: p.harbour })),
+      editMeta = Object.fromEntries(planL.parcels.map((p) => {
+        let lm = lmOf(p) || (World.PARCELS[p.type] || {}).landmark, g = lm && te[lm], c = CATALOG.find((x) => x.type === p.type);
+        return [p.id, { name: g ? g.name : c ? c.label : CLASSIC_LABEL[p.type] || p.type, color: (g && g.color) || (c && c.color) || "#9F98B8", scenery: !g && !["marina", "goals", "home"].includes(p.type) && !String(p.type).startsWith("cs:") }];
+      })),
+      applyEdit = (id, patch) => {
+        if (fresh) return saveLayout({ ...baseLayout, parcels: baseLayout.parcels.map((p) => (p.id === id ? { ...p, ...patch } : p)).filter((p) => !patch.remove || p.id !== id) });
+        if ((baseLayout.extra || []).some((p) => p.id === id)) return saveLayout({ ...baseLayout, extra: baseLayout.extra.map((p) => (p.id === id ? { ...p, ...patch } : p)).filter((p) => !patch.remove || p.id !== id) });
+        let mv = { ...(baseLayout.moves || {}) };
+        patch.remove ? (mv[id] = { ...(mv[id] || {}), removed: !0 }) : (mv[id] = { at: patch.at, rot: patch.rot || 0 });
+        saveLayout({ ...baseLayout, classic: !0, moves: mv });
+      },
+      onEditMove = (id, at, rot) => (applyEdit(id, { at, rot }), Fe.tap()),
+      rotateSel = () => {
+        let p = editParcels.find((q) => q.id === editSel);
+        if (!p) return;
+        let moved = { ...p, rot: ((p.rot || 0) + 1) % 4 }, chk = World.checkPlan(editParcels.map((q) => (q.id === p.id ? moved : q)));
+        chk.ok ? applyEdit(p.id, { at: p.at, rot: moved.rot }) : Re(chk.why || "It doesn't fit that way round.", "bad");
+      },
+      removeSel = () => {
+        let p = editParcels.find((q) => q.id === editSel), rest = editParcels.filter((q) => q.id !== editSel), chk = World.checkPlan(rest);
+        if (!p) return;
+        if (!chk.ok) return Re("Removing that would cut the island in two.", "bad");
+        applyEdit(p.id, { remove: !0 });
+        setEditSel(null);
+      },
       Kn = (a) => {
         let g = xe.filter((F) => F.venture === a.id);
         M({
@@ -16306,7 +16419,11 @@ select.inp {
         workers: Ce,
         lightMode: lightMode,
         opening: opening,
-        paused: !!v,
+        paused: !!v || editing,
+        edit: editing ? { A: planL.A, B: planL.B, parcels: editParcels, meta: editMeta, check: World.checkPlan, selected: editSel } : null,
+        onEditMove: onEditMove,
+        onEditSelect: (id) => setEditSel(id),
+        onEditInvalid: (why) => Re(why || "That spot doesn't work.", "bad"),
         onPlot: (a) => {
           a.free
             ? M({ type: "section" })
@@ -16468,7 +16585,15 @@ select.inp {
           ),
         ),
       ),
-      !t &&
+      editing &&
+        React.createElement("div", { className: "edit-bar hud-card", role: "toolbar", "aria-label": "Layout editor" },
+          React.createElement("div", { className: "edit-txt" },
+            React.createElement("b", null, editSel && editMeta[editSel] ? editMeta[editSel].name : "Edit layout"),
+            React.createElement("span", null, editSel ? "Drag it to a new spot, or rotate it." : "Drag any building to move it. Tap one to select it.")),
+          editSel && React.createElement(Q, { variant: "ghost", onClick: rotateSel }, "Rotate"),
+          editSel && editMeta[editSel] && editMeta[editSel].scenery && React.createElement(Q, { variant: "ghost", onClick: removeSel }, "Remove"),
+          React.createElement(Q, { variant: "gold", onClick: () => (setEditing(!1), setEditSel(null)) }, "Done")),
+      !t && !editing &&
         React.createElement(
           "div",
           { className: "banner" + (sandbox ? " sandbox" : "") },
@@ -16566,6 +16691,16 @@ select.inp {
           N
             ? React.createElement(kn, { size: 18 })
             : React.createElement(vn, { size: 18 }),
+        ),
+        React.createElement(
+          Pe,
+          {
+            label: editing ? "Finish editing the layout" : "Edit layout: move and rotate buildings",
+            className: "map-btn" + (editing ? " on" : ""),
+            onClick: () => (Fe.tap(), $(null), setEditSel(null), setEditing(!editing)),
+          },
+          React.createElement("svg", { width: 18, height: 18, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" },
+            React.createElement("path", { d: "M12 3l9 5-9 5-9-5 9-5z" }), React.createElement("path", { d: "M3 13l9 5 9-5" }), React.createElement("path", { d: "M12 13v8" })),
         ),
         React.createElement(
           Pe,

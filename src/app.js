@@ -199,6 +199,7 @@
     { type: "farm", id: null, label: "Farm", blurb: "Fields, a barn and a few animals", color: "#C9B458", group: "scenery" },
     { type: "garden", id: null, label: "Garden", blurb: "Orchard rows and a stall", color: "#B7D8A4", group: "scenery" },
   ];
+  var CLASSIC_LABEL = { farm: "Farm", park: "Park", houses: "Houses", houses2: "Houses", beachHouses: "Beach houses", parking: "Parking", square: "Town square", garden: "Garden", downtown: "Downtown", apartments: "Apartments", "cs:learning": "Learning centre", "cs:townhall": "Town hall", "cs:cinema": "Cinema", home: "Home", marina: "Marina", goals: "Lookout", section: "District" };
   var FAITH_STYLES = [
     { id: "mosque", label: "Mosque" }, { id: "church", label: "Church" }, { id: "temple", label: "Temple" },
     { id: "synagogue", label: "Synagogue" }, { id: "gurdwara", label: "Gurdwara" }, { id: "garden", label: "Prayer garden" }, { id: "chapel", label: "Chapel" },
@@ -8404,6 +8405,8 @@
       [ce, $e] = He(() => On("valley-quests", window.innerWidth >= 900)),
       [lightMode, setLightMode] = He(() => On("valley-light", "auto")),
       [crewCard, setCrewCard] = He(null),
+      [editing, setEditing] = He(!1),
+      [editSel, setEditSel] = He(null),
       [, setCrewTick] = He(0),
       [z, ne] = He(!0),
       fe = Lt(null);
@@ -8482,7 +8485,8 @@
         let st = (p) => ({ ...p, status: buildingIds.has(lmOf(p)) ? "building" : "open" });
         if (fresh) return World.layoutPlan({ ...baseLayout, parcels: baseLayout.parcels.map(st) });
         let cp = World.classicPlan();
-        cp.parcels.forEach((p) => { let m = baseLayout.moves && baseLayout.moves[p.id]; m && ((p.at = m.at), (p.rot = m.rot || 0)); });
+        cp.parcels.forEach((p) => { let m = baseLayout.moves && baseLayout.moves[p.id]; m && m.at && ((p.at = m.at), (p.rot = m.rot || 0)); });
+        cp.parcels = cp.parcels.filter((p) => !(baseLayout.moves && baseLayout.moves[p.id] && baseLayout.moves[p.id].removed));
         (baseLayout.extra || []).forEach((p) => cp.parcels.push(st(p)));
         return cp;
       }, [planKey]),
@@ -8972,6 +8976,33 @@
         Fe.pop && Fe.pop();
         Re(c.group === "scenery" ? c.label + " placed." : a.name + ": building site ready. Finish its first task to open it." + (a.crew ? " The studio crew is waiting on the square." : ""), "gold");
       },
+      // layout editor: move / rotate / remove parcels and save them into the island's layout
+      editParcels = planL.parcels.filter((p) => !p.auto).map((p) => ({ id: p.id, type: p.type, at: p.at, rot: p.rot || 0, shape: p.shape, harbour: p.harbour })),
+      editMeta = Object.fromEntries(planL.parcels.map((p) => {
+        let lm = lmOf(p) || (World.PARCELS[p.type] || {}).landmark, g = lm && te[lm], c = CATALOG.find((x) => x.type === p.type);
+        return [p.id, { name: g ? g.name : c ? c.label : CLASSIC_LABEL[p.type] || p.type, color: (g && g.color) || (c && c.color) || "#9F98B8", scenery: !g && !["marina", "goals", "home"].includes(p.type) && !String(p.type).startsWith("cs:") }];
+      })),
+      applyEdit = (id, patch) => {
+        if (fresh) return saveLayout({ ...baseLayout, parcels: baseLayout.parcels.map((p) => (p.id === id ? { ...p, ...patch } : p)).filter((p) => !patch.remove || p.id !== id) });
+        if ((baseLayout.extra || []).some((p) => p.id === id)) return saveLayout({ ...baseLayout, extra: baseLayout.extra.map((p) => (p.id === id ? { ...p, ...patch } : p)).filter((p) => !patch.remove || p.id !== id) });
+        let mv = { ...(baseLayout.moves || {}) };
+        patch.remove ? (mv[id] = { ...(mv[id] || {}), removed: !0 }) : (mv[id] = { at: patch.at, rot: patch.rot || 0 });
+        saveLayout({ ...baseLayout, classic: !0, moves: mv });
+      },
+      onEditMove = (id, at, rot) => (applyEdit(id, { at, rot }), Fe.tap()),
+      rotateSel = () => {
+        let p = editParcels.find((q) => q.id === editSel);
+        if (!p) return;
+        let moved = { ...p, rot: ((p.rot || 0) + 1) % 4 }, chk = World.checkPlan(editParcels.map((q) => (q.id === p.id ? moved : q)));
+        chk.ok ? applyEdit(p.id, { at: p.at, rot: moved.rot }) : Re(chk.why || "It doesn't fit that way round.", "bad");
+      },
+      removeSel = () => {
+        let p = editParcels.find((q) => q.id === editSel), rest = editParcels.filter((q) => q.id !== editSel), chk = World.checkPlan(rest);
+        if (!p) return;
+        if (!chk.ok) return Re("Removing that would cut the island in two.", "bad");
+        applyEdit(p.id, { remove: !0 });
+        setEditSel(null);
+      },
       Kn = (a) => {
         let g = xe.filter((F) => F.venture === a.id);
         M({
@@ -9328,7 +9359,11 @@
         workers: Ce,
         lightMode: lightMode,
         opening: opening,
-        paused: !!v,
+        paused: !!v || editing,
+        edit: editing ? { A: planL.A, B: planL.B, parcels: editParcels, meta: editMeta, check: World.checkPlan, selected: editSel } : null,
+        onEditMove: onEditMove,
+        onEditSelect: (id) => setEditSel(id),
+        onEditInvalid: (why) => Re(why || "That spot doesn't work.", "bad"),
         onPlot: (a) => {
           a.free
             ? M({ type: "section" })
@@ -9490,7 +9525,15 @@
           ),
         ),
       ),
-      !t &&
+      editing &&
+        React.createElement("div", { className: "edit-bar hud-card", role: "toolbar", "aria-label": "Layout editor" },
+          React.createElement("div", { className: "edit-txt" },
+            React.createElement("b", null, editSel && editMeta[editSel] ? editMeta[editSel].name : "Edit layout"),
+            React.createElement("span", null, editSel ? "Drag it to a new spot, or rotate it." : "Drag any building to move it. Tap one to select it.")),
+          editSel && React.createElement(Q, { variant: "ghost", onClick: rotateSel }, "Rotate"),
+          editSel && editMeta[editSel] && editMeta[editSel].scenery && React.createElement(Q, { variant: "ghost", onClick: removeSel }, "Remove"),
+          React.createElement(Q, { variant: "gold", onClick: () => (setEditing(!1), setEditSel(null)) }, "Done")),
+      !t && !editing &&
         React.createElement(
           "div",
           { className: "banner" + (sandbox ? " sandbox" : "") },
@@ -9588,6 +9631,16 @@
           N
             ? React.createElement(kn, { size: 18 })
             : React.createElement(vn, { size: 18 }),
+        ),
+        React.createElement(
+          Pe,
+          {
+            label: editing ? "Finish editing the layout" : "Edit layout: move and rotate buildings",
+            className: "map-btn" + (editing ? " on" : ""),
+            onClick: () => (Fe.tap(), $(null), setEditSel(null), setEditing(!editing)),
+          },
+          React.createElement("svg", { width: 18, height: 18, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" },
+            React.createElement("path", { d: "M12 3l9 5-9 5-9-5 9-5z" }), React.createElement("path", { d: "M3 13l9 5 9-5" }), React.createElement("path", { d: "M12 13v8" })),
         ),
         React.createElement(
           Pe,

@@ -2703,3 +2703,8 @@ select.inp {
 .chip-btn.on { border-color: var(--terra); color: var(--ink); background: #fdefe9; }
 .site-banner { display: grid; gap: 2px; margin: 0 0 12px; padding: 10px 12px; border-radius: 12px; background: repeating-linear-gradient(135deg, #fbf1d9 0 12px, #f7e8c4 12px 24px); color: #6b5a2a; font-size: 12.5px; line-height: 1.4; }
 .site-banner b { font: 600 14px Fredoka, sans-serif; color: #5a4a1e; }
+.edit-bar { position: absolute; left: 50%; transform: translateX(-50%); top: calc(env(safe-area-inset-top, 0px) + 84px); z-index: 24; display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 14px; border-radius: 18px; max-width: calc(100vw - 32px); }
+.edit-txt { display: grid; gap: 1px; min-width: 0; margin-right: 6px; }
+.edit-txt b { font: 600 14.5px Fredoka, sans-serif; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.edit-txt span { font-size: 12px; color: var(--ink2); }
+@media (max-width: 767px) { .edit-bar { top: calc(env(safe-area-inset-top, 0px) + 150px); flex-wrap: wrap; } }

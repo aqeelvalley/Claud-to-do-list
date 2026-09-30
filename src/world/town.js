@@ -218,7 +218,7 @@
       return I;
     };
 
-    const life = makeIsle("life", plan, { bridgeEast: !!plan.work, seed: hash("coast-life" + (plan.seed || "")), name: "Life Island", color: "#6DAE5B" });
+    const life = makeIsle("life", { ...plan, parcels: fillHoles(plan.parcels) }, { bridgeEast: !!plan.work, seed: hash("coast-life" + (plan.seed || "")), name: "Life Island", color: "#6DAE5B" });
     let bridgeE = null, work = null;
     if (plan.work && life.bridgePt) {
       const [bi, bj] = life.bridgePt, aw = life.A[bi] + 520, by = life.B[bj];
@@ -328,7 +328,7 @@
     const pier = (r, type = "pier") => { const p = { ...r, type }; piers.push(p); return p; };
     life.parcels.filter((p) => p.harbour).forEach((p) => {
       const occ = new Map([...life.cellP.keys()].map((k) => [k, 1]));
-      const side = p.harbour.side || coastSide(p, occ);
+      const side = coastSide({ ...p, side: p.harbour.side }, occ);
       if (!side) return;
       const [i, j] = p.cells[0], A = life.A, B = life.B, ca0 = A[i], ca1 = A[i + 1], cb0 = B[j], cb1 = B[j + 1];
       const L = side[1] === "b" ? ca1 - ca0 : cb1 - cb0, E = 15 + VERGE + 60;

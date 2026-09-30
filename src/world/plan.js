@@ -69,7 +69,7 @@
       while (q.length) { const [i, j] = q.pop().split(",").map(Number); [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([di, dj]) => { const k = i + di + "," + (j + dj); if (occ.has(k) && !seen.has(k)) { seen.add(k); q.push(k); } }); }
       if (seen.size !== keys.length) return { ok: false, why: "Every building needs to join the rest of the island." };
     }
-    for (const p of parcels) if ((PARCELS[p.type] || {}).coastal && !coastSide(p, occ)) return { ok: false, why: PARCELS[p.type].label + " has to sit on the coast." };
+    for (const p of parcels) if (((PARCELS[p.type] || {}).coastal || p.harbour) && !coastSide(p, occ)) return { ok: false, why: ((PARCELS[p.type] || {}).label || "The harbour") + " has to sit on the coast, with open water on one side." };
     return { ok: true, occ };
   }
   /* the open side of a coastal parcel's main cell, preferring the sides that face the viewer */
@@ -119,8 +119,10 @@
   }
 
   /* the original Valley Isle as a plan: same streets, same buildings, now movable */
+  const CL_OFF = [6, 5]; // where the original streets sit inside the full-size grid
   function classicPlan() {
-    const A = [100, 420, 720, 1010, 1380], B = [100, 400, 720, 1000, 1330, 1640];
+    const pad = (core, off) => { const out = core.slice(); for (let k = 0; k < off; k++) out.unshift(out[0] - 300); while (out.length < FRESH_N + 1) out.push(out[out.length - 1] + 300); return out; };
+    const A = pad([100, 420, 720, 1010, 1380], CL_OFF[0]), B = pad([100, 400, 720, 1000, 1330, 1640], CL_OFF[1]);
     const T = [
       ["farm", "park", "houses", "gym", "beachHouses"],
       ["freelance", "home", "maker", "parking", "cs:learning"],
@@ -128,17 +130,16 @@
       ["houses2", "downtown", "mill", "cs:townhall", "cs:cinema"],
     ];
     const parcels = [];
-    T.forEach((col, i) => col.forEach((t, j) => parcels.push({ id: "c" + i + j, type: t, at: [i, j], rot: 0, shape: [[0, 0]], classic: true })));
+    T.forEach((col, i) => col.forEach((t, j) => parcels.push({ id: "c" + i + j, type: t, at: [i + CL_OFF[0], j + CL_OFF[1]], rot: 0, shape: [[0, 0]], classic: true })));
     parcels.find((p) => p.type === "marina").harbour = { kind: "marina", side: "+b" };
     parcels.find((p) => p.type === "cs:cinema").harbour = { kind: "lighthouse", side: "+b" };
     const joins = [["c03", "c13"], ["c20", "c21"], ["c23", "c33"], ["c30", "c31"], ["c01", "c02"]];
-    return { A, B, parcels, joins, main: { a: [2], b: [2] }, roundabout: [2, 2], work: true, classic: true };
+    return { A, B, parcels, joins, main: { a: [2 + CL_OFF[0]], b: [2 + CL_OFF[1]] }, roundabout: [2 + CL_OFF[0], 2 + CL_OFF[1]], work: true, classic: true };
   }
   /* a stored layout (settings/island.layout) as a plan */
   function layoutPlan(layout, sections = []) {
     const { A, B } = freshLines(layout.seed || 7);
     let parcels = (layout.parcels || []).map((p) => ({ ...p, cells: undefined }));
-    parcels = fillHoles(parcels);
     parcels.forEach((p) => { if (p.type === "marina") p.harbour = { kind: "marina" }; if (p.type === "goals") p.harbour = { kind: "lighthouse" }; });
     return { A, B, parcels, joins: [], main: null, roundabout: "auto", work: !!layout.work, seed: layout.seed || 7 };
   }

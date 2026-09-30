@@ -38,7 +38,7 @@
     const wrap = React.useRef(null), cvs = React.useRef(null);
     const st = React.useRef(null);
     const cb = React.useRef({});
-    cb.current = { onOpen, onShip, onPlot, onAgent, onCrew, onAssign, landmarks, lightMode, reserveRight, paused: props.paused, opening: props.opening };
+    cb.current = { onOpen, onShip, onPlot, onAgent, onCrew, onAssign, landmarks, lightMode, reserveRight, paused: props.paused, opening: props.opening, edit: props.edit, onEditMove: props.onEditMove, onEditSelect: props.onEditSelect, onEditInvalid: props.onEditInvalid };
 
     /* one-time engine setup per town */
     React.useEffect(() => {
@@ -306,7 +306,54 @@
         }
         // gulls above everything
         sim.gulls.forEach((gl) => { const a = gl.cx + Math.cos(gl.t) * gl.r, b = gl.cy + Math.sin(gl.t) * gl.r * 0.6; drawAnimal(ctx, "gull", a - b, (a + b) / 2 - gl.z, Math.cos(gl.t + 1.57) < 0 ? -1 : 1, time * 7 + gl.cx, null); });
+        if (cb.current.edit) drawEdit(time);
         plates(time);
+      };
+      /* ---- layout editor overlay: the grid, every parcel's cells, and the one being dragged ---- */
+      const cellOfWorld = (wx, wy) => {
+        const ed = cb.current.edit; if (!ed) return null;
+        const a = wy + wx / 2, b = wy - wx / 2, find = (L, v) => { for (let i = 0; i < L.length - 1; i++) if (v >= L[i] && v < L[i + 1]) return i; return -1; };
+        const i = find(ed.A, a), j = find(ed.B, b);
+        return i < 0 || j < 0 ? null : [i, j];
+      };
+      const drawEdit = (time) => {
+        const ed = cb.current.edit, { A, B } = ed, cam = S.cam;
+        const quad = (i, j) => [[A[i], B[j]], [A[i + 1], B[j]], [A[i + 1], B[j + 1]], [A[i], B[j + 1]]].map(([a, b]) => [a - b, (a + b) / 2]);
+        const path = (pts) => { ctx.beginPath(); pts.forEach(([x, y], k) => (k ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.closePath(); };
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = "rgba(248,240,236,0.42)"; ctx.fillRect(0, 0, cv.width, cv.height);
+        ctx.setTransform(S.dpr * cam.s, 0, 0, S.dpr * cam.s, S.dpr * cam.tx, S.dpr * cam.ty);
+        const occ = new Map(); ed.parcels.forEach((p) => cellsOf(p).forEach((c) => occ.set(c.join(","), p)));
+        const all = [...occ.keys()].map((k) => k.split(",").map(Number));
+        const i0 = Math.max(0, Math.min(...all.map((c) => c[0])) - 3), i1 = Math.min(A.length - 2, Math.max(...all.map((c) => c[0])) + 3), j0 = Math.max(0, Math.min(...all.map((c) => c[1])) - 3), j1 = Math.min(B.length - 2, Math.max(...all.map((c) => c[1])) + 3);
+        ctx.lineWidth = 1 / cam.s; ctx.strokeStyle = "rgba(110,98,150,0.28)";
+        for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) { path(quad(i, j)); ctx.stroke(); }
+        const ghost = S.ghost;
+        ed.parcels.forEach((p) => {
+          if (ghost && ghost.id === p.id) return;
+          const meta = ed.meta[p.id] || {}, col = meta.color || "#9F98B8", sel = ed.selected === p.id;
+          cellsOf(p).forEach(([i, j]) => { path(quad(i, j)); ctx.fillStyle = col + (sel ? "88" : "4A"); ctx.fill(); });
+          cellsOf(p).forEach(([i, j]) => {
+            const edges = [[[i, j], [i + 1, j], [i, j - 1]], [[i + 1, j], [i + 1, j + 1], [i + 1, j]], [[i + 1, j + 1], [i, j + 1], [i, j + 1]], [[i, j + 1], [i, j], [i - 1, j]]];
+            edges.forEach(([g0, g1, nb]) => { if (occ.get(nb.join(",")) === p) return; const P0 = [A[g0[0]] - B[g0[1]], (A[g0[0]] + B[g0[1]]) / 2], P1 = [A[g1[0]] - B[g1[1]], (A[g1[0]] + B[g1[1]]) / 2]; ctx.beginPath(); ctx.moveTo(...P0); ctx.lineTo(...P1); ctx.strokeStyle = sel ? "#463D63" : col; ctx.lineWidth = (sel ? 3 : 2) / cam.s; ctx.stroke(); });
+          });
+        });
+        if (ghost) {
+          const bob = 0.5 + 0.5 * Math.sin(time * 6);
+          ghost.cells.forEach(([i, j]) => { path(quad(i, j)); ctx.fillStyle = ghost.ok ? `rgba(120,200,150,${0.45 + 0.15 * bob})` : `rgba(228,130,106,${0.45 + 0.15 * bob})`; ctx.fill(); ctx.strokeStyle = ghost.ok ? "#4E9A6E" : "#C0604C"; ctx.lineWidth = 2.5 / cam.s; ctx.stroke(); });
+        }
+        // names on the parcels
+        const ls = clamp(1 / cam.s, 0.5, 3);
+        ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.font = `600 ${12 * ls}px Fredoka, sans-serif`;
+        ed.parcels.forEach((p) => {
+          const cells = ghost && ghost.id === p.id ? ghost.cells : cellsOf(p), c0 = cells[0], q = quad(c0[0], c0[1]);
+          const x = (q[0][0] + q[2][0]) / 2, y = (q[0][1] + q[2][1]) / 2, meta = ed.meta[p.id] || {};
+          if (!meta.name) return;
+          const tw = ctx.measureText(meta.name).width + 12 * ls;
+          ctx.fillStyle = "rgba(255,248,240,0.94)"; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x - tw / 2, y - 9 * ls, tw, 18 * ls, 9 * ls) : ctx.rect(x - tw / 2, y - 9 * ls, tw, 18 * ls); ctx.fill();
+          ctx.fillStyle = "#463D63"; ctx.fillText(meta.name, x, y + 0.5 * ls);
+        });
+        ctx.restore();
       };
 
       const fx = (time) => {
@@ -340,6 +387,7 @@
 
       /* ---- nameplates & crew chips (screen-steady size) ---- */
       const plates = () => {
+        if (cb.current.edit) return;
         const ls = clamp(1 / S.cam.s, 0.45, 3.4);
         const lms = cb.current.landmarks;
         S.plates = [];
@@ -420,8 +468,16 @@
         if (ptr.map.size === 1) {
           ptr.moved = false; ptr.start = { x, y, tx: S.cam.tx, ty: S.cam.ty };
           const w0 = toWorld(x, y);
-          const c = hitCrew(w0.x, w0.y);
-          ptr.crew = c || null;
+          ptr.parcel = null;
+          if (cb.current.edit) {
+            const cell = cellOfWorld(w0.x, w0.y), ed = cb.current.edit;
+            const p = cell && ed.parcels.find((q) => cellsOf(q).some((c) => c[0] === cell[0] && c[1] === cell[1]));
+            ptr.parcel = p && !p.locked ? { p, grab: cell } : null;
+            ptr.crew = null;
+          } else {
+            const c = hitCrew(w0.x, w0.y);
+            ptr.crew = c || null;
+          }
         }
         if (ptr.map.size === 2) { const [p, q] = [...ptr.map.values()]; ptr.pinch = { d: Math.hypot(p.x - q.x, p.y - q.y), s: S.cam.s }; ptr.moved = true; ptr.crew = null; if (S.drag) cancelDrag(); }
         try { el.setPointerCapture(e.pointerId); } catch {}
@@ -446,7 +502,18 @@
             ptr.moved = true;
             if (ptr.crew) { const w = ptr.crew; w.carried = true; w.hidden = false; if (w.onCross) { w.onCross.peds--; w.onCross = null; } S.drag = { w }; w.crew.status = "carried"; el.style.cursor = "grabbing"; }
           }
-          if (S.drag) {
+          if (ptr.parcel && ptr.moved) {
+            const ed = cb.current.edit, w0 = toWorld(x, y), cell = cellOfWorld(w0.x, w0.y);
+            if (cell && ed) {
+              const p = ptr.parcel.p, at = [p.at[0] + cell[0] - ptr.parcel.grab[0], p.at[1] + cell[1] - ptr.parcel.grab[1]];
+              if (!S.ghost || S.ghost.at[0] !== at[0] || S.ghost.at[1] !== at[1]) {
+                const moved = { ...p, at };
+                const chk = ed.check(ed.parcels.map((q) => (q.id === p.id ? moved : q)));
+                S.ghost = { id: p.id, at, rot: p.rot || 0, cells: cellsOf(moved), ok: chk.ok, why: chk.why };
+              }
+            }
+            if (x < 40) S.cam.tx += 6; if (x > S.w - 40) S.cam.tx -= 6; if (y < 60) S.cam.ty += 6; if (y > S.h - 90) S.cam.ty -= 6;
+          } else if (S.drag) {
             const w0 = toWorld(x, y + 14);
             const a = w0.y + w0.x / 2, b = w0.y - w0.x / 2;
             S.drag.w.a = a; S.drag.w.b = b;
@@ -468,6 +535,15 @@
         if (ptr.map.size < 2) ptr.pinch = null;
         if (ptr.map.size === 1) { const [p] = [...ptr.map.values()]; ptr.start = { x: p.x, y: p.y, tx: S.cam.tx, ty: S.cam.ty }; }
         if (!was || ptr.map.size > 0) return;
+        if (ptr.parcel) {
+          const pp = ptr.parcel, g = S.ghost;
+          ptr.parcel = null; S.ghost = null;
+          if (!ptr.moved) { cb.current.onEditSelect && cb.current.onEditSelect(pp.p.id); return; }
+          if (g && g.ok && (g.at[0] !== pp.p.at[0] || g.at[1] !== pp.p.at[1])) cb.current.onEditMove && cb.current.onEditMove(pp.p.id, g.at, g.rot);
+          else if (g && !g.ok) cb.current.onEditInvalid && cb.current.onEditInvalid(g.why);
+          return;
+        }
+        if (cb.current.edit) { if (!ptr.moved) cb.current.onEditSelect && cb.current.onEditSelect(null); return; }
         if (S.drag) {
           const w = S.drag.w; w.carried = false; S.drag = null;
           const w0 = toWorld(x, y);
