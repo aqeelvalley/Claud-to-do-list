@@ -20,6 +20,18 @@ import { App } from "@capacitor/app";
 
 const native = Capacitor.isNativePlatform();
 const LLHealth = registerPlugin("LLHealth");
+const LLWidget = registerPlugin("LLWidget");
+
+/* things the app should react to: lifelist:// links from the widgets, coming back to the foreground */
+const actionHandlers = new Set(), pendingActions = [];
+const emitAction = (a) => { if (actionHandlers.size) actionHandlers.forEach((f) => f(a)); else pendingActions.push(a); };
+const routeUrl = (url) => {
+  try {
+    const u = new URL(url);
+    if (u.protocol !== "lifelist:") return;
+    emitAction({ type: u.host || u.pathname.replace(/^\/+/, ""), params: Object.fromEntries(u.searchParams) });
+  } catch {}
+};
 
 /* ---------------- on-device document store ---------------- */
 const DIR = Directory.Library;
@@ -166,12 +178,20 @@ window.LLPlatform = {
       } catch (e) { console.warn("LifeList: notifications", e); return false; }
     },
   },
+  // home-screen widgets: today's snapshot out, taps made on the widgets back in
+  widgets: native && Capacitor.getPlatform() === "ios" ? {
+    update: (json) => LLWidget.update({ data: json }).catch(() => {}),
+    take: () => LLWidget.takeActions().then((r) => r.actions || []).catch(() => []),
+  } : null,
+  onAction: (fn) => { actionHandlers.add(fn); pendingActions.splice(0).forEach(fn); return () => actionHandlers.delete(fn); },
   flush: () => (dbPromise ? dbPromise.then((db) => db.flush()) : Promise.resolve()),
 };
 
 if (native) {
   // save straight away when the app goes to the background
   App.addListener("pause", () => window.LLPlatform.flush());
+  App.addListener("resume", () => emitAction({ type: "resume" }));
+  App.addListener("appUrlOpen", (e) => routeUrl(e.url));
   App.addListener("appStateChange", (s) => { if (!s.isActive) window.LLPlatform.flush(); });
   StatusBar.setStyle({ style: Style.Light }).catch(() => {});
   // hide the splash once the island has drawn its first frames

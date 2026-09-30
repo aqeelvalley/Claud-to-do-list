@@ -43,6 +43,18 @@ GitHub Actions (`.github/workflows/ios.yml`) builds the app on GitHub's Macs.
      - `APPLE_TEAM_ID`: your 10-character team ID (Membership page)
   4. Run the workflow from the Actions tab with **Upload to TestFlight** ticked (or push to `main`). Signing is automatic. The build appears in TestFlight about 10–20 minutes later, and you can install it with the TestFlight app on your iPhone.
 
+### Home-screen widgets
+Four widgets, which you add by long-pressing the home screen and choosing **+** → LifeList:
+
+- **Quick log** (small/medium): today's calories, what's due, and one-tap buttons.
+  - **+ To-do** and **Food** open the app on the right screen.
+  - **+100 / +250 / +500 kcal** log calories without opening the app.
+- **Progress** (small/medium, plus lock screen): quests, calories and steps rings, level bar and streak.
+- **To-dos** (medium/large): today's list. Tap a circle to tick a to-do off.
+- **Island** (medium/large): a mix of progress, top to-dos and quick buttons.
+
+The widgets share data with the app through the App Group `group.app.lifelist.island`. Taps made on a widget are applied when the app next opens. Ticking and logging buttons need iOS 17 or later.
+
 ### Install with Sideloadly (free Apple ID, no Mac)
 1. Download the file.
    - On GitHub, open **Actions → LifeList iOS** and pick the latest green run.
@@ -58,7 +70,7 @@ GitHub Actions (`.github/workflows/ios.yml`) builds the app on GitHub's Macs.
    - On iOS 16 or later, also turn on Settings → Privacy & Security → **Developer Mode** (the phone restarts).
 6. A free Apple ID install lasts **7 days**. Re-install from Sideloadly to renew; your island data is kept.
 
-Apple Health needs the paid account's HealthKit permission, so it may not connect in a Sideloadly install. Everything else works: the island, tasks, reminders, vibration and backups.
+Apple Health needs the paid account's HealthKit permission, so it may not connect in a Sideloadly install. Widgets need the App Group to be kept when Sideloadly re-signs the app. If they only say "Open LifeList to sync", that's the free-account limit, and the paid account fixes it. Everything else works: the island, tasks, reminders, vibration and backups.
 
 ### Moving your island from the artifact to the app
 1. In the artifact, open Settings (tap the island crest) and choose **Download backup**.

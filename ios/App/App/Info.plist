@@ -57,6 +57,17 @@
 	</array>
 	<key>NSHealthShareUsageDescription</key>
 	<string>LifeList reads your steps, active calories, workouts and cycle from Apple Health to fill in your Health Centre and fitness streak. It only reads: nothing is ever written to Apple Health, and your data stays on this iPhone.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>app.lifelist.island</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>lifelist</string>
+			</array>
+		</dict>
+	</array>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>UIStatusBarStyle</key>

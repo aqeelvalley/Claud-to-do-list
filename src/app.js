@@ -9816,6 +9816,70 @@
       }, 1500);
       return () => clearTimeout(tm);
     }, [remindKey, sandbox]);
+    // iPhone home-screen widgets: hand them a small snapshot of today...
+    let wdg = window.LLPlatform && window.LLPlatform.widgets,
+      wSnap = "";
+    if (wdg && k && !sandbox) {
+      let todayH = (hDays || []).find((x) => x.id === ue) || {},
+        billsDue = (billsC || []).filter((b2) => !(b2.paid && b2.paid[monthKey()]) && new Date().getDate() >= b2.day),
+        dueLbl = (t2) => { if (t2.repeat) return t2.repeat === "daily" ? "Daily" : t2.repeat === "weekdays" ? "Weekdays" : "Weekly"; let d4 = xt(t2.due); return d4 == null ? "" : d4 < 0 ? "Late" : d4 === 0 ? "Today" : d4 === 1 ? "Tomorrow" : d4 < 7 ? new Date(t2.due + "T12:00").toLocaleDateString("en", { weekday: "short" }) : new Date(t2.due + "T12:00").toLocaleDateString("en", { day: "numeric", month: "short" }); },
+        row = (t2, quest) => ({ id: t2.id, title: t2.title || "Untitled", done: t2.status === "done", quest, place: (te[t2.venture] || {}).name || "Home", color: (te[t2.venture] || {}).color || "#9F8FC9", due: dueLbl(t2) }),
+        others = xe.filter((t2) => t2.status !== "done" && !t2.repeat && !Ye.includes(t2)).sort((a2, b3) => String(a2.due || "9").localeCompare(String(b3.due || "9"))),
+        todos = [...billsDue.map((b2) => ({ id: "bill:" + b2.id, title: "Pay " + b2.name, done: !1, quest: !0, place: "Bank", color: "#E9B949", due: money(b2.amount) })), ...Ye.map((t2) => row(t2, !0)), ...others.map((t2) => row(t2, !1))].slice(0, 10),
+        habitQ = hasVenture("fitness"),
+        late = xe.filter((t2) => Ut(t2) && !t2.repeat).length,
+        dueToday = xe.filter((t2) => t2.status !== "done" && t2.due === ue).length;
+      wSnap = JSON.stringify({
+        island: (isl && isl.islandName) || "LifeList", level: je.level, xpPct: Math.round(je.pct * 100) / 100, streak: Ve, activeToday: !!Xe,
+        questsDone: Ye.filter((t2) => t2.status === "done").length + (habitQ && Ue ? 1 : 0), questsTotal: Ye.length + (habitQ ? 1 : 0) + billsDue.length,
+        todos,
+        kcal: Math.round((todayH.kcal || []).reduce((a2, x) => a2 + (Number(x.kcal) || 0), 0)), kcalTarget: Math.round((hCfg && hCfg.calTarget) || 2000),
+        steps: Math.round(Number(todayH.steps) || 0), stepTarget: Math.round((hCfg && hCfg.stepTarget) || 1e4),
+        next: billsDue.length ? "Pay " + billsDue[0].name + (billsDue.length > 1 ? " +" + (billsDue.length - 1) + " more" : " \xB7 due") : late ? late + " to-do" + (late > 1 ? "s" : "") + " overdue" : dueToday ? dueToday + " due today" : focus ? "Focus: " + focus.task.title : "",
+        updated: Date.now(),
+      });
+    }
+    at(() => {
+      if (!wSnap) return;
+      let tm = setTimeout(() => wdg.update(wSnap), 700);
+      return () => clearTimeout(tm);
+    }, [wSnap]);
+    // ...and act on what was tapped there: ticked to-dos, logged calories, "new to-do" / "log food" links
+    let wAct = Lt({});
+    wAct.current = { xe, js, billsC, bankAct, healthAct, Yt, Ie, ready: !!(k && hBase && !sandbox) };
+    at(() => {
+      let P = window.LLPlatform;
+      if (!P || !P.onAction) return;
+      let busy = !1,
+        drain = async () => {
+          let W = wAct.current;
+          if (busy || !W.ready || !P.widgets) return;
+          busy = !0;
+          try {
+            let acts = await P.widgets.take(), kc = 0, n5 = 0;
+            for (let a2 of acts) {
+              if (a2.type === "kcal") kc += Number(a2.kcal) || 0;
+              else if (a2.type === "done" && typeof a2.id === "string") {
+                if (a2.id.startsWith("bill:")) { let b2 = (W.billsC || []).find((x) => "bill:" + x.id === a2.id); b2 && !(b2.paid && b2.paid[monthKey()]) && (W.bankAct.toggleBill(b2, monthKey()), n5++); }
+                else { let t2 = W.xe.find((x) => x.id === a2.id); t2 && t2.status !== "done" && (W.js(t2, "done"), n5++); }
+              }
+            }
+            if (kc > 0) { let h2 = new Date().getHours(); W.healthAct.addFood({ name: "Quick add (widget)", kcal: kc, meal: h2 < 11 ? "Breakfast" : h2 < 15 ? "Lunch" : h2 < 20 ? "Dinner" : "Snack" }); }
+            (kc || n5) && Re("From your widget: " + [n5 ? n5 + " to-do" + (n5 > 1 ? "s" : "") + " done" : "", kc ? kc + " kcal logged" : ""].filter(Boolean).join(", ") + ".", "gold");
+          } finally { busy = !1; }
+        },
+        off = P.onAction((a2) => {
+          let W = wAct.current;
+          if (a2.type === "add-task") W.Yt();
+          else if (a2.type === "log-food") W.Ie({ type: "health", tab: "calories" });
+          drain();
+        });
+      wAct.drain = drain;
+      drain();
+      return off;
+    }, []);
+    // once the island has loaded, pick up anything tapped on the widgets while the app was closed
+    at(() => { wAct.current.ready && wAct.drain && wAct.drain(); }, [k, hBase, sandbox]);
     // repeating tasks come back: a done repeating task from an earlier day reopens on its next day
     at(() => {
       if (!k || !t && !sandbox) return;
