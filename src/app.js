@@ -7200,6 +7200,7 @@
     onGoal: w,
     onDelGoal: v,
     onAddTask: $,
+    fields: fieldsList,
   }) {
     let E = t.target || 2e5,
       M =
@@ -7385,94 +7386,13 @@
           "Update",
         ),
       ),
-      React.createElement(
-        "div",
-        { className: "section-h mt-6" },
-        React.createElement(An, { size: 16 }),
-        "Personal goals",
-      ),
-      React.createElement(
-        "div",
-        { className: "space-y-2" },
-        i.map((z) =>
-          React.createElement(
-            "div",
-            { key: z.id, className: "goal-row" },
-            React.createElement(
-              "div",
-              { className: "flex items-center gap-2" },
-              React.createElement(
-                "span",
-                { className: "font-semibold text-[14.5px] flex-1 min-w-0" },
-                z.title,
-              ),
-              React.createElement(
-                "span",
-                {
-                  className: "tnum text-[13px] font-bold",
-                  style: {
-                    color: z.progress >= 100 ? "#3E8E3A" : "var(--ink2)",
-                  },
-                },
-                z.progress,
-                "%",
-              ),
-              React.createElement(
-                Pe,
-                {
-                  label: "Delete goal",
-                  className: "row-del",
-                  onClick: () => v(z),
-                },
-                React.createElement(mt, { size: 15 }),
-              ),
-            ),
-            React.createElement("input", {
-              id: "goal-" + z.id,
-              type: "range",
-              min: "0",
-              max: "100",
-              step: "5",
-              defaultValue: z.progress,
-              className: "range mt-1.5",
-              "aria-label": `Progress for ${z.title}`,
-              onPointerUp: (ne) => w(z, Number(ne.target.value)),
-              onKeyUp: (ne) => w(z, Number(ne.target.value)),
-            }),
-          ),
-        ),
-        !i.length &&
-          React.createElement(
-            "div",
-            { className: "empty" },
-            "Add a goal you want to work towards.",
-          ),
-      ),
-      React.createElement(
-        "div",
-        { className: "mt-2 grid grid-cols-[1fr_auto] gap-2" },
-        React.createElement("input", {
-          id: "goal-new",
-          className: "inp",
-          value: ee,
-          placeholder: "New goal, e.g. Read 12 books",
-          onChange: (z) => ce(z.target.value),
-          onKeyDown: (z) => {
-            z.key === "Enter" && ee.trim() && (f(ee.trim()), ce(""));
-          },
-        }),
-        React.createElement(
-          Q,
-          {
-            disabled: !ee.trim(),
-            onClick: () => {
-              (f(ee.trim()), ce(""));
-            },
-          },
-          React.createElement(At, { size: 16 }),
-          "Goal",
-        ),
-      ),
+      React.createElement(Inside.GoalTree, {
+        goals: i,
+        fields: fieldsList || [],
+        onAdd: f,
+        onGoal: w,
+        onDel: v,
+      }),
       React.createElement(
         "div",
         { className: "section-h mt-6" },
@@ -8350,8 +8270,15 @@
         [i],
       ),
       cityL = _t(
-        () => City.layout(pe.reduce((a, g) => Math.max(a, g.slot + 1), 0)),
-        [pe.map((a) => a.slot).join(",")],
+        () =>
+          City.layout(
+            pe.reduce((a, g) => Math.max(a, g.slot + 1), 0),
+            (l || []).filter((a) => a.progress >= 100).length,
+          ),
+        [
+          pe.map((a) => a.slot).join(","),
+          (l || []).filter((a) => a.progress >= 100).length,
+        ],
       ),
       Ge = _t(
         () => [
@@ -8910,13 +8837,13 @@
             .doc("stats/treasury")
             .set({ entries: [], ...(qe.current.treasuryD || {}), target: a }),
         ).then(() => Re("Monthly target updated")),
-      oo = (a) => {
+      oo = (a, F = "personal") => {
         let g = Ze("g");
         (U("pgoals/" + g, () =>
           e
             .collection("pgoals")
             .doc(g)
-            .set({ id: g, title: a, progress: 0, createdAt: Date.now() }),
+            .set({ id: g, title: a, field: F, progress: 0, createdAt: Date.now() }),
         ),
           Fe.pop());
       },
@@ -9104,7 +9031,10 @@
             ? M({ type: "section" })
             : (Fe.tap(),
               Re(
-                `${a.content.slice(3)} on ${a.isle.name} is under construction. Complete goals to unlock it.`,
+                (() => {
+                  let g = a.cs + 1 - G.filter((F) => F.progress >= 100).length;
+                  return `${a.content.slice(3)} on ${a.isle.name} is under construction. Complete ${g} more goal${g === 1 ? "" : "s"} to finish it.`;
+                })(),
               ));
         },
         onAgent: (a) => {
@@ -9488,6 +9418,7 @@
           onDelIncome: so,
           onSetTarget: no,
           onAddGoal: oo,
+          fields: Ge.filter((a) => a.id !== "goals"),
           onGoal: ao,
           onDelGoal: io,
           onAddTask: () => Yt("goals"),

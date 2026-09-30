@@ -2617,3 +2617,19 @@ select.inp {
   .interior-title { font-size: 16px; }
   .pin-btn { display: none; }
 }
+
+/* ---- goal tree ---- */
+.gt-hint { font-size: 12.5px; color: var(--ink2); margin: -2px 0 10px; line-height: 1.45; }
+.gt-field { padding: 10px; border-radius: 16px; background: color-mix(in srgb, var(--fc) 8%, #fffdf8); border: 1.5px solid color-mix(in srgb, var(--fc) 30%, #efe1c8); display: flex; flex-direction: column; gap: 7px; }
+.gt-head { display: flex; align-items: center; gap: 7px; font: 600 14px Fredoka, sans-serif; }
+.gt-name { flex: 1; min-width: 0; }
+.gt-tier { font: 700 11px Fredoka, sans-serif; color: #fff; background: var(--fc); padding: 1px 8px; border-radius: 999px; }
+.gt-slots { font: 700 11.5px Fredoka, sans-serif; color: var(--ink2); background: var(--paper3); padding: 1px 8px; border-radius: 999px; }
+.gt-lock, .gt-open { display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 700; color: var(--ink3); padding: 8px 10px; border-radius: 12px; border: 1.5px dashed var(--line2); background: rgba(255, 255, 255, 0.5); }
+.gt-open { color: var(--tealD); border-color: #9fd5ca; }
+.gt-done { display: flex; flex-wrap: wrap; gap: 5px; }
+.gt-chip { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; font: 700 11.5px Nunito, sans-serif; color: #2f6b2c; background: #e3f3df; border: 1px solid #b9dfb2; border-radius: 8px; padding: 2px 4px 2px 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gt-chip button { border: 0; background: none; color: #6b8f66; cursor: pointer; font-size: 14px; line-height: 1; padding: 0 3px; }
+.gt-add { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.4fr) auto; gap: 8px; }
+.gt-full { font-size: 12.5px; color: #a9362b; margin-top: 6px; }
+@media (max-width: 480px) { .gt-add { grid-template-columns: 1fr auto; } .gt-add select { grid-column: 1 / -1; } }

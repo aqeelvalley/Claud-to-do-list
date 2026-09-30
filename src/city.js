@@ -52,7 +52,9 @@
     };
 
     /* ---------- layout ---------- */
-    function layout(nSections) {
+    const CS_KIND = { "Town hall": "office", "Research lab": "office", "Robotics bay": "shop", "Sound stage": "tower" };
+    function layout(nSections, nBuilt = 0) {
+      let csIdx = 0;
       const nFrontier = Math.floor(nSections / 4) + 1;
       const isles = CORE.map((c) => ({ ...c, sites: [...c.sites] }));
       for (let k = 0; k < nFrontier; k++) {
@@ -126,57 +128,80 @@
           const [x, y] = scr(ca + Math.cos(th) * rr, cb + Math.sin(th) * rr);
           blobs.push({ id: "b" + s.id + "h" + k, x, y, r: 120 + rnd() * 60 });
         }
-        // winding loop road
-        const M = 48;
-        const lo = [(rnd() - 0.5) * 22, (rnd() - 0.5) * 22], stretch = (rnd() - 0.5) * 0.14;
-        const loop = [];
-        for (let k = 0; k < M; k++) {
-          const th = (k / M) * TAU + spin;
-          const rr = loopR * (0.97 + 0.1 * Math.sin(2 * th + spin * 5) + 0.06 * Math.sin(3 * th + spin * 2 + 1.3) + 0.03 * Math.sin(5 * th + spin));
-          loop.push([ca + lo[0] + Math.cos(th) * rr * (1 + stretch), cb + lo[1] + Math.sin(th) * rr * (1 - stretch)]);
-        }
+        // Ring road traced from the real coastline, inset so it stays on land
+        const mine = blobs.filter((d) => d.id.startsWith("b" + s.id));
+        const fieldAt = (a, b) => {
+          const [X, Y] = scr(a, b);
+          let f = 0;
+          for (const d of mine) {
+            const u = (X - d.x) / d.r, v = (Y - d.y) / (d.r * 0.5), N = u * u + v * v;
+            if (N < 1) f += (1 - N) * (1 - N);
+          }
+          return f;
+        };
+        const M = 48, minR = sr + 90 * s.size;
+        const angle = (k) => (k / M) * TAU + spin;
+        const coastAt = (th) => {
+          let r = 40;
+          while (r < 700 && fieldAt(ca + Math.cos(th) * r, cb + Math.sin(th) * r) > 0.74) r += 4;
+          return r;
+        };
+        let coast = Array.from({ length: M }, (_, k) => coastAt(angle(k)));
+        // widen any narrow waist so the ring clears the buildings
+        coast.forEach((r, k) => {
+          if (r - 34 < minR) {
+            const th = angle(k), rr = minR + 10;
+            const [x, y] = scr(ca + Math.cos(th) * rr, cb + Math.sin(th) * rr);
+            const d = { id: "b" + s.id + "w" + k, x, y, r: 175 };
+            blobs.push(d); mine.push(d);
+          }
+        });
+        coast = Array.from({ length: M }, (_, k) => coastAt(angle(k)));
+        const raw = coast.map((r) => Math.max(minR, r - 34));
+        let rad = [...raw];
+        for (let pass = 0; pass < 4; pass++)
+          rad = rad.map((r, k) => Math.min(raw[k], (rad[(k + M - 1) % M] + 2 * r + rad[(k + 1) % M]) / 4));
+        s.landR = coast.reduce((x, y) => x + y, 0) / M;
+        s.coastAt = coastAt;
+        s.coastMax = Math.max(...coast.filter((_, k) => Math.sin(angle(k) + Math.PI / 4) > 0.5));
+        const loop = rad.map((r, k) => [ca + Math.cos(angle(k)) * r, cb + Math.sin(angle(k)) * r]);
         s.loop = loop;
         s.nodes = [];
-        for (let k = 0; k < M; k += 6) s.nodes.push(loop[k]);
+        for (let k = 0; k < M; k += 4) s.nodes.push(loop[k]);
         road([...loop, loop[0]]);
-        // sites between the lanes
+        // sites: one per block between the spokes
         const siteTh = [];
         for (let k = 0; k < n; k++) {
-          const th = spin + (k + 0.5) * (TAU / n) + (rnd() - 0.5) * 0.28;
+          const th = spin + (k + 0.5) * (TAU / n) + (rnd() - 0.5) * 0.14;
           siteTh.push(th);
-          const rr = sr * (0.96 + rnd() * 0.08);
+          const rr = sr * (0.97 + rnd() * 0.06);
           const a = ca + Math.cos(th) * rr, b = cb + Math.sin(th) * rr;
           const [x, y] = scr(a, b);
-          const content = s.sites[k];
-          blocks.push({ id: s.id + ":" + k, isle: s, a, b, x, y, content, wob: rnd() * TAU });
+          let content = s.sites[k], cs = -1;
+          if (content.startsWith("cs:")) {
+            cs = csIdx++;
+            if (cs < nBuilt) content = "fill:" + (CS_KIND[content.slice(3)] || "house");
+          }
+          blocks.push({ id: s.id + ":" + k, isle: s, a, b, x, y, content, cs, wob: rnd() * TAU });
           if (content === "park") ponds.push({ a: a + 18, b: b - 12 });
           if (content === "field") pastures.push({ a, b });
           if (!content.includes(":") && content !== "park" && content !== "field") plots[content] = { x, y, r: 200 };
           if (content.startsWith("slot:")) plots[content] = { x, y, r: 200 };
         }
-        // inner lanes run between sites (angles spin + k*TAU/n)
-        const nodeAt = (th) => {
-          let best = 0, bd = 1e9;
-          loop.forEach((p, i) => {
-            if (i % 6) return;
-            const d = Math.abs(Math.atan2(Math.sin(Math.atan2(p[1] - cb, p[0] - ca) - th), Math.cos(Math.atan2(p[1] - cb, p[0] - ca) - th)));
-            if (d < bd) { bd = d; best = i; }
-          });
-          return loop[best];
-        };
-        const centre = [ca + (rnd() - 0.5) * 16, cb + (rnd() - 0.5) * 16];
-        if (n >= 4) {
-          road(curve(nodeAt(spin), nodeAt(spin + Math.PI), (rnd() - 0.5) * 30), "lane");
-        } else {
-          road(curve(nodeAt(spin), centre, (rnd() - 0.5) * 24, 8), "lane");
-          roundabouts.push(centre);
+        // spokes from the ring to a small central roundabout: every block has road on all sides
+        const RB = 26, ring = [];
+        for (let k = 0; k < 12; k++) ring.push([ca + Math.cos(spin + (k / 12) * TAU) * RB, cb + Math.sin(spin + (k / 12) * TAU) * RB]);
+        road([...ring, ring[0]], "lane");
+        roundabouts.push([ca, cb]);
+        for (let j = 0; j < n; j++) {
+          road(curve(loop[(j * M) / n], ring[(j * 12) / n], (rnd() - 0.5) * 12, 8), "lane");
         }
-        s.nodes.forEach((p, k) => {
-          if (k % 2) return;
-          const th = Math.atan2(p[1] - cb, p[0] - ca);
-          lamps.push({ a: p[0] + Math.cos(th) * 24, b: p[1] + Math.sin(th) * 24 });
+        loop.forEach((p, k) => {
+          if (k % 8 !== 2) return;
+          const th = angle(k);
+          lamps.push({ a: p[0] - Math.cos(th) * 25, b: p[1] - Math.sin(th) * 25 });
         });
-        signs.push({ x: s.x, y: s.y + s.landR * 0.72 + 30, name: s.name, color: s.color });
+        signs.push({ x: s.x, y: s.y + s.coastMax * 0.7 + 34, name: s.name, color: s.color });
         s.siteTh = siteTh;
       });
 
@@ -184,7 +209,7 @@
       {
         const hb = isles.find((s) => s.id === "harbour");
         const th = 0.28; // mostly +a (screen down-right)
-        const qa = hb.ca + Math.cos(th) * (hb.landR + 8), qb = hb.cb + Math.sin(th) * (hb.landR + 8);
+        const cr = hb.coastAt(th) + 6, qa = hb.ca + Math.cos(th) * cr, qb = hb.cb + Math.sin(th) * cr;
         const [x, y] = scr(qa, qb);
         plots.port = { x, y, r: 130 };
         [[-40, 0, 150], [-20, 50, 130], [-60, -40, 130]].forEach(([da, db, r], n) => {
@@ -206,7 +231,17 @@
         const pts = curve(p0, p1, (n % 2 ? 1 : -1) * L * 0.08, Math.max(12, Math.round(L / 22)));
         road(pts, "bridge");
         // water span = points outside both coastlines
-        const wet = pts.filter((p) => Math.hypot(p[0] - s.ca, p[1] - s.cb) > s.landR - 30 && Math.hypot(p[0] - t.ca, p[1] - t.cb) > t.landR - 30);
+        const fAll = (p) => {
+          const [X, Y] = scr(p[0], p[1]);
+          let f = 0;
+          for (const d of blobs) {
+            const u = (X - d.x) / d.r, v = (Y - d.y) / (d.r * 0.5), N = u * u + v * v;
+            if (N < 1) f += (1 - N) * (1 - N);
+          }
+          return f;
+        };
+        let i0 = pts.findIndex((p) => fAll(p) < 0.6), i1 = pts.length - 1 - [...pts].reverse().findIndex((p) => fAll(p) < 0.6);
+        const wet = i0 >= 0 ? pts.slice(Math.max(0, i0 - 1), Math.min(pts.length, i1 + 2)) : [];
         if (wet.length > 1) bridges.push({ pts: wet });
       };
       LINKS.forEach(([x, y], n) => bridge(byId[x], byId[y], n));
@@ -232,7 +267,7 @@
           if (Math.hypot(a - a0 - da * t, b - b0 - db * t) < lim) return false;
         }
       }
-      for (const c of city.roundabouts) if (Math.hypot(a - c[0], b - c[1]) < 30 + pad) return false;
+      for (const c of city.roundabouts) if (Math.hypot(a - c[0], b - c[1]) < 42 + pad) return false;
       for (const k of city.blocks) {
         const da = a - k.a, db = b - k.b;
         if (Math.hypot(da, db) < 70 + pad) {
@@ -277,11 +312,8 @@
       return h("g", { className: "roads", pointerEvents: "none", fill: "none", strokeLinecap: "round", strokeLinejoin: "round" },
         d.map((p, n) => h("path", { key: "c" + n, d: p, stroke: "#C4B597", strokeWidth: wide[n] ? 40 : 30 })),
         d.map((p, n) => h("path", { key: "s" + n, d: p, stroke: "#DCD0B8", strokeWidth: wide[n] ? 37 : 27 })),
-        city.roundabouts.map((c, n) => h(Nt, { key: "rb" + n, x: c[0], y: c[1], z: 0.2, a: 30, b: 30, fill: "#DCD0B8", stroke: "#C4B597", sw: 1.5 })),
         d.map((p, n) => h("path", { key: "t" + n, d: p, stroke: wide[n] ? "#5F6B72" : "#6E797F", strokeWidth: wide[n] ? 25 : 17 })),
-        city.roundabouts.map((c, n) => h("g", { key: "rbi" + n },
-          h(Nt, { x: c[0], y: c[1], z: 0.3, a: 22, b: 22, fill: "#6E797F" }),
-          h(Nt, { x: c[0], y: c[1], z: 0.4, a: 10, b: 10, fill: "#8CC27A", stroke: "#DCD0B8", sw: 2 }))),
+        city.roundabouts.map((c, n) => h(Nt, { key: "rbi" + n, x: c[0], y: c[1], z: 0.4, a: 14, b: 14, fill: "#8CC27A", stroke: "#DCD0B8", sw: 3 })),
         d.map((p, n) => wide[n] && h("path", { key: "m" + n, d: p, stroke: "#F3E3B3", strokeWidth: 1.3, strokeDasharray: "8 9" })),
         city.bridges.map((br, n) => h(Bridge, { key: "br" + n, br })),
       );

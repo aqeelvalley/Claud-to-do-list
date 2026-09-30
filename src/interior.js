@@ -392,5 +392,74 @@
       );
     }
 
-    return { Interior };
+    /* ---------- goal tree: goals grouped by field, slots unlock ---------- */
+    const MAX_SLOTS = 6;
+    function slotInfo(list) {
+      const done = list.filter((g) => g.progress >= 100).length;
+      const active = list.length - done;
+      const cap = Math.min(MAX_SLOTS, 1 + done);
+      return { done, active, cap, free: cap - active };
+    }
+    function GoalTree({ goals, fields, onAdd, onGoal, onDel }) {
+      const [title, setTitle] = React.useState("");
+      const [field, setField] = React.useState("personal");
+      const byField = {};
+      goals.forEach((g) => (byField[g.field || "personal"] = byField[g.field || "personal"] || []).push(g));
+      const fById = Object.fromEntries(fields.map((f) => [f.id, f]));
+      const fOf = (id) => fById[id] || { id, name: id, color: "#9A8F7A" };
+      const order = [...fields.map((f) => f.id).filter((id) => byField[id]), ...Object.keys(byField).filter((id) => !fById[id])];
+      const sel = slotInfo(byField[field] || []);
+      const totalDone = goals.filter((g) => g.progress >= 100).length;
+      const add = () => { if (title.trim() && sel.free > 0) { onAdd(title.trim(), field); setTitle(""); } };
+      return h("div", null,
+        h("div", { className: "section-h mt-6" }, h(An, { size: 16 }), "Goal tree",
+          h("span", { className: "ml-auto gcount" }, totalDone, " done")),
+        h("p", { className: "gt-hint" }, "Each field starts with one goal slot. Finish a goal to unlock another slot in the same field (up to ", MAX_SLOTS, "). Finished goals also complete construction sites on the island."),
+        h("div", { className: "space-y-3" },
+          order.map((fid) => {
+            const f = fOf(fid), list = byField[fid], si = slotInfo(list);
+            const active = list.filter((g) => g.progress < 100), done = list.filter((g) => g.progress >= 100);
+            return h("div", { key: fid, className: "gt-field", style: { "--fc": f.color } },
+              h("div", { className: "gt-head" },
+                h("span", { className: "gdot", style: { background: f.color } }),
+                h("span", { className: "gt-name" }, f.name),
+                h("span", { className: "gt-tier" }, "Tier ", si.done + 1),
+                h("span", { className: "gt-slots tnum" }, si.active, "/", si.cap, " slots")),
+              active.map((z) => h("div", { key: z.id, className: "goal-row" },
+                h("div", { className: "flex items-center gap-2" },
+                  h("span", { className: "font-semibold text-[14.5px] flex-1 min-w-0" }, z.title),
+                  h("span", { className: "tnum text-[13px] font-bold", style: { color: "var(--ink2)" } }, z.progress, "%"),
+                  h(Pe, { label: "Delete goal", className: "row-del", onClick: () => onDel(z) }, h(mt, { size: 15 }))),
+                h("input", {
+                  id: "goal-" + z.id, type: "range", min: "0", max: "100", step: "5", defaultValue: z.progress,
+                  className: "range mt-1.5", "aria-label": `Progress for ${z.title}`,
+                  onPointerUp: (e) => onGoal(z, Number(e.target.value)), onKeyUp: (e) => onGoal(z, Number(e.target.value)),
+                }))),
+              si.free > 0 && si.cap > si.active && active.length > 0 && h("div", { className: "gt-open" }, "Open slot \xB7 add another ", f.name, " goal below"),
+              si.cap < MAX_SLOTS && h("div", { className: "gt-lock" },
+                h("svg", { width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2.2, strokeLinecap: "round" },
+                  h("rect", { x: 5, y: 11, width: 14, height: 10, rx: 2 }), h("path", { d: "M8 11V8a4 4 0 0 1 8 0v3" })),
+                "Slot ", si.cap + 1, " unlocks when you finish ", si.active ? "a " + f.name + " goal" : "another " + f.name + " goal"),
+              done.length > 0 && h("div", { className: "gt-done" }, done.map((z) => h("span", { key: z.id, className: "gt-chip", title: z.title },
+                "✓ ", z.title, h("button", { type: "button", "aria-label": "Delete goal", onClick: () => onDel(z) }, "\xD7")))));
+          }),
+          !goals.length && h("div", { className: "empty" }, "Pick a field and set your first goal. Finishing it unlocks the next one."),
+        ),
+        h("div", { className: "mt-3 gt-add" },
+          h("select", { className: "inp", value: field, "aria-label": "Goal field", onChange: (e) => setField(e.target.value) },
+            fields.map((f) => {
+              const si = slotInfo(byField[f.id] || []);
+              return h("option", { key: f.id, value: f.id }, f.name, si.free > 0 ? ` (${si.free} open)` : " (locked)");
+            })),
+          h("input", {
+            id: "goal-new", className: "inp", value: title, disabled: sel.free <= 0,
+            placeholder: sel.free > 0 ? "New goal, e.g. Read 12 books" : "Finish a goal here to unlock a slot",
+            onChange: (e) => setTitle(e.target.value), onKeyDown: (e) => e.key === "Enter" && add(),
+          }),
+          h(Q, { disabled: !title.trim() || sel.free <= 0, onClick: add }, h(At, { size: 16 }), "Goal")),
+        sel.free <= 0 && h("div", { className: "gt-full" }, "All ", fOf(field).name, " slots are in use. Finish one of those goals to unlock the next."),
+      );
+    }
+
+    return { Interior, GoalTree };
   })();

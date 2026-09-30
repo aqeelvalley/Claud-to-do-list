@@ -2622,6 +2622,22 @@ select.inp {
   .interior-title { font-size: 16px; }
   .pin-btn { display: none; }
 }
+
+/* ---- goal tree ---- */
+.gt-hint { font-size: 12.5px; color: var(--ink2); margin: -2px 0 10px; line-height: 1.45; }
+.gt-field { padding: 10px; border-radius: 16px; background: color-mix(in srgb, var(--fc) 8%, #fffdf8); border: 1.5px solid color-mix(in srgb, var(--fc) 30%, #efe1c8); display: flex; flex-direction: column; gap: 7px; }
+.gt-head { display: flex; align-items: center; gap: 7px; font: 600 14px Fredoka, sans-serif; }
+.gt-name { flex: 1; min-width: 0; }
+.gt-tier { font: 700 11px Fredoka, sans-serif; color: #fff; background: var(--fc); padding: 1px 8px; border-radius: 999px; }
+.gt-slots { font: 700 11.5px Fredoka, sans-serif; color: var(--ink2); background: var(--paper3); padding: 1px 8px; border-radius: 999px; }
+.gt-lock, .gt-open { display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 700; color: var(--ink3); padding: 8px 10px; border-radius: 12px; border: 1.5px dashed var(--line2); background: rgba(255, 255, 255, 0.5); }
+.gt-open { color: var(--tealD); border-color: #9fd5ca; }
+.gt-done { display: flex; flex-wrap: wrap; gap: 5px; }
+.gt-chip { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; font: 700 11.5px Nunito, sans-serif; color: #2f6b2c; background: #e3f3df; border: 1px solid #b9dfb2; border-radius: 8px; padding: 2px 4px 2px 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gt-chip button { border: 0; background: none; color: #6b8f66; cursor: pointer; font-size: 14px; line-height: 1; padding: 0 3px; }
+.gt-add { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.4fr) auto; gap: 8px; }
+.gt-full { font-size: 12.5px; color: #a9362b; margin-top: 6px; }
+@media (max-width: 480px) { .gt-add { grid-template-columns: 1fr auto; } .gt-add select { grid-column: 1 / -1; } }
 </style>
 <div id="root"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
@@ -6964,7 +6980,9 @@ select.inp {
     };
 
     /* ---------- layout ---------- */
-    function layout(nSections) {
+    const CS_KIND = { "Town hall": "office", "Research lab": "office", "Robotics bay": "shop", "Sound stage": "tower" };
+    function layout(nSections, nBuilt = 0) {
+      let csIdx = 0;
       const nFrontier = Math.floor(nSections / 4) + 1;
       const isles = CORE.map((c) => ({ ...c, sites: [...c.sites] }));
       for (let k = 0; k < nFrontier; k++) {
@@ -7038,57 +7056,80 @@ select.inp {
           const [x, y] = scr(ca + Math.cos(th) * rr, cb + Math.sin(th) * rr);
           blobs.push({ id: "b" + s.id + "h" + k, x, y, r: 120 + rnd() * 60 });
         }
-        // winding loop road
-        const M = 48;
-        const lo = [(rnd() - 0.5) * 22, (rnd() - 0.5) * 22], stretch = (rnd() - 0.5) * 0.14;
-        const loop = [];
-        for (let k = 0; k < M; k++) {
-          const th = (k / M) * TAU + spin;
-          const rr = loopR * (0.97 + 0.1 * Math.sin(2 * th + spin * 5) + 0.06 * Math.sin(3 * th + spin * 2 + 1.3) + 0.03 * Math.sin(5 * th + spin));
-          loop.push([ca + lo[0] + Math.cos(th) * rr * (1 + stretch), cb + lo[1] + Math.sin(th) * rr * (1 - stretch)]);
-        }
+        // Ring road traced from the real coastline, inset so it stays on land
+        const mine = blobs.filter((d) => d.id.startsWith("b" + s.id));
+        const fieldAt = (a, b) => {
+          const [X, Y] = scr(a, b);
+          let f = 0;
+          for (const d of mine) {
+            const u = (X - d.x) / d.r, v = (Y - d.y) / (d.r * 0.5), N = u * u + v * v;
+            if (N < 1) f += (1 - N) * (1 - N);
+          }
+          return f;
+        };
+        const M = 48, minR = sr + 90 * s.size;
+        const angle = (k) => (k / M) * TAU + spin;
+        const coastAt = (th) => {
+          let r = 40;
+          while (r < 700 && fieldAt(ca + Math.cos(th) * r, cb + Math.sin(th) * r) > 0.74) r += 4;
+          return r;
+        };
+        let coast = Array.from({ length: M }, (_, k) => coastAt(angle(k)));
+        // widen any narrow waist so the ring clears the buildings
+        coast.forEach((r, k) => {
+          if (r - 34 < minR) {
+            const th = angle(k), rr = minR + 10;
+            const [x, y] = scr(ca + Math.cos(th) * rr, cb + Math.sin(th) * rr);
+            const d = { id: "b" + s.id + "w" + k, x, y, r: 175 };
+            blobs.push(d); mine.push(d);
+          }
+        });
+        coast = Array.from({ length: M }, (_, k) => coastAt(angle(k)));
+        const raw = coast.map((r) => Math.max(minR, r - 34));
+        let rad = [...raw];
+        for (let pass = 0; pass < 4; pass++)
+          rad = rad.map((r, k) => Math.min(raw[k], (rad[(k + M - 1) % M] + 2 * r + rad[(k + 1) % M]) / 4));
+        s.landR = coast.reduce((x, y) => x + y, 0) / M;
+        s.coastAt = coastAt;
+        s.coastMax = Math.max(...coast.filter((_, k) => Math.sin(angle(k) + Math.PI / 4) > 0.5));
+        const loop = rad.map((r, k) => [ca + Math.cos(angle(k)) * r, cb + Math.sin(angle(k)) * r]);
         s.loop = loop;
         s.nodes = [];
-        for (let k = 0; k < M; k += 6) s.nodes.push(loop[k]);
+        for (let k = 0; k < M; k += 4) s.nodes.push(loop[k]);
         road([...loop, loop[0]]);
-        // sites between the lanes
+        // sites: one per block between the spokes
         const siteTh = [];
         for (let k = 0; k < n; k++) {
-          const th = spin + (k + 0.5) * (TAU / n) + (rnd() - 0.5) * 0.28;
+          const th = spin + (k + 0.5) * (TAU / n) + (rnd() - 0.5) * 0.14;
           siteTh.push(th);
-          const rr = sr * (0.96 + rnd() * 0.08);
+          const rr = sr * (0.97 + rnd() * 0.06);
           const a = ca + Math.cos(th) * rr, b = cb + Math.sin(th) * rr;
           const [x, y] = scr(a, b);
-          const content = s.sites[k];
-          blocks.push({ id: s.id + ":" + k, isle: s, a, b, x, y, content, wob: rnd() * TAU });
+          let content = s.sites[k], cs = -1;
+          if (content.startsWith("cs:")) {
+            cs = csIdx++;
+            if (cs < nBuilt) content = "fill:" + (CS_KIND[content.slice(3)] || "house");
+          }
+          blocks.push({ id: s.id + ":" + k, isle: s, a, b, x, y, content, cs, wob: rnd() * TAU });
           if (content === "park") ponds.push({ a: a + 18, b: b - 12 });
           if (content === "field") pastures.push({ a, b });
           if (!content.includes(":") && content !== "park" && content !== "field") plots[content] = { x, y, r: 200 };
           if (content.startsWith("slot:")) plots[content] = { x, y, r: 200 };
         }
-        // inner lanes run between sites (angles spin + k*TAU/n)
-        const nodeAt = (th) => {
-          let best = 0, bd = 1e9;
-          loop.forEach((p, i) => {
-            if (i % 6) return;
-            const d = Math.abs(Math.atan2(Math.sin(Math.atan2(p[1] - cb, p[0] - ca) - th), Math.cos(Math.atan2(p[1] - cb, p[0] - ca) - th)));
-            if (d < bd) { bd = d; best = i; }
-          });
-          return loop[best];
-        };
-        const centre = [ca + (rnd() - 0.5) * 16, cb + (rnd() - 0.5) * 16];
-        if (n >= 4) {
-          road(curve(nodeAt(spin), nodeAt(spin + Math.PI), (rnd() - 0.5) * 30), "lane");
-        } else {
-          road(curve(nodeAt(spin), centre, (rnd() - 0.5) * 24, 8), "lane");
-          roundabouts.push(centre);
+        // spokes from the ring to a small central roundabout: every block has road on all sides
+        const RB = 26, ring = [];
+        for (let k = 0; k < 12; k++) ring.push([ca + Math.cos(spin + (k / 12) * TAU) * RB, cb + Math.sin(spin + (k / 12) * TAU) * RB]);
+        road([...ring, ring[0]], "lane");
+        roundabouts.push([ca, cb]);
+        for (let j = 0; j < n; j++) {
+          road(curve(loop[(j * M) / n], ring[(j * 12) / n], (rnd() - 0.5) * 12, 8), "lane");
         }
-        s.nodes.forEach((p, k) => {
-          if (k % 2) return;
-          const th = Math.atan2(p[1] - cb, p[0] - ca);
-          lamps.push({ a: p[0] + Math.cos(th) * 24, b: p[1] + Math.sin(th) * 24 });
+        loop.forEach((p, k) => {
+          if (k % 8 !== 2) return;
+          const th = angle(k);
+          lamps.push({ a: p[0] - Math.cos(th) * 25, b: p[1] - Math.sin(th) * 25 });
         });
-        signs.push({ x: s.x, y: s.y + s.landR * 0.72 + 30, name: s.name, color: s.color });
+        signs.push({ x: s.x, y: s.y + s.coastMax * 0.7 + 34, name: s.name, color: s.color });
         s.siteTh = siteTh;
       });
 
@@ -7096,7 +7137,7 @@ select.inp {
       {
         const hb = isles.find((s) => s.id === "harbour");
         const th = 0.28; // mostly +a (screen down-right)
-        const qa = hb.ca + Math.cos(th) * (hb.landR + 8), qb = hb.cb + Math.sin(th) * (hb.landR + 8);
+        const cr = hb.coastAt(th) + 6, qa = hb.ca + Math.cos(th) * cr, qb = hb.cb + Math.sin(th) * cr;
         const [x, y] = scr(qa, qb);
         plots.port = { x, y, r: 130 };
         [[-40, 0, 150], [-20, 50, 130], [-60, -40, 130]].forEach(([da, db, r], n) => {
@@ -7118,7 +7159,17 @@ select.inp {
         const pts = curve(p0, p1, (n % 2 ? 1 : -1) * L * 0.08, Math.max(12, Math.round(L / 22)));
         road(pts, "bridge");
         // water span = points outside both coastlines
-        const wet = pts.filter((p) => Math.hypot(p[0] - s.ca, p[1] - s.cb) > s.landR - 30 && Math.hypot(p[0] - t.ca, p[1] - t.cb) > t.landR - 30);
+        const fAll = (p) => {
+          const [X, Y] = scr(p[0], p[1]);
+          let f = 0;
+          for (const d of blobs) {
+            const u = (X - d.x) / d.r, v = (Y - d.y) / (d.r * 0.5), N = u * u + v * v;
+            if (N < 1) f += (1 - N) * (1 - N);
+          }
+          return f;
+        };
+        let i0 = pts.findIndex((p) => fAll(p) < 0.6), i1 = pts.length - 1 - [...pts].reverse().findIndex((p) => fAll(p) < 0.6);
+        const wet = i0 >= 0 ? pts.slice(Math.max(0, i0 - 1), Math.min(pts.length, i1 + 2)) : [];
         if (wet.length > 1) bridges.push({ pts: wet });
       };
       LINKS.forEach(([x, y], n) => bridge(byId[x], byId[y], n));
@@ -7144,7 +7195,7 @@ select.inp {
           if (Math.hypot(a - a0 - da * t, b - b0 - db * t) < lim) return false;
         }
       }
-      for (const c of city.roundabouts) if (Math.hypot(a - c[0], b - c[1]) < 30 + pad) return false;
+      for (const c of city.roundabouts) if (Math.hypot(a - c[0], b - c[1]) < 42 + pad) return false;
       for (const k of city.blocks) {
         const da = a - k.a, db = b - k.b;
         if (Math.hypot(da, db) < 70 + pad) {
@@ -7189,11 +7240,8 @@ select.inp {
       return h("g", { className: "roads", pointerEvents: "none", fill: "none", strokeLinecap: "round", strokeLinejoin: "round" },
         d.map((p, n) => h("path", { key: "c" + n, d: p, stroke: "#C4B597", strokeWidth: wide[n] ? 40 : 30 })),
         d.map((p, n) => h("path", { key: "s" + n, d: p, stroke: "#DCD0B8", strokeWidth: wide[n] ? 37 : 27 })),
-        city.roundabouts.map((c, n) => h(Nt, { key: "rb" + n, x: c[0], y: c[1], z: 0.2, a: 30, b: 30, fill: "#DCD0B8", stroke: "#C4B597", sw: 1.5 })),
         d.map((p, n) => h("path", { key: "t" + n, d: p, stroke: wide[n] ? "#5F6B72" : "#6E797F", strokeWidth: wide[n] ? 25 : 17 })),
-        city.roundabouts.map((c, n) => h("g", { key: "rbi" + n },
-          h(Nt, { x: c[0], y: c[1], z: 0.3, a: 22, b: 22, fill: "#6E797F" }),
-          h(Nt, { x: c[0], y: c[1], z: 0.4, a: 10, b: 10, fill: "#8CC27A", stroke: "#DCD0B8", sw: 2 }))),
+        city.roundabouts.map((c, n) => h(Nt, { key: "rbi" + n, x: c[0], y: c[1], z: 0.4, a: 14, b: 14, fill: "#8CC27A", stroke: "#DCD0B8", sw: 3 })),
         d.map((p, n) => wide[n] && h("path", { key: "m" + n, d: p, stroke: "#F3E3B3", strokeWidth: 1.3, strokeDasharray: "8 9" })),
         city.bridges.map((br, n) => h(Bridge, { key: "br" + n, br })),
       );
@@ -8002,7 +8050,76 @@ select.inp {
       );
     }
 
-    return { Interior };
+    /* ---------- goal tree: goals grouped by field, slots unlock ---------- */
+    const MAX_SLOTS = 6;
+    function slotInfo(list) {
+      const done = list.filter((g) => g.progress >= 100).length;
+      const active = list.length - done;
+      const cap = Math.min(MAX_SLOTS, 1 + done);
+      return { done, active, cap, free: cap - active };
+    }
+    function GoalTree({ goals, fields, onAdd, onGoal, onDel }) {
+      const [title, setTitle] = React.useState("");
+      const [field, setField] = React.useState("personal");
+      const byField = {};
+      goals.forEach((g) => (byField[g.field || "personal"] = byField[g.field || "personal"] || []).push(g));
+      const fById = Object.fromEntries(fields.map((f) => [f.id, f]));
+      const fOf = (id) => fById[id] || { id, name: id, color: "#9A8F7A" };
+      const order = [...fields.map((f) => f.id).filter((id) => byField[id]), ...Object.keys(byField).filter((id) => !fById[id])];
+      const sel = slotInfo(byField[field] || []);
+      const totalDone = goals.filter((g) => g.progress >= 100).length;
+      const add = () => { if (title.trim() && sel.free > 0) { onAdd(title.trim(), field); setTitle(""); } };
+      return h("div", null,
+        h("div", { className: "section-h mt-6" }, h(An, { size: 16 }), "Goal tree",
+          h("span", { className: "ml-auto gcount" }, totalDone, " done")),
+        h("p", { className: "gt-hint" }, "Each field starts with one goal slot. Finish a goal to unlock another slot in the same field (up to ", MAX_SLOTS, "). Finished goals also complete construction sites on the island."),
+        h("div", { className: "space-y-3" },
+          order.map((fid) => {
+            const f = fOf(fid), list = byField[fid], si = slotInfo(list);
+            const active = list.filter((g) => g.progress < 100), done = list.filter((g) => g.progress >= 100);
+            return h("div", { key: fid, className: "gt-field", style: { "--fc": f.color } },
+              h("div", { className: "gt-head" },
+                h("span", { className: "gdot", style: { background: f.color } }),
+                h("span", { className: "gt-name" }, f.name),
+                h("span", { className: "gt-tier" }, "Tier ", si.done + 1),
+                h("span", { className: "gt-slots tnum" }, si.active, "/", si.cap, " slots")),
+              active.map((z) => h("div", { key: z.id, className: "goal-row" },
+                h("div", { className: "flex items-center gap-2" },
+                  h("span", { className: "font-semibold text-[14.5px] flex-1 min-w-0" }, z.title),
+                  h("span", { className: "tnum text-[13px] font-bold", style: { color: "var(--ink2)" } }, z.progress, "%"),
+                  h(Pe, { label: "Delete goal", className: "row-del", onClick: () => onDel(z) }, h(mt, { size: 15 }))),
+                h("input", {
+                  id: "goal-" + z.id, type: "range", min: "0", max: "100", step: "5", defaultValue: z.progress,
+                  className: "range mt-1.5", "aria-label": `Progress for ${z.title}`,
+                  onPointerUp: (e) => onGoal(z, Number(e.target.value)), onKeyUp: (e) => onGoal(z, Number(e.target.value)),
+                }))),
+              si.free > 0 && si.cap > si.active && active.length > 0 && h("div", { className: "gt-open" }, "Open slot \xB7 add another ", f.name, " goal below"),
+              si.cap < MAX_SLOTS && h("div", { className: "gt-lock" },
+                h("svg", { width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2.2, strokeLinecap: "round" },
+                  h("rect", { x: 5, y: 11, width: 14, height: 10, rx: 2 }), h("path", { d: "M8 11V8a4 4 0 0 1 8 0v3" })),
+                "Slot ", si.cap + 1, " unlocks when you finish ", si.active ? "a " + f.name + " goal" : "another " + f.name + " goal"),
+              done.length > 0 && h("div", { className: "gt-done" }, done.map((z) => h("span", { key: z.id, className: "gt-chip", title: z.title },
+                "✓ ", z.title, h("button", { type: "button", "aria-label": "Delete goal", onClick: () => onDel(z) }, "\xD7")))));
+          }),
+          !goals.length && h("div", { className: "empty" }, "Pick a field and set your first goal. Finishing it unlocks the next one."),
+        ),
+        h("div", { className: "mt-3 gt-add" },
+          h("select", { className: "inp", value: field, "aria-label": "Goal field", onChange: (e) => setField(e.target.value) },
+            fields.map((f) => {
+              const si = slotInfo(byField[f.id] || []);
+              return h("option", { key: f.id, value: f.id }, f.name, si.free > 0 ? ` (${si.free} open)` : " (locked)");
+            })),
+          h("input", {
+            id: "goal-new", className: "inp", value: title, disabled: sel.free <= 0,
+            placeholder: sel.free > 0 ? "New goal, e.g. Read 12 books" : "Finish a goal here to unlock a slot",
+            onChange: (e) => setTitle(e.target.value), onKeyDown: (e) => e.key === "Enter" && add(),
+          }),
+          h(Q, { disabled: !title.trim() || sel.free <= 0, onClick: add }, h(At, { size: 16 }), "Goal")),
+        sel.free <= 0 && h("div", { className: "gt-full" }, "All ", fOf(field).name, " slots are in use. Finish one of those goals to unlock the next."),
+      );
+    }
+
+    return { Interior, GoalTree };
   })();
 
   var To = Mo(
@@ -10922,6 +11039,7 @@ select.inp {
     onGoal: w,
     onDelGoal: v,
     onAddTask: $,
+    fields: fieldsList,
   }) {
     let E = t.target || 2e5,
       M =
@@ -11107,94 +11225,13 @@ select.inp {
           "Update",
         ),
       ),
-      React.createElement(
-        "div",
-        { className: "section-h mt-6" },
-        React.createElement(An, { size: 16 }),
-        "Personal goals",
-      ),
-      React.createElement(
-        "div",
-        { className: "space-y-2" },
-        i.map((z) =>
-          React.createElement(
-            "div",
-            { key: z.id, className: "goal-row" },
-            React.createElement(
-              "div",
-              { className: "flex items-center gap-2" },
-              React.createElement(
-                "span",
-                { className: "font-semibold text-[14.5px] flex-1 min-w-0" },
-                z.title,
-              ),
-              React.createElement(
-                "span",
-                {
-                  className: "tnum text-[13px] font-bold",
-                  style: {
-                    color: z.progress >= 100 ? "#3E8E3A" : "var(--ink2)",
-                  },
-                },
-                z.progress,
-                "%",
-              ),
-              React.createElement(
-                Pe,
-                {
-                  label: "Delete goal",
-                  className: "row-del",
-                  onClick: () => v(z),
-                },
-                React.createElement(mt, { size: 15 }),
-              ),
-            ),
-            React.createElement("input", {
-              id: "goal-" + z.id,
-              type: "range",
-              min: "0",
-              max: "100",
-              step: "5",
-              defaultValue: z.progress,
-              className: "range mt-1.5",
-              "aria-label": `Progress for ${z.title}`,
-              onPointerUp: (ne) => w(z, Number(ne.target.value)),
-              onKeyUp: (ne) => w(z, Number(ne.target.value)),
-            }),
-          ),
-        ),
-        !i.length &&
-          React.createElement(
-            "div",
-            { className: "empty" },
-            "Add a goal you want to work towards.",
-          ),
-      ),
-      React.createElement(
-        "div",
-        { className: "mt-2 grid grid-cols-[1fr_auto] gap-2" },
-        React.createElement("input", {
-          id: "goal-new",
-          className: "inp",
-          value: ee,
-          placeholder: "New goal, e.g. Read 12 books",
-          onChange: (z) => ce(z.target.value),
-          onKeyDown: (z) => {
-            z.key === "Enter" && ee.trim() && (f(ee.trim()), ce(""));
-          },
-        }),
-        React.createElement(
-          Q,
-          {
-            disabled: !ee.trim(),
-            onClick: () => {
-              (f(ee.trim()), ce(""));
-            },
-          },
-          React.createElement(At, { size: 16 }),
-          "Goal",
-        ),
-      ),
+      React.createElement(Inside.GoalTree, {
+        goals: i,
+        fields: fieldsList || [],
+        onAdd: f,
+        onGoal: w,
+        onDel: v,
+      }),
       React.createElement(
         "div",
         { className: "section-h mt-6" },
@@ -12072,8 +12109,15 @@ select.inp {
         [i],
       ),
       cityL = _t(
-        () => City.layout(pe.reduce((a, g) => Math.max(a, g.slot + 1), 0)),
-        [pe.map((a) => a.slot).join(",")],
+        () =>
+          City.layout(
+            pe.reduce((a, g) => Math.max(a, g.slot + 1), 0),
+            (l || []).filter((a) => a.progress >= 100).length,
+          ),
+        [
+          pe.map((a) => a.slot).join(","),
+          (l || []).filter((a) => a.progress >= 100).length,
+        ],
       ),
       Ge = _t(
         () => [
@@ -12632,13 +12676,13 @@ select.inp {
             .doc("stats/treasury")
             .set({ entries: [], ...(qe.current.treasuryD || {}), target: a }),
         ).then(() => Re("Monthly target updated")),
-      oo = (a) => {
+      oo = (a, F = "personal") => {
         let g = Ze("g");
         (U("pgoals/" + g, () =>
           e
             .collection("pgoals")
             .doc(g)
-            .set({ id: g, title: a, progress: 0, createdAt: Date.now() }),
+            .set({ id: g, title: a, field: F, progress: 0, createdAt: Date.now() }),
         ),
           Fe.pop());
       },
@@ -12826,7 +12870,10 @@ select.inp {
             ? M({ type: "section" })
             : (Fe.tap(),
               Re(
-                `${a.content.slice(3)} on ${a.isle.name} is under construction. Complete goals to unlock it.`,
+                (() => {
+                  let g = a.cs + 1 - G.filter((F) => F.progress >= 100).length;
+                  return `${a.content.slice(3)} on ${a.isle.name} is under construction. Complete ${g} more goal${g === 1 ? "" : "s"} to finish it.`;
+                })(),
               ));
         },
         onAgent: (a) => {
@@ -13210,6 +13257,7 @@ select.inp {
           onDelIncome: so,
           onSetTarget: no,
           onAddGoal: oo,
+          fields: Ge.filter((a) => a.id !== "goals"),
           onGoal: ao,
           onDelGoal: io,
           onAddTask: () => Yt("goals"),
