@@ -6,8 +6,8 @@ mkdir -p dist
 node -e '
 const fs=require("fs");
 const app=fs.readFileSync("src/app.js","utf8");
-const worldFiles=["kit","assets","town","buildings","engine","sim","view"].map(f=>fs.readFileSync("src/world/"+f+".js","utf8")).join("\n");
-const city="  var World = (() => {\n"+worldFiles+"\n    return { buildTown, WorldMap, lightAt };\n  })();\n";
+const worldFiles=["kit","plan","assets","town","buildings","engine","sim","view"].map(f=>fs.readFileSync("src/world/"+f+".js","utf8")).join("\n");
+const city="  var World = (() => {\n"+worldFiles+"\n    return { buildTown, WorldMap, lightAt, PARCELS, classicPlan, layoutPlan, placeParcel, checkPlan, freshParcels, cellsOf, freshLines, FRESH_N };\n  })();\n";
 const interior=fs.existsSync("src/interior.js")?fs.readFileSync("src/interior.js","utf8"):"";
 if(!app.includes("/*@@CITY@@*/")) throw new Error("missing city marker");
 const js=app.replace("/*@@CITY@@*/",()=>city+"\n"+interior);

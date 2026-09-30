@@ -145,8 +145,83 @@
     pn.line([-26, o.d / 2 - 8, 0], [-26, o.d / 2 - 8, 8], "#6F5A45", 1.4); pn.line([6, o.d / 2 - 8, 0], [6, o.d / 2 - 8, 8], "#6F5A45", 1.4);
     pn.box(s.x, s.y, s.z, s.w, s.d, s.h, "#F2C14E");
     pn.sign(s, "L", 0.5, 0.62, o.name, "#F2C14E", "#4A3A10", 5.4, false);
-    pn.sign(s, "L", 0.5, 0.2, "Level " + o.level, "#44545A", "#FFF", 4.6, false);
+    pn.sign(s, "L", 0.5, 0.2, o.site ? "Opens after 1st task" : "Level " + o.level, "#44545A", "#FFF", 4.2, false);
   };
+  /* ---- shapes for the new venues ---- */
+  const dome = (pn, x, y, z, R, c, tip = "#F0C06A") => {
+    for (let k = 0; k < 6; k++) { const r = R * Math.cos(Math.asin(k / 6)); pn.cyl(x, y, z + (k * R) / 6, Math.max(1, r), R / 6 + 0.6, c, { noTop: k < 5 }); }
+    pn.cyl(x, y, z + R, 0.9, 7, tip);
+  };
+  const spire = (pn, x, y, z, w, h, c) => {
+    const t = [x, y, z + h], a = [x - w / 2, y - w / 2, z], b = [x + w / 2, y - w / 2, z], cc = [x + w / 2, y + w / 2, z], d = [x - w / 2, y + w / 2, z];
+    pn.poly([d, cc, t], c); pn.poly([b, cc, t], shade(c, -0.2));
+  };
+  // the treasury: columns, pediment and a gold coin over the door
+  B.bank = (pn, o) => {
+    const w = Math.min(o.w, 120), d = Math.min(o.d, 90), bx = { x: 0, y: 0, z: 6, w, d, h: 50 };
+    pn.box(0, 0, 0, w + 12, d + 12, 3, "#E8DFD2"); pn.box(0, 4, 3, w + 6, d + 8, 3, "#F1E9DE");
+    pn.box(0, 0, 6, w, d, 50, "#F6EFE6");
+    const fr = FACE[o.face] || "L";
+    for (let k = 0; k < 6; k++) { const u = (k + 0.5) / 6; const p = pn.faceP({ ...bx, h: 0 }, fr, u, 0); pn.cyl(p[0] + (fr === "R" ? 4 : 0), p[1] + (fr === "L" ? 4 : 0), 6, 3.2, 44, "#FFFFFF"); }
+    facade(pn, bx, 2, o, { pitch: 24 });
+    pn.hip(0, 0, 56, w, d, 16, "#C9B7E0", 5);
+    pn.box(0, 0, 56, w + 6, d + 6, 3, "#EDE4F4");
+    const [sx, sy] = pn.P(0, d / 2 + 2, 66); if (!pn.E) { pn.ctx.fillStyle = "#F0C06A"; pn.ctx.beginPath(); pn.ctx.arc(sx, sy, 5, 0, TAU); pn.ctx.fill(); pn.ctx.fillStyle = "#FFF6D8"; pn.ctx.font = "700 6px Fredoka, sans-serif"; pn.ctx.textAlign = "center"; pn.ctx.textBaseline = "middle"; pn.ctx.fillText("R", sx, sy + 0.3); }
+  };
+  // faith: the building follows the style the player picked
+  B.faith = (pn, o) => {
+    const st = o.style || "chapel", w = Math.min(o.w, 130), d = Math.min(o.d, 110);
+    pn.box(0, 0, 0, w + 10, d + 10, 2, "#EFE6DA");
+    if (st === "mosque") {
+      pn.box(0, 0, 2, w * 0.8, d * 0.8, 40, "#FBF6EE");
+      facade(pn, { x: 0, y: 0, z: 2, w: w * 0.8, d: d * 0.8, h: 40 }, 1, o, { pitch: 22 });
+      dome(pn, 0, 0, 42, Math.min(w, d) * 0.3, "#8FD0C6");
+      [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sy]) => dome(pn, sx * w * 0.32, sy * d * 0.32, 42, 7, "#8FD0C6"));
+      pn.cyl(w * 0.5, -d * 0.45, 2, 5, 96, "#FBF6EE", { bands: [[70, 74, "#8FD0C6"]] }); dome(pn, w * 0.5, -d * 0.45, 98, 5, "#8FD0C6");
+    } else if (st === "church") {
+      pn.box(0, 8, 2, w * 0.55, d * 0.85, 40, "#F7EFE6"); facade(pn, { x: 0, y: 8, z: 2, w: w * 0.55, d: d * 0.85, h: 40 }, 1, o, { pitch: 18 });
+      pn.gable(0, 8, 42, w * 0.55, d * 0.85, 28, "#C9A7C7", "b", "#F7EFE6", 4);
+      pn.box(0, -d * 0.4, 2, 26, 26, 76, "#F7EFE6"); pn.windowQ({ x: 0, y: -d * 0.4, z: 2, w: 26, d: 26, h: 76 }, "L", 0.3, 0.7, 0.66, 0.86);
+      spire(pn, 0, -d * 0.4, 78, 30, 46, "#B38DB1"); pn.line([0, -d * 0.4, 124], [0, -d * 0.4, 138], "#F0C06A", 1.6); pn.line([-4, -d * 0.4, 133], [4, -d * 0.4, 133], "#F0C06A", 1.6);
+    } else if (st === "temple") {
+      [[0, w * 0.8, 28, "#F3C9A8"], [28, w * 0.62, 22, "#F6D6B8"], [50, w * 0.44, 18, "#F8E1C8"]].forEach(([z, ww, hh, c], k) => {
+        pn.box(0, 0, z + 2, ww, ww * (d / w), hh, c); pn.hip(0, 0, z + 2 + hh, ww + 18, ww * (d / w) + 18, 8, k === 2 ? "#E4826A" : "#D9736A", 2);
+      });
+      pn.cyl(0, 0, 84, 2, 18, "#F0C06A");
+    } else if (st === "synagogue") {
+      pn.box(0, 0, 2, w * 0.78, d * 0.72, 50, "#F4EDE2"); facade(pn, { x: 0, y: 0, z: 2, w: w * 0.78, d: d * 0.72, h: 50 }, 2, o, { pitch: 20 });
+      pn.box(0, 0, 52, w * 0.8, d * 0.74, 4, "#E9DEC9"); dome(pn, 0, 0, 56, 18, "#9EC1E6");
+      const fr = FACE[o.face] || "L", fp = pn.faceP({ x: 0, y: 0, z: 2, w: w * 0.78, d: d * 0.72, h: 50 }, fr, 0.5, 0.82);
+      const [px, py] = pn.P(fp[0], fp[1], fp[2]); if (!pn.E) { pn.ctx.strokeStyle = "#6E88C4"; pn.ctx.lineWidth = 1.2; [0, Math.PI].forEach((o2) => { pn.ctx.beginPath(); for (let k = 0; k < 3; k++) { const t = o2 - Math.PI / 2 + (k * TAU) / 3; k ? pn.ctx.lineTo(px + Math.cos(t) * 5, py + Math.sin(t) * 5) : pn.ctx.moveTo(px + Math.cos(t) * 5, py + Math.sin(t) * 5); } pn.ctx.closePath(); pn.ctx.stroke(); }); }
+    } else if (st === "gurdwara") {
+      pn.box(0, 0, 2, w * 0.7, d * 0.7, 44, "#FFFDF8"); facade(pn, { x: 0, y: 0, z: 2, w: w * 0.7, d: d * 0.7, h: 44 }, 2, o, { pitch: 18 });
+      dome(pn, 0, 0, 46, 20, "#F0C06A", "#F0C06A");
+      [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sy]) => { pn.box(sx * w * 0.3, sy * d * 0.3, 46, 10, 10, 8, "#FFFDF8"); dome(pn, sx * w * 0.3, sy * d * 0.3, 54, 6, "#F0C06A", "#F0C06A"); });
+      pn.line([w * 0.52, d * 0.42, 0], [w * 0.52, d * 0.42, 70], "#8E86A8", 1.2); pn.poly([[w * 0.52, d * 0.42, 70], [w * 0.52, d * 0.42, 60], [w * 0.52 + 12, d * 0.42, 65]], "#F0A04A");
+    } else if (st === "garden") {
+      pn.box(0, 0, 0.4, w * 0.9, d * 0.9, 1, "#EFE2C8");
+      for (let k = 0; k < 5; k++) pn.line([-w * 0.4, -d * 0.35 + k * d * 0.12, 1.6], [w * 0.1, -d * 0.35 + k * d * 0.12, 1.6], "#E0CFAE", 1);
+      Bt2(pn, 1.2); pn.box(w * 0.22, d * 0.1, 0, 44, 36, 4, "#C9A07A");
+      [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sy]) => pn.box(w * 0.22 + sx * 18, d * 0.1 + sy * 14, 4, 3, 3, 26, "#B5835A"));
+      pn.hip(w * 0.22, d * 0.1, 30, 44, 36, 12, "#7FB5A8", 6);
+    } else {
+      pn.box(0, 0, 2, w * 0.6, d * 0.8, 36, "#F7F1E8"); facade(pn, { x: 0, y: 0, z: 2, w: w * 0.6, d: d * 0.8, h: 36 }, 1, o, { pitch: 20 });
+      pn.gable(0, 0, 38, w * 0.6, d * 0.8, 24, "#9FB8D8", "b", "#F7F1E8", 4); spire(pn, 0, -d * 0.3, 50, 14, 30, "#8AA6CC");
+    }
+  };
+  // a long thin wing in the owner's colour (offices, sheds, sound stages)
+  B.annex = (pn, o) => {
+    const bx = { x: 0, y: 0, z: 0, w: o.w, d: o.d, h: o.H - 12 };
+    const wall = o.stage ? "#5A5F7A" : shade(o.color || "#7E6BC4", 0.7);
+    pn.box(0, 0, 0, o.w, o.d, bx.h, wall);
+    if (!o.stage) facade(pn, bx, Math.max(1, Math.round(bx.h / 18)), o, { pitch: 22, noDoor: false });
+    else { pn.box(0, 0, bx.h, o.w + 2, o.d + 2, 3, "#E4826A"); pn.sign({ ...bx, h: bx.h }, FACE[o.face] || "L", 0.5, 0.6, "STAGE 1", "#E4826A", "#FFF", 5, false); }
+    pn.box(0, 0, bx.h, o.w, o.d, 2, shade(o.color || "#7E6BC4", 0.2));
+  };
+  // savings buildings (drawn in full later in this build)
+  B.terminal = (pn, o) => { pn.box(0, 0, 0, o.w, o.d * 0.7, 34, "#EEF2F8"); facade(pn, { x: 0, y: 0, z: 0, w: o.w, d: o.d * 0.7, h: 34 }, 1, o, { pitch: 16 }); pn.box(0, 0, 34, o.w + 6, o.d * 0.7 + 6, 4, "#9EC1E6"); pn.cyl(o.w * 0.35, -o.d * 0.2, 38, 5, 26, "#F6F2EC"); pn.box(o.w * 0.35, -o.d * 0.2, 64, 16, 16, 8, "#9EC1E6"); };
+  B.dealership = (pn, o) => { pn.box(0, 0, 0, o.w * 0.9, o.d * 0.7, 30, "#E9F1F6"); pn.box(0, 0, 30, o.w * 0.92, o.d * 0.72, 4, "#E4826A"); facade(pn, { x: 0, y: 0, z: 0, w: o.w * 0.9, d: o.d * 0.7, h: 30 }, 1, o, { pitch: 30, shopfront: true }); };
+  B.dreamhouse = (pn, o) => B.house(pn, { ...o, wall: "#F7E1E6", roof: "#C98FA8", floors: 2, seed: 11 });
   /* user-created sections pick a building style from their kind */
   B.section = (pn, o) => {
     const k = o.sKind;

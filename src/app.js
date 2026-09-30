@@ -177,18 +177,38 @@
       { x: 650, y: 330 },
       { x: -810, y: -160 },
     ];
-  /* what a fresh island can build on its empty venture sites (ids match the classic buildings) */
-  var BUILDABLE = [
-    { id: "youtube", label: "Studio", kind: "film", blurb: "Video, content and creative work", name: "Studio", sub: "Film studio", color: "#E0474C", crew: "studio" },
-    { id: "freelance", label: "Office", kind: "drafting", blurb: "Freelance, consulting and services", name: "Freelance", sub: "Drafting studio", color: "#7E6BC4" },
-    { id: "bynode", label: "Workshop", kind: "maker", blurb: "Making and selling products", name: "Workshop", sub: "Maker space", color: "#2A9D8F" },
-    { id: "wood", label: "Mill", kind: "mill", blurb: "Crafts, trades and hands-on work", name: "Woodworking", sub: "Timber mill", color: "#B5773A" },
-    { id: "coffee", label: "Café", kind: "cafe", blurb: "Shop, café or retail", name: "Caf\xE9", sub: "Seaside caf\xE9", color: "#D9734E" },
-    { id: "fitness", label: "Gym", kind: "gym", blurb: "Workouts, weights and daily habits", name: "Fitness", sub: "Gym & track", color: "#F08A4B" },
-    { id: "goals", label: "Lighthouse", kind: "lighthouse", blurb: "Goals and the money treasury", name: "Goals", sub: "Lighthouse \xB7 treasury", color: "#E9B949" },
-    { id: "marina", label: "Marina", kind: "port", blurb: "Side-business leads dock here by boat", name: "Marina", sub: "Leads & orders", color: "#2A9D8F" },
-    { id: "epcm", label: "Day-job HQ", kind: "refinery", blurb: "Your job: HQ, plus the work island's logistics hub and tender port", name: "Day job", sub: "Work island", color: "#3E7CB1" },
+  /* what an island can build. type = the parcel shape in World.PARCELS; id = the venture/landmark id */
+  var CATALOG = [
+    { type: "studio", id: "youtube", label: "Studio", kind: "film", blurb: "Video, content and creative work", name: "Studio", sub: "Film studio", color: "#E0474C", crew: "studio", group: "work" },
+    { type: "freelance", id: "freelance", label: "Office", kind: "drafting", blurb: "Freelance, consulting and services", name: "Office", sub: "Drafting studio", color: "#7E6BC4", group: "work" },
+    { type: "maker", id: "bynode", label: "Workshop", kind: "maker", blurb: "Making and selling products", name: "Workshop", sub: "Maker space", color: "#2A9D8F", group: "work" },
+    { type: "mill", id: "wood", label: "Mill", kind: "mill", blurb: "Crafts, trades and hands-on work", name: "Woodworking", sub: "Timber mill", color: "#B5773A", group: "work" },
+    { type: "cafe", id: "coffee", label: "Caf\xE9", kind: "cafe", blurb: "A shop, caf\xE9 or retail side-business", name: "Caf\xE9", sub: "Seaside caf\xE9", color: "#D9734E", group: "work" },
+    { type: "marina", id: "marina", label: "Marina", kind: "port", blurb: "Side-business leads dock here by boat", name: "Marina", sub: "Leads & orders", color: "#2A9D8F", group: "work" },
+    { type: "epcm", id: "epcm", label: "Day job", kind: "refinery", blurb: "Your job, on its own work island with a logistics hub and tender port", name: "Day job", sub: "Work island", color: "#3E7CB1", group: "work", work: !0 },
+    { type: "gym", id: "fitness", label: "Gym", kind: "gym", blurb: "Workouts, weights and daily habits", name: "Fitness", sub: "Gym & track", color: "#F08A4B", group: "life" },
+    { type: "goals", id: "goals", label: "Lighthouse", kind: "lighthouse", blurb: "Goals and the money treasury", name: "Goals", sub: "Lighthouse \xB7 treasury", color: "#E9B949", group: "life" },
+    { type: "bank", id: "bank", label: "Bank", kind: "bank", blurb: "Budget planner, spending, bills and savings goals", name: "Bank", sub: "Budget & savings", color: "#C9A227", group: "life" },
+    { type: "faith", id: "faith", label: "Faith", kind: "faith", blurb: "Prayer, worship and faith goals", name: "Faith", sub: "Place of worship", color: "#8FB8B0", group: "life", styles: !0 },
+    { type: "townhall", id: "townhall", label: "Town Hall", kind: "townhall", blurb: "Your week planner: every task by day", name: "Town Hall", sub: "Week planner", color: "#9F8FC9", group: "life" },
+    { type: "section", id: null, label: "Something else", blurb: "Name it and pick a building style", color: "#C2577A", group: "life" },
+    { type: "houses", id: null, label: "Neighbours", blurb: "A street of houses", color: "#F3D9C4", group: "scenery" },
+    { type: "park", id: null, label: "Park", blurb: "Trees, a pond and benches", color: "#9BC98A", group: "scenery" },
+    { type: "square", id: null, label: "Town square", blurb: "A fountain, market stalls and pigeons", color: "#F3E7D5", group: "scenery" },
+    { type: "downtown", id: null, label: "Downtown", blurb: "A cluster of towers", color: "#9EB4D8", group: "scenery" },
+    { type: "farm", id: null, label: "Farm", blurb: "Fields, a barn and a few animals", color: "#C9B458", group: "scenery" },
+    { type: "garden", id: null, label: "Garden", blurb: "Orchard rows and a stall", color: "#B7D8A4", group: "scenery" },
   ];
+  var FAITH_STYLES = [
+    { id: "mosque", label: "Mosque" }, { id: "church", label: "Church" }, { id: "temple", label: "Temple" },
+    { id: "synagogue", label: "Synagogue" }, { id: "gurdwara", label: "Gurdwara" }, { id: "garden", label: "Prayer garden" }, { id: "chapel", label: "Chapel" },
+  ];
+  // venture buildings that aren't on the classic island
+  var EXTRA_Q = {
+    bank: { id: "bank", name: "Bank", sub: "Budget & savings", kind: "bank", color: "#C9A227" },
+    faith: { id: "faith", name: "Faith", sub: "Place of worship", kind: "faith", color: "#8FB8B0" },
+    townhall: { id: "townhall", name: "Town Hall", sub: "Week planner", kind: "townhall", color: "#9F8FC9" },
+  };
   var STUDIO_CREW = [
     { id: "script", name: "Scriptwriter", kind: "role", color: "#3E9B6B" },
     { id: "imagegen", name: "Image Gen", kind: "role", color: "#C04FB0" },
@@ -6096,6 +6116,9 @@
         icon: React.createElement("span", { className: "lv-badge" }, t.level),
         onClose: p,
       },
+      e.building && React.createElement("div", { className: "site-banner" },
+        React.createElement("b", null, "Under construction"),
+        React.createElement("span", null, s.length ? "Finish any task below to cut the ribbon and open " + e.name + "." : "Add its first task, then finish it to cut the ribbon and open " + e.name + ".")),
       React.createElement(
         "div",
         { className: "sec-stats" },
@@ -8006,53 +8029,93 @@
     );
   }
   /* ---- fresh start: welcome + build dialogs ---- */
+  /* a card per catalog entry: tick to pick, or tap to choose */
+  function PickCard({ c: c, on: on, onClick: f, taken: tk }) {
+    return React.createElement("button", { type: "button", className: "pick-card" + (on ? " on" : "") + (tk ? " taken" : ""), "aria-pressed": !!on, disabled: !!tk, onClick: f },
+      React.createElement("span", { className: "pick-dot", style: { background: c.color } }),
+      React.createElement("b", null, c.label),
+      React.createElement("span", null, tk ? "Already built" : c.blurb));
+  }
+  function FaithStyle({ value: v, onChange: f }) {
+    return React.createElement(Y, { label: "Which building?" },
+      React.createElement("div", { className: "flex flex-wrap gap-2" },
+        FAITH_STYLES.map((st) => React.createElement("button", { key: st.id, type: "button", className: "chip-btn" + (v === st.id ? " on" : ""), "aria-pressed": v === st.id, onClick: () => f(st.id) }, st.label))));
+  }
   function WelcomeDlg({ onStart: e, sandbox: sb, onExit: x }) {
-    let [f, setF] = React.useState({ owner: "", islandName: "", mode: "fresh" }),
+    let [f, setF] = React.useState({ owner: "", islandName: "", mode: "fresh", picks: ["houses"], faith: "mosque", step: 1 }),
       ok = f.owner.trim().length > 0,
-      go = () => ok && e({ ...f, owner: f.owner.trim(), islandName: f.islandName.trim() || f.owner.trim() + "\u2019s Isle" }),
+      name = () => f.islandName.trim() || f.owner.trim() + "’s Isle",
+      go = () => ok && (f.mode === "fresh" && f.step === 1 ? setF({ ...f, step: 2 }) : e({ ...f, owner: f.owner.trim(), islandName: name() })),
+      toggle = (t) => setF({ ...f, picks: f.picks.includes(t) ? f.picks.filter((x) => x !== t) : [...f.picks, t] }),
       opt = (id, title, text) =>
         React.createElement("button", { type: "button", className: "start-opt" + (f.mode === id ? " on" : ""), "aria-pressed": f.mode === id, onClick: () => setF({ ...f, mode: id }) },
-          React.createElement("b", null, title), React.createElement("span", null, text));
+          React.createElement("b", null, title), React.createElement("span", null, text)),
+      group = (g, title) => React.createElement("div", { key: g },
+        React.createElement("div", { className: "pick-group" }, title),
+        React.createElement("div", { className: "pick-grid" }, CATALOG.filter((c) => c.group === g).map((c) => React.createElement(PickCard, { key: c.type, c, on: f.picks.includes(c.type), onClick: () => toggle(c.type) }))));
     return React.createElement("div", { className: "modal-back welcome-back" },
-      React.createElement("div", { className: "hud-card modal-card welcome-card", role: "dialog", "aria-label": "Welcome to Valley Isle" },
-        React.createElement("div", { className: "welcome-emblem" }, React.createElement(qn, null)),
-        React.createElement("h2", { className: "welcome-title" }, "Welcome to your island"),
-        React.createElement("p", { className: "welcome-sub" }, "Every part of your life gets a building. Finish tasks and the island grows with you."),
-        React.createElement("div", { className: "grid gap-3" },
-          React.createElement(Y, { label: "What should we call you?" },
-            React.createElement("input", { className: "inp", autoFocus: !0, value: f.owner, placeholder: "Your name", onChange: (a) => setF({ ...f, owner: a.target.value }), onKeyDown: (a) => a.key === "Enter" && go() })),
-          React.createElement(Y, { label: "Name your island" },
-            React.createElement("input", { className: "inp", value: f.islandName, placeholder: f.owner.trim() ? f.owner.trim() + "\u2019s Isle" : "e.g. Valley Isle", onChange: (a) => setF({ ...f, islandName: a.target.value }), onKeyDown: (a) => a.key === "Enter" && go() })),
-          React.createElement("div", { className: "start-opts" },
-            opt("fresh", "Start with just my home", "Your cottage stands on the island. Tap an empty plot to build each part of your life when you need it."),
-            opt("classic", "Explore the sample island", "Everything already built: studio, workshop, caf\xE9, gym, the work island and a crew."))),
+      React.createElement("div", { className: "hud-card modal-card welcome-card" + (f.step === 2 ? " wide" : ""), role: "dialog", "aria-label": "Welcome to Valley Isle" },
+        f.step === 1
+          ? React.createElement(React.Fragment, null,
+              React.createElement("div", { className: "welcome-emblem" }, React.createElement(qn, null)),
+              React.createElement("h2", { className: "welcome-title" }, "Welcome to your island"),
+              React.createElement("p", { className: "welcome-sub" }, "Every part of your life gets a building. Finish tasks and the island grows with you."),
+              React.createElement("div", { className: "grid gap-3" },
+                React.createElement(Y, { label: "What should we call you?" },
+                  React.createElement("input", { className: "inp", autoFocus: !0, value: f.owner, placeholder: "Your name", onChange: (a) => setF({ ...f, owner: a.target.value }), onKeyDown: (a) => a.key === "Enter" && go() })),
+                React.createElement(Y, { label: "Name your island" },
+                  React.createElement("input", { className: "inp", value: f.islandName, placeholder: f.owner.trim() ? f.owner.trim() + "’s Isle" : "e.g. Valley Isle", onChange: (a) => setF({ ...f, islandName: a.target.value }), onKeyDown: (a) => a.key === "Enter" && go() })),
+                React.createElement("div", { className: "start-opts" },
+                  opt("fresh", "Build my own island", "Pick the parts of your life you want. Your island takes its shape from what you choose."),
+                  opt("classic", "Explore the sample island", "Everything already built: studio, workshop, caf\xE9, gym, the work island and a crew."))))
+          : React.createElement(React.Fragment, null,
+              React.createElement("h2", { className: "welcome-title" }, "What goes on " + name() + "?"),
+              React.createElement("p", { className: "welcome-sub" }, "Your home is already there. Everything you pick starts as a building site and opens when you finish its first task. You can add more, move things around and reshape the island any time."),
+              React.createElement("div", { className: "pick-scroll" },
+                group("work", "Work & business"), group("life", "Life"),
+                f.picks.includes("faith") && React.createElement("div", { className: "mt-2" }, React.createElement(FaithStyle, { value: f.faith, onChange: (v) => setF({ ...f, faith: v }) })),
+                group("scenery", "Scenery"))),
         React.createElement("div", { className: "welcome-foot" },
           sb && React.createElement(Q, { variant: "ghost", onClick: x }, "Leave sandbox"),
-          React.createElement(Q, { variant: "gold", disabled: !ok, onClick: go }, "Raise my island"))));
+          f.step === 2 && React.createElement(Q, { variant: "ghost", onClick: () => setF({ ...f, step: 1 }) }, "Back"),
+          React.createElement(Q, { variant: "gold", disabled: !ok, onClick: go }, f.mode === "fresh" && f.step === 1 ? "Next" : "Raise my island"))));
   }
-  function BuildDlg({ id: e, onClose: t, onBuild: s }) {
-    let b = BUILDABLE.find((a) => a.id === e) || BUILDABLE[0],
-      [f, setF] = React.useState({ name: b.name, sub: b.sub, color: b.color, crew: !!b.crew }),
-      ok = f.name.trim().length > 0;
+  function BuildDlg({ preset: e, taken: tk, onClose: t, onBuild: s }) {
+    let [f, setF] = React.useState(() => {
+        let c = CATALOG.find((x) => x.type === e);
+        return c ? { type: c.type, name: c.name || c.label, sub: c.sub || "", color: c.color, crew: !!c.crew, faith: "mosque" } : { type: null };
+      }),
+      c = CATALOG.find((x) => x.type === f.type),
+      choose = (x) => x.type === "section" ? s("section", {}) : setF({ type: x.type, name: x.name || x.label, sub: x.sub || "", color: x.color, crew: !!x.crew, faith: "mosque" }),
+      ok = c && (c.group === "scenery" || f.name.trim().length > 0);
     return React.createElement(cs, {
-        title: "Build " + (/^[aeiou]/i.test(b.label) ? "an " : "a ") + b.label,
-        color: f.color,
+        title: c ? "Build " + (/^[aeiou]/i.test(c.label) ? "an " : "a ") + c.label : "Build something new",
+        color: c ? f.color : "#E9B949",
         onClose: t,
+        width: c ? 520 : 640,
         footer: React.createElement(React.Fragment, null,
+          c && !e && React.createElement(Q, { variant: "ghost", onClick: () => setF({ type: null }) }, "Back"),
           React.createElement(Q, { variant: "ghost", onClick: t }, "Not yet"),
-          React.createElement(Q, { variant: "gold", disabled: !ok, onClick: () => ok && s(e, { ...f, name: f.name.trim(), sub: f.sub.trim() || b.sub }) }, React.createElement(Ls, { size: 16 }), "Build it")),
+          c && React.createElement(Q, { variant: "gold", disabled: !ok, onClick: () => ok && s(f.type, { ...f, name: (f.name || c.label).trim(), sub: f.sub.trim() || c.sub || "" }) }, React.createElement(Ls, { size: 16 }), c.group === "scenery" ? "Place it" : "Start building")),
       },
-      React.createElement("div", { className: "build-hero" },
-        React.createElement("p", null, b.blurb, ". ", "It gets its own room inside, levels up as you finish its tasks, and your crew can be sent to work there.")),
-      React.createElement("div", { className: "grid grid-cols-2 gap-3" },
-        React.createElement(Y, { label: "Name" }, React.createElement("input", { className: "inp", autoFocus: !0, value: f.name, onChange: (a) => setF({ ...f, name: a.target.value }) })),
-        React.createElement(Y, { label: "Short description" }, React.createElement("input", { className: "inp", value: f.sub, onChange: (a) => setF({ ...f, sub: a.target.value }) })),
-        React.createElement(Y, { label: "Colour", className: "col-span-2" },
-          React.createElement("div", { className: "flex flex-wrap gap-2" },
-            gs.map((c) => React.createElement("button", { key: c, type: "button", className: "swatch" + (f.color === c ? " on" : ""), style: { background: c }, onClick: () => setF({ ...f, color: c }), "aria-label": "Colour " + c, "aria-pressed": f.color === c })))),
-        b.crew && React.createElement("label", { className: "col-span-2 crew-opt" },
-          React.createElement("input", { type: "checkbox", checked: f.crew, onChange: (a) => setF({ ...f, crew: a.target.checked }) }),
-          React.createElement("span", null, React.createElement("b", null, "Hire the studio crew"), " \xB7 Scriptwriter, Image Gen, Voiceover, Editor, Thumbnail and Publisher, each with their own look."))));
+      !c
+        ? React.createElement("div", null,
+            React.createElement("p", { className: "build-hero" }, "New buildings start as a site with a crane. Finish their first task and they open. After that you can drag them anywhere in Edit layout."),
+            [["work", "Work & business"], ["life", "Life"], ["scenery", "Scenery"]].map(([g, title]) => React.createElement("div", { key: g },
+              React.createElement("div", { className: "pick-group" }, title),
+              React.createElement("div", { className: "pick-grid" }, CATALOG.filter((x) => x.group === g).map((x) => React.createElement(PickCard, { key: x.type, c: x, taken: x.id && tk && tk.includes(x.id), onClick: () => choose(x) }))))))
+        : React.createElement("div", null,
+            React.createElement("p", { className: "build-hero" }, c.blurb + (c.group === "scenery" ? "." : ". It starts as a building site and opens when you finish its first task there.")),
+            c.group !== "scenery" && React.createElement("div", { className: "grid grid-cols-2 gap-3" },
+              React.createElement(Y, { label: "Name" }, React.createElement("input", { className: "inp", autoFocus: !0, value: f.name, onChange: (a) => setF({ ...f, name: a.target.value }) })),
+              React.createElement(Y, { label: "Short description" }, React.createElement("input", { className: "inp", value: f.sub, onChange: (a) => setF({ ...f, sub: a.target.value }) })),
+              c.styles && React.createElement("div", { className: "col-span-2" }, React.createElement(FaithStyle, { value: f.faith, onChange: (v) => setF({ ...f, faith: v }) })),
+              React.createElement(Y, { label: "Colour", className: "col-span-2" },
+                React.createElement("div", { className: "flex flex-wrap gap-2" },
+                  gs.map((col) => React.createElement("button", { key: col, type: "button", className: "swatch" + (f.color === col ? " on" : ""), style: { background: col }, onClick: () => setF({ ...f, color: col }), "aria-label": "Colour " + col, "aria-pressed": f.color === col })))),
+              c.crew && React.createElement("label", { className: "col-span-2 crew-opt" },
+                React.createElement("input", { type: "checkbox", checked: f.crew, onChange: (a) => setF({ ...f, crew: a.target.checked }) }),
+                React.createElement("span", null, React.createElement("b", null, "Hire the studio crew"), " \xB7 Scriptwriter, Image Gen, Voiceover, Editor, Thumbnail and Publisher, each with their own look.")))));
   }
   var {
     useState: He,
@@ -8365,7 +8428,26 @@
       hasData = !!((s && s.length) || (n && n.length) || (o && o.length) || (i && i.length) || (l && l.length)),
       islMode = isl ? isl.mode : sandbox || (t && !hasData) ? "new" : "classic",
       fresh = islMode !== "classic",
-      built = (isl && isl.built) || {},
+      lmOf = (p) => (CATALOG.find((c) => c.type === p.type) || {}).id || (p.type === "section" ? p.id : null),
+      // a venture opens once something has been finished there (its first task, or its tool's first use)
+      doneBy = (() => {
+        let m = {};
+        (s || []).forEach((t2) => t2.status === "done" && (m[t2.venture] = (m[t2.venture] || 0) + 1));
+        ((u && u.entries) || []).length && (m.fitness = (m.fitness || 0) + 1);
+        (l || []).length && (m.goals = (m.goals || 0) + 1);
+        return m;
+      })(),
+      // pre-layout fresh islands (a 'built' map) get packed into a layout on the fly
+      baseLayout = fresh
+        ? (isl && isl.layout) || (() => {
+            let b2 = (isl && isl.built) || {}, types = Object.keys(b2).map((id) => (CATALOG.find((c) => c.id === id) || {}).type).filter((t2) => t2 && t2 !== "epcm");
+            return { seed: 7, work: !!b2.epcm, workInfo: b2.epcm, parcels: World.freshParcels(types).map((p) => ({ ...p, ...(b2[lmOf(p)] || {}) })) };
+          })()
+        : (isl && isl.layout) || { classic: !0, moves: {}, extra: [] },
+      extraParcels = (fresh ? baseLayout.parcels : baseLayout.extra) || [],
+      ventureP = extraParcels.filter((p) => lmOf(p) && p.type !== "marina" && p.type !== "section"),
+      buildingIds = new Set(extraParcels.filter((p) => p.status === "building" && lmOf(p) && !doneBy[lmOf(p)]).map(lmOf)),
+      hasVenture = (id) => (fresh ? id === "personal" || extraParcels.some((p) => lmOf(p) === id) || (id === "epcm" && baseLayout.work) : !0) || extraParcels.some((p) => lmOf(p) === id),
       C = o || [],
       G = [...(l || [])].sort(
         (a, g) => (a.createdAt || 0) - (g.createdAt || 0),
@@ -8389,11 +8471,24 @@
             .map((a) => ({ ...a })),
         [i],
       ),
-      QsL = fresh ? Qs.filter((a) => a.id === "personal" || built[a.id]).map((a) => ({ ...a, ...(built[a.id] || {}) })) : Qs,
-      hiddenL = fresh ? BUILDABLE.map((b) => b.id).filter((id) => !built[id]) : [],
+      QsL = (() => {
+        let fromP = (p) => { let id = lmOf(p), base = Qs.find((q) => q.id === id) || EXTRA_Q[id] || {}; return { ...base, id, name: p.name || base.name, sub: p.sub || base.sub, color: p.color || base.color, style: p.style, building: buildingIds.has(id) }; };
+        return fresh
+          ? [Qs.find((q) => q.id === "personal"), ...ventureP.filter((p) => lmOf(p) !== "personal").map(fromP), ...(baseLayout.work ? [{ ...Qs.find((q) => q.id === "epcm"), ...(baseLayout.workInfo || {}) }] : [])]
+          : [...Qs, ...ventureP.filter((p) => !Qs.some((q) => q.id === lmOf(p))).map(fromP)];
+      })(),
+      planKey = JSON.stringify([fresh, baseLayout, [...buildingIds]]),
+      planL = _t(() => {
+        let st = (p) => ({ ...p, status: buildingIds.has(lmOf(p)) ? "building" : "open" });
+        if (fresh) return World.layoutPlan({ ...baseLayout, parcels: baseLayout.parcels.map(st) });
+        let cp = World.classicPlan();
+        cp.parcels.forEach((p) => { let m = baseLayout.moves && baseLayout.moves[p.id]; m && ((p.at = m.at), (p.rot = m.rot || 0)); });
+        (baseLayout.extra || []).forEach((p) => cp.parcels.push(st(p)));
+        return cp;
+      }, [planKey]),
       Ge = _t(
-        () => [...QsL, ...pe.map((a) => ({ ...a, plot: Us(a.slot) }))],
-        [pe, QsL.map((a) => a.id + a.name + a.color).join("|")],
+        () => [...QsL, ...pe.map((a) => ({ ...a, plot: Us(a.slot), building: buildingIds.has(a.id) }))],
+        [pe, QsL.map((a) => a.id + a.name + a.color + a.building).join("|"), [...buildingIds].join(",")],
       ),
       te = _t(() => Object.fromEntries(Ge.map((a) => [a.id, a])), [Ge]),
       ue = Be(),
@@ -8429,8 +8524,8 @@
       Oe = H >= 0.66 ? 3 : H >= 0.33 ? 2 : 1,
       je = ws(Object.values(se).reduce((a, g) => a + g, 0) + Ee * 40, 60),
       townL = _t(
-        () => World.buildTown({ sections: pe, islandLevel: je.level, hidden: hiddenL }),
-        [pe.map((a) => [a.id, a.slot, a.kind, a.color, a.name].join(":")).join("|"), je.level, hiddenL.join(",")],
+        () => World.buildTown({ sections: fresh ? [] : pe, islandLevel: je.level, plan: planL }),
+        [pe.map((a) => [a.id, a.slot, a.kind, a.color, a.name].join(":")).join("|"), je.level, planKey],
       ),
       { streak: Ve, activeToday: Xe } = sn(r == null ? void 0 : r.days),
       Ye = nn(xe, ue),
@@ -8465,7 +8560,7 @@
       Me.push({
         id: a.id,
         kind: a.kind,
-        name: a.name,
+        name: a.building ? a.name + " \xB7 building" : a.name,
         color: a.color,
         x: (townL.plots[a.id] || { sx: 0 }).sx,
         y: (townL.plots[a.id] || { sy: 0 }).sy,
@@ -8531,11 +8626,11 @@
         data: gt,
         sig: JSON.stringify(["port", gt, It]),
       }),
-      townL.plots.marina && (!fresh || built.marina) && Me.push({
+      townL.plots.marina && Me.push({
         id: "marina",
         kind: "port",
-        name: (built.marina && built.marina.name) || "Marina",
-        color: (built.marina && built.marina.color) || "#2A9D8F",
+        name: ((extraParcels.find((p) => p.type === "marina") || {}).name) || "Marina",
+        color: ((extraParcels.find((p) => p.type === "marina") || {}).color) || "#2A9D8F",
         x: townL.plots.marina.sx,
         y: townL.plots.marina.sy,
         tier: 1,
@@ -8549,11 +8644,7 @@
       Me.forEach((a) => {
         a.id === "port" && (a.name = "Tender Port", a.level = Ke.filter((g) => g.type === "tender").length);
       }),
-      // empty venture sites on a fresh island
-      hiddenL.forEach((id) => {
-        let o = townL.plots["build:" + id], b = BUILDABLE.find((x) => x.id === id);
-        o && b && Me.push({ id: "build:" + id, kind: "build", name: b.label, color: "#B4ABCB", x: o.sx, y: o.sy, tier: 1, level: "+", open: 0, alert: !1, crew: [], data: null, sig: "build:" + id });
-      }));
+      0);
     let
       Ps = Object.fromEntries(Me.map((a) => [a.id, a])),
       Os = (a) => {
@@ -8821,6 +8912,10 @@
           F = 0;
         for (; g.has(F); ) F++;
         let S = "s_" + Date.now().toString(36);
+        if (fresh) {
+          let p2 = World.placeParcel(baseLayout.parcels, "section", { id: S, name: a.name.trim(), color: a.color, sKind: a.kind, status: "building" });
+          p2 && saveLayout({ ...baseLayout, parcels: [...baseLayout.parcels, { id: S, type: "section", at: p2.at, rot: p2.rot, name: a.name.trim(), color: a.color, sKind: a.kind, status: "building" }] });
+        }
         U("sections/" + S, () =>
           e
             .collection("sections")
@@ -8836,23 +8931,46 @@
             }),
         );
       },
+      saveLayout = (lay) => U("settings/island", () => e.doc("settings/island").set({ ...(isl || { mode: fresh ? "fresh" : "classic" }), layout: lay })),
       onboard = (a) => {
-        let me = { id: "me", name: a.owner, kind: "human", color: "#2A9D8F" };
-        U("settings/island", () => e.doc("settings/island").set({ mode: a.mode, owner: a.owner, islandName: a.islandName, built: {}, createdAt: Date.now() }));
+        let me = { id: "me", name: a.owner, kind: "human", color: "#2A9D8F" },
+          picks = a.mode === "fresh" ? a.picks.filter((t2) => t2 !== "epcm") : [],
+          parcels = World.freshParcels(picks).map((p) => {
+            let c = CATALOG.find((x) => x.type === p.type) || {};
+            return c.group === "scenery" || p.type === "home" ? { ...p, id: p.type === "home" ? "home" : p.type + ":" + Math.random().toString(36).slice(2, 7) } : { ...p, name: c.name, sub: c.sub, color: c.color, status: "building", ...(p.type === "faith" ? { style: a.faith } : {}) };
+          }),
+          lay = a.mode === "fresh" ? { seed: (Math.random() * 1e6) | 0, parcels, work: a.picks.includes("epcm") } : null;
+        U("settings/island", () => e.doc("settings/island").set({ mode: a.mode, owner: a.owner, islandName: a.islandName, createdAt: Date.now(), ...(lay ? { layout: lay } : {}) }));
         (a.mode === "classic" ? ks.map((w) => (w.id === "me" ? me : w)) : [me]).forEach((w) =>
           U("workers/" + w.id, () => e.collection("workers").doc(w.id).set(w)));
-        Re(a.mode === "classic" ? "Welcome to the sample island, " + a.owner + "." : "Welcome home, " + a.owner + ". Tap an empty plot to build.", "gold");
+        Re(a.mode === "classic" ? "Welcome to the sample island, " + a.owner + "." : "Welcome home, " + a.owner + ". Tap a building site to give it its first task.", "gold");
       },
-      buildVenture = (id, a) => {
-        let next = { ...built, [id]: { name: a.name, sub: a.sub, color: a.color } };
-        (M(null), Fe.level && Fe.level());
-        U("settings/island", () => e.doc("settings/island").set({ ...(isl || { mode: "fresh" }), mode: "fresh", built: next }));
+      buildVenture = (type, a) => {
+        let c = CATALOG.find((x) => x.type === type);
+        if (!c) return;
+        if (type === "section") return M({ type: "section" });
+        M(null);
+        if (c.work) {
+          saveLayout({ ...baseLayout, work: !0, workInfo: { name: a.name, sub: a.sub, color: a.color } });
+          Re(a.name + " is on its own island now, over the bridge.", "gold");
+          return;
+        }
+        let parcels = fresh ? baseLayout.parcels : [...World.classicPlan().parcels.map((p) => { let m = baseLayout.moves && baseLayout.moves[p.id]; return m ? { ...p, ...m } : p; }), ...(baseLayout.extra || [])],
+          p = World.placeParcel(parcels, type, {
+            id: c.id || type + ":" + Math.random().toString(36).slice(2, 7),
+            ...(c.group === "scenery" ? {} : { name: a.name, sub: a.sub, color: a.color, status: "building" }),
+            ...(type === "faith" ? { style: a.faith } : {}),
+          });
+        if (!p) return Re("There's no room left that fits it. Try moving things in Edit layout.", "bad");
+        let clean = { id: p.id, type: p.type, at: p.at, rot: p.rot, ...(p.name ? { name: p.name, sub: p.sub, color: p.color, status: p.status } : {}), ...(p.style ? { style: p.style } : {}) };
+        saveLayout(fresh ? { ...baseLayout, parcels: [...baseLayout.parcels, clean] } : { ...baseLayout, extra: [...(baseLayout.extra || []), clean] });
         if (a.crew) {
           let have = new Set((n || []).map((w) => w.id));
           [...(have.has("me") ? [] : [Ce[0] || { id: "me", name: "You", kind: "human", color: "#2A9D8F" }]), ...STUDIO_CREW.filter((w) => !have.has(w.id))].forEach((w) =>
             U("workers/" + w.id, () => e.collection("workers").doc(w.id).set(w)));
         }
-        Re(a.name + " is built!" + (a.crew ? " The studio crew is on the square." : ""), "gold");
+        Fe.pop && Fe.pop();
+        Re(c.group === "scenery" ? c.label + " placed." : a.name + ": building site ready. Finish its first task to open it." + (a.crew ? " The studio crew is waiting on the square." : ""), "gold");
       },
       Kn = (a) => {
         let g = xe.filter((F) => F.venture === a.id);
@@ -9022,8 +9140,8 @@
         }),
       Ie = (a) => {
         if (fresh) {
-          let need = a.type === "fitness" && !built.fitness ? "fitness" : a.type === "goals" && !built.goals ? "goals" : a.type === "port" && !a.via && !built.epcm && !built.marina ? "marina" : null;
-          if (need) return (Fe.tap(), $(null), M({ type: "build", id: need }));
+          let need = a.type === "fitness" && !hasVenture("fitness") ? "gym" : a.type === "goals" && !hasVenture("goals") ? "goals" : a.type === "port" && !a.via && !townL.plots.marina && !townL.plots.port ? "marina" : null;
+          if (need) return (Fe.tap(), $(null), M({ type: "build", preset: need }));
         }
         ($(a), Fe.tap(), ne(!1));
         let g =
@@ -9046,7 +9164,6 @@
         );
       },
       lo = ds((a) => {
-        if (typeof a === "string" && a.startsWith("build:")) return (Fe.tap(), M({ type: "build", id: a.slice(6) }));
         Ie(
           a === "port" || a === "hub" || a === "marina"
             ? { type: "port", via: a }
@@ -9124,6 +9241,21 @@
         }
       hs.current = a;
     }, [k, Hs]);
+    // a building site that just got its first finished task: raise the building with a little ceremony
+    let prevBuilding = Lt(null),
+      [opening, setOpening] = He(null);
+    at(() => {
+      if (!k) return;
+      let now = [...buildingIds], prev = prevBuilding.current;
+      prevBuilding.current = now;
+      if (!prev) return;
+      let opened = prev.filter((id) => !buildingIds.has(id));
+      if (!opened.length) return;
+      let g = te[opened[0]];
+      setOpening({ id: opened[0], t: performance.now() });
+      Fe.level && Fe.level();
+      Re((g ? g.name : "Your new building") + " is open! Ribbon cut, doors open.", "gold");
+    }, [k, [...buildingIds].join(",")]);
     let Xs = Lt(!1);
     at(() => {
       if (!k || Xs.current) return;
@@ -9195,11 +9327,10 @@
         leads: Ke.map((a) => ({ id: a.id, type: a.type, color: (kt[a.type] || {}).color || "#1F7A8C" })),
         workers: Ce,
         lightMode: lightMode,
+        opening: opening,
         paused: !!v,
         onPlot: (a) => {
-          a.build
-            ? M({ type: "build", id: a.build })
-            : a.free
+          a.free
             ? M({ type: "section" })
             : (Fe.tap(),
               Re(
@@ -9384,7 +9515,7 @@
           onToggle: Wt.onToggle,
           onEdit: Wt.onEdit,
           onHabits: () => Ie({ type: "fitness", tab: "habits" }),
-          noHabits: fresh && !built.fitness,
+          noHabits: !hasVenture("fitness"),
         }),
       ),
       React.createElement(
@@ -9517,11 +9648,11 @@
           {
             variant: "gold",
             className: "dock-main",
-            onClick: () => M({ type: "section" }),
-            title: "Add a new section to the island",
+            onClick: () => M({ type: "build" }),
+            title: "Build something new on the island",
           },
           React.createElement(Ls, { size: 18 }),
-          React.createElement("span", { className: "hide-xs" }, "Expand"),
+          React.createElement("span", { className: "hide-xs" }, "Build"),
         ),
       ),
       (() => {
@@ -9682,7 +9813,7 @@
       (E == null ? void 0 : E.type) === "section" &&
         React.createElement(Pn, { onClose: () => M(null), onCreate: Yn }),
       (E == null ? void 0 : E.type) === "build" &&
-        React.createElement(BuildDlg, { key: E.id, id: E.id, onClose: () => M(null), onBuild: buildVenture }),
+        React.createElement(BuildDlg, { key: E.preset || "any", preset: E.preset, taken: Ge.map((g) => g.id).concat(townL.plots.marina ? ["marina"] : [], baseLayout.work || !fresh ? ["epcm"] : []), onClose: () => M(null), onBuild: buildVenture }),
       islMode === "new" &&
         React.createElement(WelcomeDlg, { onStart: onboard, sandbox: sandbox, onExit: () => setSandbox(!1) }),
       (E == null ? void 0 : E.type) === "confirm" &&

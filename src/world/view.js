@@ -27,6 +27,8 @@
       else if (o.p === "stall") { pn.box(0, 0, 0, 22, 12, 10, "#B98759"); [[-10, -5], [10, -5], [-10, 5], [10, 5]].forEach(([x, y]) => pn.line([x, y, 10], [x, y, 22], "#6F5A45", 1)); pn.box(0, 0, 22, 26, 16, 2, o.c); pn.box(-4, 2, 10, 6, 5, 3, "#E0474C"); pn.box(4, 2, 10, 6, 5, 3, "#F2C14E"); pn.glow(0, 0, 20, 10, "#FFE3A0", 1); }
       else if (o.p === "umbrella") umbrellaTable(pn, o.c);
       else if (o.p === "rock") Bt2(pn, o.s || 1);
+      else if (o.p === "crate") { crate(pn, 0, 0, 0, 10); crate(pn, 8, 3, 0, 8, "#B98759"); }
+      else if (o.p === "logs") { pn.box(0, 0, 0, 30, 6, 5, "#9C6B45"); pn.box(0, 7, 0, 30, 6, 5, "#8A5A3A"); pn.box(0, 3.5, 5, 30, 6, 5, "#A87B50"); }
       else if (o.p === "hay") { pn.cyl(0, 0, 0, 5, 6, "#E3C46B", { top: "#EFD68A" }); pn.cyl(9, 3, 0, 5, 6, "#D9B95C", { top: "#E8CE7E" }); }
     }
   }
@@ -36,7 +38,7 @@
     const wrap = React.useRef(null), cvs = React.useRef(null);
     const st = React.useRef(null);
     const cb = React.useRef({});
-    cb.current = { onOpen, onShip, onPlot, onAgent, onCrew, onAssign, landmarks, lightMode, reserveRight, paused: props.paused };
+    cb.current = { onOpen, onShip, onPlot, onAgent, onCrew, onAssign, landmarks, lightMode, reserveRight, paused: props.paused, opening: props.opening };
 
     /* one-time engine setup per town */
     React.useEffect(() => {
@@ -46,7 +48,7 @@
       // world bounds in screen units
       const { x0, x1, y0, y1 } = T.bbox;
       const bounds = { x0: x0 - 120, x1: x1 + 120, y0: y0 - 220, y1: y1 + 120 };
-      const sim = createSim(T, { cars: window.innerWidth < 700 ? 22 : 32, peds: window.innerWidth < 700 ? 40 : 60 });
+      const mob = window.innerWidth < 700, sim = createSim(T, { cars: Math.max(3, Math.min(mob ? 22 : 32, Math.round(T.edges.length * 0.9))), peds: Math.max(10, Math.min(mob ? 40 : 60, T.blocks.length * 4)) });
       const sprites = new Sprites();
       const chunks = new Map();
       const CH = 420;
@@ -209,7 +211,15 @@
           if (d.bnd) {
             const s = spriteFor(d, sc, lightState(d));
             d._s = s;
-            ctx.drawImage(s.cv, d.sx - s.ox, d.sy - s.oy, s.w, s.h);
+            const op = cb.current.opening, age = op && d.o.landmark === op.id ? (performance.now() - op.t) / 1000 : 99;
+            if (age < 3.4) {
+              // just opened: the building rises out of the ground, dust at the base, confetti on top
+              const p = clamp(age / 2.4, 0, 1), e = 1 - Math.pow(1 - p, 3), y0 = d.sy - s.oy;
+              ctx.save(); ctx.beginPath(); ctx.rect(d.sx - s.ox - 4, y0 + s.h * (1 - e) - 2, s.w + 8, s.h * e + 4); ctx.clip();
+              ctx.drawImage(s.cv, d.sx - s.ox, d.sy - s.oy, s.w, s.h); ctx.restore();
+              for (let q = 0; q < 10; q++) { const th = (q / 10) * TAU + age, rr = 20 + age * 18; ctx.fillStyle = `rgba(240,232,220,${0.5 * (1 - age / 3.4)})`; ctx.beginPath(); ctx.ellipse(d.sx + Math.cos(th) * rr, d.sy + Math.sin(th) * rr * 0.5, 9, 5, 0, 0, TAU); ctx.fill(); }
+              if (age > 1.8) for (let q = 0; q < 26; q++) { const h2 = (q * 97) % 100 / 100, fall = (age - 1.8) * 40; ctx.fillStyle = ["#E4826A", "#F0C06A", "#7CC2CB", "#9BC98A", "#B7A6DC"][q % 5]; ctx.fillRect(d.sx - 40 + h2 * 80 + Math.sin(age * 4 + q) * 6, y0 + 10 + fall + ((q * 37) % 30), 2.4, 3.6); }
+            } else ctx.drawImage(s.cv, d.sx - s.ox, d.sy - s.oy, s.w, s.h);
             if (S.hover && d.o.landmark && S.hover === d.o.landmark) { ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 0.14; ctx.drawImage(s.cv, d.sx - s.ox, d.sy - s.oy, s.w, s.h); ctx.restore(); }
             return;
           }
@@ -239,6 +249,7 @@
             }
             return;
           }
+          if (d.kind === "animal" && d.m.kind === "builder") { const m = d.m; drawPerson(ctx, d.sx, d.sy, m.look, ((m.da || 1) - (m.db || 0)) < 0 ? -1 : 1, true, m.phase, m.moving, 0.95, m.moving ? null : { kind: "hammer" }, time); return; }
           if (d.kind === "animal") { const m = d.m; drawAnimal(ctx, m.kind, d.sx, d.sy, ((m.da || 1) - (m.db || 0)) < 0 ? -1 : 1, m.phase, m.col, m.moving, time); return; }
         });
         // effects: chimney smoke, flare, fountain, dolphins

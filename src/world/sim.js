@@ -35,7 +35,7 @@
     /* ---- cars ---- */
     const CAR_COLS = ["#D9534F", "#3E7CB1", "#F2C14E", "#2A9D8F", "#F6EDDF", "#7E6BC4", "#E07B39", "#44545A", "#6DAE5B", "#C2577A", "#1F3A5F"];
     const spawnable = T.edges.filter((e) => !e.bridge && e.len > 150);
-    const nCars = opts.cars || 30;
+    const nCars = opts.cars || Math.max(3, Math.min(30, Math.round(T.edges.length * 0.55)));
     for (let k = 0; k < nCars; k++) {
       const kind = k === 0 || k === 13 ? "bus" : k % 9 === 4 ? "truck" : k % 5 === 1 ? "van" : k % 4 === 2 ? "bakkie" : k % 3 ? "hatch" : "sedan";
       const e = spawnable[k % spawnable.length], dir = R() < 0.5 ? 1 : -1;
@@ -206,7 +206,7 @@
       w.path = p && p.length ? p : null; w.i = 0; w.segT = 0;
       if (!w.path) w.wait = 1 + R() * 3;
     };
-    const nPeds = opts.peds || 56;
+    const nPeds = opts.peds || Math.max(8, Math.min(56, Math.round(T.blocks.length * 2.8)));
     for (let k = 0; k < nPeds; k++) {
       const n = pick(ringNodes);
       const w = { id: "p" + k, look: randomLook(R), node: n, a: n.a, b: n.b, speed: 12 + R() * 7, phase: R() * TAU, wait: R() * 2, name: pick(["Sam", "Lebo", "Zara", "Theo", "Naledi", "Kai", "Amara", "Ravi", "Jess", "Sipho", "Mia", "Omar", "Lindiwe", "Ben", "Aisha", "Tumi", "Noah", "Priya", "Luca", "Thandi"]) };
@@ -275,6 +275,7 @@
       if (n % 2) return;
       S.animals.push({ kind: "cat", a: k.a1 - 20, b: k.b1 - 20, home: { a: k.a1 - 24, b: k.b1 - 24, ra: 14, rb: 14 }, wait: 4 + R() * 6, col: pick(["#E07B39", "#3B3B3B", "#B9A58C", "#EDE3D1"]), phase: 0 });
     });
+    T.blocks.filter((k) => k.site).forEach((k) => { for (let n = 0; n < 3; n++) S.animals.push({ kind: "builder", look: builderLook(R), a: k.site.a + (R() - 0.5) * k.site.ra, b: k.site.b + (R() - 0.5) * k.site.rb, home: { a: k.site.a, b: k.site.b + k.site.rb * 0.6, ra: k.site.ra, rb: k.site.rb * 0.4 }, wait: R() * 3, phase: 0 }); });
     const AB = T.abox;
     for (let k = 0; k < 7; k++) S.gulls.push({ cx: lerp(AB.a0, AB.a1, R()), cy: lerp(AB.b0, AB.b1, R()), r: 120 + R() * 220, t: R() * TAU, sp: 0.1 + R() * 0.12, z: 80 + R() * 60 });
     for (let k = 0; S.dolphins.length < 5 && k < 400; k++) { const a = lerp(AB.a0 - 250, AB.a1 + 250, R()), b = lerp(AB.b0 - 250, AB.b1 + 250, R()); if (!T.landAt(a, b) && !T.landAt(a + 60, b) && !T.landAt(a - 60, b) && !T.landAt(a, b + 60) && !T.landAt(a, b - 60)) S.dolphins.push({ a, b, t: R() * 12, dir: R() < 0.5 ? 1 : -1 }); }
@@ -286,7 +287,7 @@
           m.tgt = { a: h.a + Math.cos(th) * (h.ra || 30) * 0.8 * rr, b: h.b + Math.sin(th) * (h.rb || 20) * 0.8 * rr };
         }
         const da = m.tgt.a - m.a, db = m.tgt.b - m.b, d = Math.hypot(da, db);
-        const sp = m.kind === "duck" ? 6 : m.kind === "pigeon" ? 8 : 10;
+        const sp = m.kind === "duck" ? 6 : m.kind === "pigeon" ? 8 : m.kind === "builder" ? 9 : 10;
         if (d < 1) { m.tgt = null; m.wait = m.kind === "cat" ? 5 + R() * 14 : 1 + R() * 4; m.moving = false; return; }
         const s = Math.min(d, sp * dt);
         m.a += (da / d) * s; m.b += (db / d) * s; m.da = da; m.db = db; m.moving = true; m.phase += dt * 9;
@@ -307,11 +308,13 @@
       ];
     };
     const ring = (m) => [[AB.a0 - m, AB.b0 - m], [(AB.a0 + AB.a1) / 2, AB.b0 - m * 1.2], [AB.a1 + m, AB.b0 - m], [AB.a1 + m * 1.2, (AB.b0 + AB.b1) / 2], [AB.a1 + m, AB.b1 + m], [(AB.a0 + AB.a1) / 2, AB.b1 + m * 1.2], [AB.a0 - m, AB.b1 + m], [AB.a0 - m * 1.2, (AB.b0 + AB.b1) / 2]];
-    const mw = T.marinaWater, gapA = (ISLES.life.box.a1 + ISLES.work.box.a0) / 2;
+    const mw = T.marinaWater, BE = T.bridgeE, W = T.isles.work;
     S.traffic = [
       { kind: "yacht", color: "#2A9D8F", route: ring(230), u: 0, speed: 18 },
       { kind: "cargo", color: "#8C3B3B", route: ring(360).reverse(), u: 0.5, speed: 14 },
-      { kind: "launch", color: "#F6EDDF", route: [[(mw.a0 + mw.a1) / 2 + 60, mw.b1 + 120], [gapA, ISLES.work.box.b1 + 180], [gapA, 1000], [gapA + 20, 880], [gapA - 10, 1200]], u: 0.2, speed: 16 },
+      // a launch that threads under the bridge between the islands (or just loops the harbour)
+      BE && W ? { kind: "launch", color: "#F6EDDF", route: [[(BE.bridge.a0 + BE.bridge.a1) / 2, W.box.b1 + 180], [(BE.bridge.a0 + BE.bridge.a1) / 2, BE.n0.b + 280], [(BE.bridge.a0 + BE.bridge.a1) / 2 + 20, BE.n0.b + 160], [(BE.bridge.a0 + BE.bridge.a1) / 2 - 10, BE.n0.b + 480]], u: 0.2, speed: 16 }
+        : { kind: "launch", color: "#F6EDDF", route: ring(150), u: 0.2, speed: 16 },
     ].map((b) => ({ ...b, path: withLen([...b.route, b.route[0]]), moving: true }));
     S.boats = [...S.traffic];
     function stepBoats(dt) {

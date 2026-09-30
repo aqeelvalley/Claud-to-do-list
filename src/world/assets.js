@@ -194,6 +194,12 @@
     look.hat = R.hat; look.style = R.style; look.scarf = R.scarf || null; look.acc = null;
     return look;
   }
+  // builders on a construction site: hi-vis vest and a hard hat
+  function builderLook(r) {
+    const l = randomLook(r);
+    l.top = r() < 0.5 ? "#F08A4B" : "#F2C14E"; l.hat = { kind: "hardhat", c: r() < 0.7 ? "#F2C14E" : "#FFF6EC" }; l.acc = null; l.scarf = null; l.build = r() < 0.5 ? "round" : "slim";
+    return l;
+  }
   function randomLook(r) {
     const pick = (a) => a[(r() * a.length) | 0];
     const build = pick(["slim", "slim", "round", "tall", "kid"]);
@@ -233,6 +239,7 @@
     const armY = top + 2.2;
     const role = !moving && look.role;
     const handAt = (side) => {
+      if (!moving && side === 1 && act0 === "hammer") return [wid * 0.9 + 1, armY - 3 + Math.sin(t * 10 + look.h * 7) * 2.2];
       if (role === "thumb") return [side * (wid * 0.7 + 0.8), armY - 7 + Math.sin(t * 2) * 0.4];
       if (role && side === 1) {
         if (role === "voice") return [wid * 0.45 + 0.8, top - 1.4 + Math.sin(t * 5) * 0.4];
@@ -259,6 +266,7 @@
         else if (look.acc === "balloon") { ctx.strokeStyle = "rgba(60,50,80,0.6)"; ctx.lineWidth = 0.4; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.quadraticCurveTo(hx + 2, hy - 7, hx + 1, hy - 13 + Math.sin(t * 2) * 0.6); ctx.stroke(); ctx.fillStyle = look.accC; ctx.beginPath(); ctx.ellipse(hx + 1, hy - 15.5 + Math.sin(t * 2) * 0.6, 2.2, 2.7, 0, 0, TAU); ctx.fill(); }
       }
     });
+    if (!moving && act0 === "hammer") { const [hx, hy] = handAt(1); ctx.strokeStyle = "#9C6B45"; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx + 1.2, hy - 3); ctx.stroke(); ctx.fillStyle = "#6E6A80"; ctx.fillRect(hx + 0.2, hy - 3.8, 2.2, 1.2); }
     // role props (idle only; while walking the hat carries the identity)
     if (role) {
       const [hx, hy] = handAt(1);
@@ -285,6 +293,7 @@
       const c = look.hat.c; ctx.fillStyle = c;
       if (look.hat.kind === "beanie") { ctx.beginPath(); ctx.arc(0, hy - 0.4, hr + 0.3, Math.PI, 0); ctx.fill(); ctx.beginPath(); ctx.arc(0, hy - hr - 0.9, 0.9, 0, TAU); ctx.fill(); }
       else if (look.hat.kind === "cap") { ctx.beginPath(); ctx.arc(0, hy - 0.4, hr + 0.25, Math.PI, 0); ctx.fill(); ctx.fillRect(front ? 0 : -hr - 1.6, hy - 0.8, hr + 1.6, 0.9); }
+      else if (look.hat.kind === "hardhat") { ctx.beginPath(); ctx.arc(0, hy - 0.5, hr + 0.35, Math.PI, 0); ctx.fill(); ctx.fillRect(-hr - 1, hy - 0.8, hr * 2 + 2, 0.8); ctx.fillStyle = shade(c, 0.25); ctx.fillRect(-0.4, hy - hr - 0.7, 0.8, hr * 0.8); }
       else if (look.hat.kind === "beret") { ctx.beginPath(); ctx.ellipse(-0.4, hy - hr + 0.2, hr + 0.9, 1.2, -0.18, 0, TAU); ctx.fill(); ctx.fillRect(-0.6, hy - hr - 1.6, 0.6, 0.9); }
       else if (look.hat.kind === "bucket") { ctx.beginPath(); ctx.arc(0, hy - 0.5, hr + 0.2, Math.PI, 0); ctx.fill(); ctx.beginPath(); ctx.ellipse(0, hy - 0.4, hr + 1.3, 0.7, 0, 0, TAU); ctx.fill(); }
       else if (look.hat.kind === "visor") { ctx.fillRect(-hr - 0.2, hy - 1.2, hr * 2 + 0.4, 0.8); ctx.beginPath(); ctx.ellipse(front ? hr * 0.7 : -hr * 0.7, hy - 0.8, 1.6, 0.5, 0, 0, TAU); ctx.fill(); }

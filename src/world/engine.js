@@ -72,8 +72,7 @@
     });
     /* ---- town: footway base, roads, then rounded blocks ---- */
     Object.values(T.isles).forEach((I) => {
-      const r = RC + 15 + VERGE;
-      pn.poly(rrect4(I.box.a0, I.box.a1, I.box.b0, I.box.b1, [r, r, r, r], 0.4), "#F2E6D6", "#E3D1BE", 1.2);
+      pn.poly(I.base.map(([a, b]) => [a, b, 0.4]), "#F2E6D6", "#E3D1BE", 1.2);
     });
     const road = "#8E8CAA";
     const arcBand = (n, r0, r1, z) => {

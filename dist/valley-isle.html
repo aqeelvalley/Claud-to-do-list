@@ -2695,6 +2695,21 @@ select.inp {
 .banner-btn { font: 600 12px Fredoka, sans-serif; color: #fff; background: var(--terra); border: 0; border-radius: 999px; padding: 3px 10px; cursor: pointer; }
 @media (max-width: 767px) { .banner.sandbox { font-size: 11.5px; white-space: normal; width: calc(100vw - 32px); justify-content: center; } }
 .quest-empty { font-size: 12.5px; color: var(--ink2); padding: 8px 4px 4px; line-height: 1.4; }
+.pick-group { font: 700 11.5px Nunito, sans-serif; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink3); margin: 14px 2px 6px; }
+.pick-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.pick-card { display: grid; grid-template-columns: 12px 1fr; column-gap: 8px; row-gap: 2px; text-align: left; padding: 10px 12px; border-radius: 14px; border: 1.5px solid var(--line); background: var(--paper); color: var(--ink2); font-size: 12px; line-height: 1.35; cursor: pointer; }
+.pick-card b { font: 600 14px Fredoka, sans-serif; color: var(--ink); }
+.pick-card > span:last-child { grid-column: 1 / -1; }
+.pick-card .pick-dot { width: 12px; height: 12px; border-radius: 4px; align-self: center; }
+.pick-card.on { border-color: var(--terra); background: #fdefe9; box-shadow: inset 0 0 0 1px var(--terra); }
+.pick-card.taken { opacity: 0.45; cursor: default; }
+.pick-card:focus-visible { outline: 2px solid var(--terra); outline-offset: 2px; }
+.pick-scroll { max-height: min(56vh, 520px); overflow-y: auto; padding: 0 2px 4px; }
+.welcome-card.wide { max-width: 680px; }
+.chip-btn { font: 600 13px Fredoka, sans-serif; padding: 6px 12px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--paper); color: var(--ink2); cursor: pointer; }
+.chip-btn.on { border-color: var(--terra); color: var(--ink); background: #fdefe9; }
+.site-banner { display: grid; gap: 2px; margin: 0 0 12px; padding: 10px 12px; border-radius: 12px; background: repeating-linear-gradient(135deg, #fbf1d9 0 12px, #f7e8c4 12px 24px); color: #6b5a2a; font-size: 12.5px; line-height: 1.4; }
+.site-banner b { font: 600 14px Fredoka, sans-serif; color: #5a4a1e; }
 </style>
 <div id="root"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
@@ -2878,18 +2893,38 @@ select.inp {
       { x: 650, y: 330 },
       { x: -810, y: -160 },
     ];
-  /* what a fresh island can build on its empty venture sites (ids match the classic buildings) */
-  var BUILDABLE = [
-    { id: "youtube", label: "Studio", kind: "film", blurb: "Video, content and creative work", name: "Studio", sub: "Film studio", color: "#E0474C", crew: "studio" },
-    { id: "freelance", label: "Office", kind: "drafting", blurb: "Freelance, consulting and services", name: "Freelance", sub: "Drafting studio", color: "#7E6BC4" },
-    { id: "bynode", label: "Workshop", kind: "maker", blurb: "Making and selling products", name: "Workshop", sub: "Maker space", color: "#2A9D8F" },
-    { id: "wood", label: "Mill", kind: "mill", blurb: "Crafts, trades and hands-on work", name: "Woodworking", sub: "Timber mill", color: "#B5773A" },
-    { id: "coffee", label: "Café", kind: "cafe", blurb: "Shop, café or retail", name: "Caf\xE9", sub: "Seaside caf\xE9", color: "#D9734E" },
-    { id: "fitness", label: "Gym", kind: "gym", blurb: "Workouts, weights and daily habits", name: "Fitness", sub: "Gym & track", color: "#F08A4B" },
-    { id: "goals", label: "Lighthouse", kind: "lighthouse", blurb: "Goals and the money treasury", name: "Goals", sub: "Lighthouse \xB7 treasury", color: "#E9B949" },
-    { id: "marina", label: "Marina", kind: "port", blurb: "Side-business leads dock here by boat", name: "Marina", sub: "Leads & orders", color: "#2A9D8F" },
-    { id: "epcm", label: "Day-job HQ", kind: "refinery", blurb: "Your job: HQ, plus the work island's logistics hub and tender port", name: "Day job", sub: "Work island", color: "#3E7CB1" },
+  /* what an island can build. type = the parcel shape in World.PARCELS; id = the venture/landmark id */
+  var CATALOG = [
+    { type: "studio", id: "youtube", label: "Studio", kind: "film", blurb: "Video, content and creative work", name: "Studio", sub: "Film studio", color: "#E0474C", crew: "studio", group: "work" },
+    { type: "freelance", id: "freelance", label: "Office", kind: "drafting", blurb: "Freelance, consulting and services", name: "Office", sub: "Drafting studio", color: "#7E6BC4", group: "work" },
+    { type: "maker", id: "bynode", label: "Workshop", kind: "maker", blurb: "Making and selling products", name: "Workshop", sub: "Maker space", color: "#2A9D8F", group: "work" },
+    { type: "mill", id: "wood", label: "Mill", kind: "mill", blurb: "Crafts, trades and hands-on work", name: "Woodworking", sub: "Timber mill", color: "#B5773A", group: "work" },
+    { type: "cafe", id: "coffee", label: "Caf\xE9", kind: "cafe", blurb: "A shop, caf\xE9 or retail side-business", name: "Caf\xE9", sub: "Seaside caf\xE9", color: "#D9734E", group: "work" },
+    { type: "marina", id: "marina", label: "Marina", kind: "port", blurb: "Side-business leads dock here by boat", name: "Marina", sub: "Leads & orders", color: "#2A9D8F", group: "work" },
+    { type: "epcm", id: "epcm", label: "Day job", kind: "refinery", blurb: "Your job, on its own work island with a logistics hub and tender port", name: "Day job", sub: "Work island", color: "#3E7CB1", group: "work", work: !0 },
+    { type: "gym", id: "fitness", label: "Gym", kind: "gym", blurb: "Workouts, weights and daily habits", name: "Fitness", sub: "Gym & track", color: "#F08A4B", group: "life" },
+    { type: "goals", id: "goals", label: "Lighthouse", kind: "lighthouse", blurb: "Goals and the money treasury", name: "Goals", sub: "Lighthouse \xB7 treasury", color: "#E9B949", group: "life" },
+    { type: "bank", id: "bank", label: "Bank", kind: "bank", blurb: "Budget planner, spending, bills and savings goals", name: "Bank", sub: "Budget & savings", color: "#C9A227", group: "life" },
+    { type: "faith", id: "faith", label: "Faith", kind: "faith", blurb: "Prayer, worship and faith goals", name: "Faith", sub: "Place of worship", color: "#8FB8B0", group: "life", styles: !0 },
+    { type: "townhall", id: "townhall", label: "Town Hall", kind: "townhall", blurb: "Your week planner: every task by day", name: "Town Hall", sub: "Week planner", color: "#9F8FC9", group: "life" },
+    { type: "section", id: null, label: "Something else", blurb: "Name it and pick a building style", color: "#C2577A", group: "life" },
+    { type: "houses", id: null, label: "Neighbours", blurb: "A street of houses", color: "#F3D9C4", group: "scenery" },
+    { type: "park", id: null, label: "Park", blurb: "Trees, a pond and benches", color: "#9BC98A", group: "scenery" },
+    { type: "square", id: null, label: "Town square", blurb: "A fountain, market stalls and pigeons", color: "#F3E7D5", group: "scenery" },
+    { type: "downtown", id: null, label: "Downtown", blurb: "A cluster of towers", color: "#9EB4D8", group: "scenery" },
+    { type: "farm", id: null, label: "Farm", blurb: "Fields, a barn and a few animals", color: "#C9B458", group: "scenery" },
+    { type: "garden", id: null, label: "Garden", blurb: "Orchard rows and a stall", color: "#B7D8A4", group: "scenery" },
   ];
+  var FAITH_STYLES = [
+    { id: "mosque", label: "Mosque" }, { id: "church", label: "Church" }, { id: "temple", label: "Temple" },
+    { id: "synagogue", label: "Synagogue" }, { id: "gurdwara", label: "Gurdwara" }, { id: "garden", label: "Prayer garden" }, { id: "chapel", label: "Chapel" },
+  ];
+  // venture buildings that aren't on the classic island
+  var EXTRA_Q = {
+    bank: { id: "bank", name: "Bank", sub: "Budget & savings", kind: "bank", color: "#C9A227" },
+    faith: { id: "faith", name: "Faith", sub: "Place of worship", kind: "faith", color: "#8FB8B0" },
+    townhall: { id: "townhall", name: "Town Hall", sub: "Week planner", kind: "townhall", color: "#9F8FC9" },
+  };
   var STUDIO_CREW = [
     { id: "script", name: "Scriptwriter", kind: "role", color: "#3E9B6B" },
     { id: "imagegen", name: "Image Gen", kind: "role", color: "#C04FB0" },
@@ -7226,6 +7261,151 @@ select.inp {
     return { P, path, poly, line, box, faceQ, faceP, cyl, gable, hip, windowQ, door, awning, sign, glow, fillPath, ctx, E, winCount: () => winK };
   }
 
+  /* ===================== island plans: parcels of any shape on an uneven grid =====================
+   * A plan is a set of parcels, each a list of grid cells. Roads run only along the
+   * boundaries between different parcels, so a parcel's shape (a single cell, a long
+   * strip, an L, a T...) is the shape of its land. Columns and rows have different
+   * widths, so the same parcel reads thin in one spot and wide in another.
+   */
+  const PARCELS = {
+    // ventures (landmark = the building's id in the app)
+    home: { label: "Home", landmark: "personal", cells: [[0, 0]], fixed: true },
+    studio: { label: "Studio", landmark: "youtube", cells: [[0, 0], [1, 0]], wing: "backlot" },
+    freelance: { label: "Office", landmark: "freelance", cells: [[0, 0], [0, 1]], wing: "annex" },
+    maker: { label: "Workshop", landmark: "bynode", cells: [[0, 0], [0, 1], [1, 1]], wing: "yard" },
+    mill: { label: "Mill", landmark: "wood", cells: [[0, 0], [1, 0], [1, -1]], wing: "timber" },
+    cafe: { label: "Café", landmark: "coffee", cells: [[0, 0]] },
+    gym: { label: "Gym", landmark: "fitness", cells: [[0, 0], [1, 0]], wing: "field" },
+    marina: { label: "Marina", landmark: "marina", cells: [[0, 0]], coastal: "marina" },
+    goals: { label: "Lighthouse", landmark: "goals", cells: [[0, 0]], coastal: "lighthouse" },
+    bank: { label: "Bank", landmark: "bank", cells: [[0, 0]] },
+    faith: { label: "Faith", landmark: "faith", cells: [[0, 0], [0, 1]], wing: "courtyard" },
+    townhall: { label: "Town Hall", landmark: "townhall", cells: [[0, 0]] },
+    // savings goals that grow on the island
+    airport: { label: "Airport", cells: [[0, 0], [1, 0], [2, 0]], wing: "runway" },
+    dealership: { label: "Dealership", cells: [[0, 0]] },
+    dreamhouse: { label: "Dream house", cells: [[0, 0]] },
+    // scenery
+    houses: { label: "Houses", cells: [[0, 0], [1, 0]], ambient: true },
+    park: { label: "Park", cells: [[0, 0]], ambient: true },
+    square: { label: "Town square", cells: [[0, 0]], ambient: true },
+    downtown: { label: "Downtown", cells: [[0, 0]], ambient: true },
+    farm: { label: "Farm", cells: [[0, 0], [0, 1]], ambient: true },
+    apartments: { label: "Apartments", cells: [[0, 0]], ambient: true },
+    garden: { label: "Garden", cells: [[0, 0]], ambient: true },
+    section: { label: "District", cells: [[0, 0]] },
+  };
+  // which classic fill draws each parcel type's main cell
+  const FILL_OF = { home: "home", studio: "studio", freelance: "freelance", maker: "maker", mill: "mill", cafe: "cafe", gym: "gym", marina: "marina",
+    goals: "lookout", bank: "bank", faith: "faith", townhall: "townhall", airport: "airport", dealership: "dealership", dreamhouse: "dreamhouse", section: "section",
+    houses: "houses", park: "park", square: "square", downtown: "downtown", farm: "farm", apartments: "apartments", garden: "garden" };
+
+  /* grid line positions for a fresh island: uneven widths from a seed */
+  const FRESH_N = 16;
+  function freshLines(seed) {
+    const r = rng(seed >>> 0), W = [360, 250, 320, 290, 380, 230, 340, 300];
+    const line = (off) => { const out = [100]; for (let i = 0; i < FRESH_N; i++) out.push(out[i] + W[(i * 3 + off + ((r() * 3) | 0)) % W.length]); return out; };
+    return { A: line(0), B: line(5) };
+  }
+
+  /* rotate a footprint a quarter-turn k times, normalised so the main cell stays at [0,0] */
+  function footprint(type, rot = 0) {
+    let cells = (Array.isArray(type) ? type : (PARCELS[type] || PARCELS.section).cells).map((c) => c.slice());
+    for (let k = 0; k < ((rot % 4) + 4) % 4; k++) cells = cells.map(([i, j]) => [-j, i]);
+    return cells;
+  }
+  const cellsOf = (p) => footprint(p.shape || p.type, p.rot || 0).map(([i, j]) => [p.at[0] + i, p.at[1] + j]);
+
+  /* check a plan: no overlaps, inside the grid, every parcel touching the rest, coastal ones on the coast */
+  function checkPlan(parcels, N = FRESH_N) {
+    const occ = new Map();
+    for (const p of parcels) for (const [i, j] of cellsOf(p)) {
+      if (i < 0 || j < 0 || i >= N || j >= N) return { ok: false, why: "That's off the edge of the map." };
+      const k = i + "," + j;
+      if (occ.has(k)) return { ok: false, why: "That spot is already taken." };
+      occ.set(k, p.id);
+    }
+    // connected (4-neighbour) across all cells
+    const keys = [...occ.keys()];
+    if (keys.length) {
+      const seen = new Set([keys[0]]), q = [keys[0]];
+      while (q.length) { const [i, j] = q.pop().split(",").map(Number); [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([di, dj]) => { const k = i + di + "," + (j + dj); if (occ.has(k) && !seen.has(k)) { seen.add(k); q.push(k); } }); }
+      if (seen.size !== keys.length) return { ok: false, why: "Every building needs to join the rest of the island." };
+    }
+    for (const p of parcels) if ((PARCELS[p.type] || {}).coastal && !coastSide(p, occ)) return { ok: false, why: PARCELS[p.type].label + " has to sit on the coast." };
+    return { ok: true, occ };
+  }
+  /* the open side of a coastal parcel's main cell, preferring the sides that face the viewer */
+  function coastSide(p, occ) {
+    const [i, j] = cellsOf(p)[0];
+    const pref = p.side ? [p.side, "+b", "+a", "-a", "-b"] : ["+b", "+a", "-a", "-b"];
+    const free = (s) => { const [di, dj] = { "+a": [1, 0], "-a": [-1, 0], "+b": [0, 1], "-b": [0, -1] }[s]; for (let k = 1; k <= 3; k++) if (occ.has(i + di * k + "," + (j + dj * k))) return false; return true; };
+    return pref.find(free) || null;
+  }
+  /* auto-place a new parcel: the free spot nearest the island's middle that keeps the plan valid */
+  function placeParcel(parcels, type, extra = {}) {
+    const cells = parcels.flatMap(cellsOf);
+    const ci = cells.length ? cells.reduce((s, c) => s + c[0], 0) / cells.length : FRESH_N / 2, cj = cells.length ? cells.reduce((s, c) => s + c[1], 0) / cells.length : FRESH_N / 2;
+    let best = null;
+    for (let rot = 0; rot < 4; rot++) for (let i = 1; i < FRESH_N - 1; i++) for (let j = 1; j < FRESH_N - 1; j++) {
+      const p = { id: extra.id || type + ":" + Date.now().toString(36), type, at: [i, j], rot, ...extra };
+      // near the middle, but with a little seeded wobble and a liking for branching out,
+      // so islands grow into irregular shapes rather than tidy rectangles
+      const wob = ((Math.imul(i * 73856093 ^ j * 19349663 ^ (parcels.length + 1) * 83492791 ^ rot * 2654435761, 1) >>> 0) % 1000) / 1000;
+      const pc = cellsOf(p), contacts = pc.reduce((n, [a, b]) => n + cells.filter(([x, y]) => Math.abs(x - a) + Math.abs(y - b) === 1).length, 0);
+      const d = Math.hypot(i - ci, j - cj) * 0.8 + wob * 1.6 + (contacts > 2 ? 0.7 * (contacts - 2) : 0) + (PARCELS[type].coastal ? -0.5 : 0);
+      if (best && d >= best.d) continue;
+      if (!checkPlan([...parcels, p]).ok) continue;
+      if (cells.length && !cellsOf(p).some(([a, b]) => cells.some(([x, y]) => Math.abs(x - a) + Math.abs(y - b) === 1))) continue;
+      best = { p, d };
+    }
+    return best && best.p;
+  }
+  /* a fresh island from the onboarding picks: home first, then everything else packed round it */
+  function freshParcels(picks) {
+    let parcels = [{ id: "home", type: "home", at: [Math.floor(FRESH_N / 2) - 1, Math.floor(FRESH_N / 2) - 1], rot: 0 }];
+    picks.forEach((t) => { const p = placeParcel(parcels, t, { id: PARCELS[t].landmark || t }); if (p) parcels = [...parcels, p]; });
+    return parcels;
+  }
+  /* empty cells boxed in by the island become little parks, so there are no inland holes */
+  function fillHoles(parcels) {
+    const occ = new Set(parcels.flatMap(cellsOf).map((c) => c.join(",")));
+    if (!occ.size) return parcels;
+    const all = [...occ].map((k) => k.split(",").map(Number));
+    const i0 = Math.min(...all.map((c) => c[0])) - 1, i1 = Math.max(...all.map((c) => c[0])) + 1, j0 = Math.min(...all.map((c) => c[1])) - 1, j1 = Math.max(...all.map((c) => c[1])) + 1;
+    const out = new Set(), q = [[i0, j0]];
+    out.add(i0 + "," + j0);
+    while (q.length) { const [i, j] = q.pop(); [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([di, dj]) => { const a = i + di, b = j + dj, k = a + "," + b; if (a < i0 || a > i1 || b < j0 || b > j1 || out.has(k) || occ.has(k)) return; out.add(k); q.push([a, b]); }); }
+    const extra = [];
+    for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) { const k = i + "," + j; if (!occ.has(k) && !out.has(k)) extra.push({ id: "hole:" + k, type: "park", at: [i, j], rot: 0, auto: true }); }
+    return extra.length ? [...parcels, ...extra] : parcels;
+  }
+
+  /* the original Valley Isle as a plan: same streets, same buildings, now movable */
+  function classicPlan() {
+    const A = [100, 420, 720, 1010, 1380], B = [100, 400, 720, 1000, 1330, 1640];
+    const T = [
+      ["farm", "park", "houses", "gym", "beachHouses"],
+      ["freelance", "home", "maker", "parking", "cs:learning"],
+      ["studio", "square", "cafe", "garden", "marina"],
+      ["houses2", "downtown", "mill", "cs:townhall", "cs:cinema"],
+    ];
+    const parcels = [];
+    T.forEach((col, i) => col.forEach((t, j) => parcels.push({ id: "c" + i + j, type: t, at: [i, j], rot: 0, shape: [[0, 0]], classic: true })));
+    parcels.find((p) => p.type === "marina").harbour = { kind: "marina", side: "+b" };
+    parcels.find((p) => p.type === "cs:cinema").harbour = { kind: "lighthouse", side: "+b" };
+    const joins = [["c03", "c13"], ["c20", "c21"], ["c23", "c33"], ["c30", "c31"], ["c01", "c02"]];
+    return { A, B, parcels, joins, main: { a: [2], b: [2] }, roundabout: [2, 2], work: true, classic: true };
+  }
+  /* a stored layout (settings/island.layout) as a plan */
+  function layoutPlan(layout, sections = []) {
+    const { A, B } = freshLines(layout.seed || 7);
+    let parcels = (layout.parcels || []).map((p) => ({ ...p, cells: undefined }));
+    parcels = fillHoles(parcels);
+    parcels.forEach((p) => { if (p.type === "marina") p.harbour = { kind: "marina" }; if (p.type === "goals") p.harbour = { kind: "lighthouse" }; });
+    return { A, B, parcels, joins: [], main: null, roundabout: "auto", work: !!layout.work, seed: layout.seed || 7 };
+  }
+
   /* ===================== assets: vehicles, people, animals, props ===================== */
 
   /* ---- oriented prisms (vehicles, boats) ----
@@ -7422,6 +7602,12 @@ select.inp {
     look.hat = R.hat; look.style = R.style; look.scarf = R.scarf || null; look.acc = null;
     return look;
   }
+  // builders on a construction site: hi-vis vest and a hard hat
+  function builderLook(r) {
+    const l = randomLook(r);
+    l.top = r() < 0.5 ? "#F08A4B" : "#F2C14E"; l.hat = { kind: "hardhat", c: r() < 0.7 ? "#F2C14E" : "#FFF6EC" }; l.acc = null; l.scarf = null; l.build = r() < 0.5 ? "round" : "slim";
+    return l;
+  }
   function randomLook(r) {
     const pick = (a) => a[(r() * a.length) | 0];
     const build = pick(["slim", "slim", "round", "tall", "kid"]);
@@ -7461,6 +7647,7 @@ select.inp {
     const armY = top + 2.2;
     const role = !moving && look.role;
     const handAt = (side) => {
+      if (!moving && side === 1 && act0 === "hammer") return [wid * 0.9 + 1, armY - 3 + Math.sin(t * 10 + look.h * 7) * 2.2];
       if (role === "thumb") return [side * (wid * 0.7 + 0.8), armY - 7 + Math.sin(t * 2) * 0.4];
       if (role && side === 1) {
         if (role === "voice") return [wid * 0.45 + 0.8, top - 1.4 + Math.sin(t * 5) * 0.4];
@@ -7487,6 +7674,7 @@ select.inp {
         else if (look.acc === "balloon") { ctx.strokeStyle = "rgba(60,50,80,0.6)"; ctx.lineWidth = 0.4; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.quadraticCurveTo(hx + 2, hy - 7, hx + 1, hy - 13 + Math.sin(t * 2) * 0.6); ctx.stroke(); ctx.fillStyle = look.accC; ctx.beginPath(); ctx.ellipse(hx + 1, hy - 15.5 + Math.sin(t * 2) * 0.6, 2.2, 2.7, 0, 0, TAU); ctx.fill(); }
       }
     });
+    if (!moving && act0 === "hammer") { const [hx, hy] = handAt(1); ctx.strokeStyle = "#9C6B45"; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx + 1.2, hy - 3); ctx.stroke(); ctx.fillStyle = "#6E6A80"; ctx.fillRect(hx + 0.2, hy - 3.8, 2.2, 1.2); }
     // role props (idle only; while walking the hat carries the identity)
     if (role) {
       const [hx, hy] = handAt(1);
@@ -7513,6 +7701,7 @@ select.inp {
       const c = look.hat.c; ctx.fillStyle = c;
       if (look.hat.kind === "beanie") { ctx.beginPath(); ctx.arc(0, hy - 0.4, hr + 0.3, Math.PI, 0); ctx.fill(); ctx.beginPath(); ctx.arc(0, hy - hr - 0.9, 0.9, 0, TAU); ctx.fill(); }
       else if (look.hat.kind === "cap") { ctx.beginPath(); ctx.arc(0, hy - 0.4, hr + 0.25, Math.PI, 0); ctx.fill(); ctx.fillRect(front ? 0 : -hr - 1.6, hy - 0.8, hr + 1.6, 0.9); }
+      else if (look.hat.kind === "hardhat") { ctx.beginPath(); ctx.arc(0, hy - 0.5, hr + 0.35, Math.PI, 0); ctx.fill(); ctx.fillRect(-hr - 1, hy - 0.8, hr * 2 + 2, 0.8); ctx.fillStyle = shade(c, 0.25); ctx.fillRect(-0.4, hy - hr - 0.7, 0.8, hr * 0.8); }
       else if (look.hat.kind === "beret") { ctx.beginPath(); ctx.ellipse(-0.4, hy - hr + 0.2, hr + 0.9, 1.2, -0.18, 0, TAU); ctx.fill(); ctx.fillRect(-0.6, hy - hr - 1.6, 0.6, 0.9); }
       else if (look.hat.kind === "bucket") { ctx.beginPath(); ctx.arc(0, hy - 0.5, hr + 0.2, Math.PI, 0); ctx.fill(); ctx.beginPath(); ctx.ellipse(0, hy - 0.4, hr + 1.3, 0.7, 0, 0, TAU); ctx.fill(); }
       else if (look.hat.kind === "visor") { ctx.fillRect(-hr - 0.2, hy - 1.2, hr * 2 + 0.4, 0.8); ctx.beginPath(); ctx.ellipse(front ? hr * 0.7 : -hr * 0.7, hy - 0.8, 1.6, 0.5, 0, 0, TAU); ctx.fill(); }
@@ -7708,38 +7897,7 @@ select.inp {
   const VERGE = 18; // footway outside the ring road
   const CURB = 14; // kerb radius at junction corners
   const WALK = 9; // how far in from the kerb people walk
-  const ISLES = {
-    life: { id: "life", name: "Life Island", color: "#6DAE5B",
-      A: [100, 420, 720, 1010, 1380], B: [100, 400, 720, 1000, 1330, 1640], mainA: [720], mainB: [720],
-      // streets that don't go through: [col, row, 'a'|'b'] joins that cell with its neighbour
-      merges: [[0, 3, "a"], [2, 0, "b"], [2, 3, "a"], [3, 0, "b"], [0, 1, "b"]],
-      coast: {
-        N: { m: 130, amp: 60, sand: 14 },
-        E: { m: 115, amp: 40, sand: 16 },
-        S: { m: 150, amp: 55, sand: 22, walls: [[610, 1300, 60]], beaches: [[60, 560, 58]] },
-        W: { m: 140, amp: 65, sand: 16, beaches: [[860, 1440, 60]] },
-      } },
-    work: { id: "work", name: "Work Island", color: "#3E7CB1",
-      A: [1900, 2230, 2520], B: [300, 720, 1170], mainA: [], mainB: [720], quay: true,
-      merges: [[1, 0, "b"]],
-      coast: {
-        N: { m: 70, amp: 0, sand: 0, walls: [[-1e9, 1e9, 70]] },
-        E: { m: 70, amp: 0, sand: 0, walls: [[-1e9, 1e9, 70]] },
-        S: { m: 72, amp: 0, sand: 0, walls: [[-1e9, 1e9, 72]] },
-        W: { m: 105, amp: 35, sand: 10, walls: [[980, 1e9, 80]] },
-      } },
-  };
-  const ROUNDABOUT = [720, 720];
   const RB_R = 44;
-  const roadW = (isle, axis, v) => ((axis === "A" ? isle.mainA : isle.mainB).includes(v) ? 40 : 30);
-
-  const LIFE_PLAN = [
-    ["farm", "park", "houses", "gym", "beachHouses"],
-    ["freelance", "home", "maker", "parking", "cs:learning"],
-    ["studio", "square", "cafe", "garden", "marina"],
-    ["houses2", "downtown", "mill", "cs:townhall", "cs:cinema"],
-  ];
-  const WORK_PLAN = [["epcmHQ", "hub"], ["refinery", "portyard"]];
   const UNLOCKS = {
     townhall: { name: "Town Hall", level: 3, kind: "townhall" },
     learning: { name: "Learning Centre", level: 5, kind: "library" },
@@ -7780,55 +7938,106 @@ select.inp {
     return c;
   };
 
-  /* coastline: offset the urban edge outward by a margin that wanders along
-     natural shores and stays constant along seawalls */
-  function buildCoast(I, box, seed) {
-    const r = rng(seed);
-    const ph = [r() * 9, r() * 9, r() * 9, r() * 9];
-    const bumps = [0, 1, 2].map(() => ({ s: r(), w: 60 + r() * 90, h: (r() < 0.5 ? -1 : 1) * (40 + r() * 50), side: "NESW"[(r() * 4) | 0] }));
-    const spec = I.coast;
-    const sideLen = { N: box.a1 - box.a0, S: box.a1 - box.a0, E: box.b1 - box.b0, W: box.b1 - box.b0 };
-    const inRange = (ranges, s, blend = 60) => {
-      let w = 0;
-      (ranges || []).forEach(([x0, x1]) => { const d = s < x0 ? x0 - s : s > x1 ? s - x1 : 0; w = Math.max(w, clamp(1 - d / blend, 0, 1)); });
-      return w;
+  /* ---- raster helpers for coastlines ---- */
+  // exact Euclidean distance (in pixels) from every pixel to the nearest masked pixel
+  function edt(mask, w, h) {
+    const INF = 1e20, n = Math.max(w, h), f = new Float64Array(n), d = new Float64Array(n), v = new Int32Array(n), z = new Float64Array(n + 1);
+    const g = new Float64Array(w * h);
+    for (let i = 0; i < w * h; i++) g[i] = mask[i] ? 0 : INF;
+    const pass = (len) => {
+      let k = 0; v[0] = 0; z[0] = -INF; z[1] = INF;
+      for (let q = 1; q < len; q++) {
+        let s = (f[q] + q * q - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
+        while (s <= z[k]) { k--; s = (f[q] + q * q - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]); }
+        k++; v[k] = q; z[k] = s; z[k + 1] = INF;
+      }
+      k = 0;
+      for (let q = 0; q < len; q++) { while (z[k + 1] < q) k++; d[q] = (q - v[k]) * (q - v[k]) + f[v[k]]; }
     };
-    const marginAt = (side, s) => {
-      const c = spec[side];
-      const n = 0.55 * Math.sin(s / 97 + ph[0]) + 0.3 * Math.sin(s / 43 + ph[1]) + 0.15 * Math.sin(s / 19 + ph[2]);
-      let m = c.m + c.amp * n;
-      bumps.forEach((bp) => { if (bp.side !== side) return; const lo = side === "N" || side === "S" ? box.a0 : box.b0; const cs = lo + bp.s * sideLen[side]; m += bp.h * Math.exp(-(((s - cs) / bp.w) ** 2)) * (c.amp ? 1 : 0); });
-      const wall = inRange((c.walls || []).map((w) => [w[0], w[1]]), s);
-      const wm = c.walls && c.walls.length ? c.walls.find((w) => s >= w[0] - 60 && s <= w[1] + 60) : null;
-      if (wm) m = lerp(m, wm[2], wall);
-      const beach = inRange(c.beaches, s, 80);
-      let sand = lerp(c.sand, (c.beaches && c.beaches[0] ? c.beaches[0][2] : c.sand), beach);
-      sand = lerp(sand, 0, wall);
-      return { m: Math.max(40, m), wall: wall > 0.5, sand };
-    };
-    const base = rrect(box.a0, box.a1, box.b0, box.b1, RC + 33, 12);
-    const pts = base.map((p) => {
-      let mg;
-      if (p.arc) {
-        const [s0, s1, t] = p.arc;
-        const e0 = s0 === "N" ? box.a1 : s0 === "E" ? box.b1 : s0 === "S" ? box.a0 : box.b0;
-        const e1 = s1 === "E" ? box.b0 : s1 === "S" ? box.a1 : s1 === "W" ? box.b1 : box.a0;
-        const m0 = marginAt(s0, e0), m1 = marginAt(s1, e1);
-        mg = { m: lerp(m0.m, m1.m, t), wall: t < 0.5 ? m0.wall : m1.wall, sand: lerp(m0.sand, m1.sand, t) };
-      } else mg = marginAt(p.side, p.s);
-      return { a: p.a + p.na * mg.m, b: p.b + p.nb * mg.m, na: p.na, nb: p.nb, wall: mg.wall, sand: mg.sand };
+    for (let x = 0; x < w; x++) { for (let y = 0; y < h; y++) f[y] = g[y * w + x]; pass(h); for (let y = 0; y < h; y++) g[y * w + x] = d[y]; }
+    for (let y = 0; y < h; y++) { for (let x = 0; x < w; x++) f[x] = g[y * w + x]; pass(w); for (let x = 0; x < w; x++) g[y * w + x] = Math.sqrt(d[x]); }
+    return g;
+  }
+  // marching squares: closed loops where F crosses zero (F < 0 is land)
+  const MS = { 1: [["L", "B"]], 2: [["B", "R"]], 3: [["L", "R"]], 4: [["T", "R"]], 5: [["T", "R"], ["L", "B"]], 6: [["T", "B"]], 7: [["L", "T"]], 8: [["L", "T"]], 9: [["T", "B"]], 10: [["L", "T"], ["B", "R"]], 11: [["T", "R"]], 12: [["L", "R"]], 13: [["B", "R"]], 14: [["L", "B"]] };
+  function contour(F, w, h, x0, y0, res) {
+    const ep = (xa, ya, xb, yb) => { const fa = F[ya * w + xa], fb = F[yb * w + xb], t = fa / (fa - fb); return [x0 + (xa + (xb - xa) * t) * res, y0 + (ya + (yb - ya) * t) * res]; };
+    const segs = [], adj = new Map();
+    const K = (p) => Math.round(p[0] * 100) + "," + Math.round(p[1] * 100);
+    for (let y = 0; y < h - 1; y++) for (let x = 0; x < w - 1; x++) {
+      const c = (F[y * w + x] < 0 ? 8 : 0) | (F[y * w + x + 1] < 0 ? 4 : 0) | (F[(y + 1) * w + x + 1] < 0 ? 2 : 0) | (F[(y + 1) * w + x] < 0 ? 1 : 0);
+      if (!c || c === 15) continue;
+      const E = { T: () => ep(x, y, x + 1, y), R: () => ep(x + 1, y, x + 1, y + 1), B: () => ep(x, y + 1, x + 1, y + 1), L: () => ep(x, y, x, y + 1) };
+      MS[c].forEach(([e1, e2]) => { const s = [E[e1](), E[e2]()], id = segs.length; segs.push(s); s.forEach((p) => { const k = K(p); if (!adj.has(k)) adj.set(k, []); adj.get(k).push(id); }); });
+    }
+    const used = new Uint8Array(segs.length), loops = [];
+    for (let s0 = 0; s0 < segs.length; s0++) {
+      if (used[s0]) continue;
+      used[s0] = 1;
+      const loop = [segs[s0][0], segs[s0][1]];
+      let cur = segs[s0][1];
+      for (;;) {
+        const nx = (adj.get(K(cur)) || []).find((id) => !used[id]);
+        if (nx == null) break;
+        used[nx] = 1;
+        const s = segs[nx], p = K(s[0]) === K(cur) ? s[1] : s[0];
+        loop.push(p); cur = p;
+      }
+      loops.push(loop);
+    }
+    return loops;
+  }
+  const polyArea = (pts) => { let s = 0; for (let i = 0; i < pts.length; i++) { const p = pts[i], q = pts[(i + 1) % pts.length]; s += p[0] * q[1] - q[0] * p[1]; } return s / 2; };
+  function rasterPoly(poly, w, h, x0, y0, res) {
+    const m = new Uint8Array(w * h);
+    for (let y = 0; y < h; y++) {
+      const b = y0 + y * res, xs = [];
+      for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [ai, bi] = poly[i], [aj, bj] = poly[j]; if ((bi > b) !== (bj > b)) xs.push(ai + ((b - bi) * (aj - ai)) / (bj - bi)); }
+      xs.sort((p, q) => p - q);
+      for (let k = 0; k + 1 < xs.length; k += 2) { const xa = Math.max(0, Math.ceil((xs[k] - x0) / res)), xb = Math.min(w - 1, Math.floor((xs[k + 1] - x0) / res)); for (let x = xa; x <= xb; x++) m[y * w + x] = 1; }
+    }
+    return m;
+  }
+  /* outline of a set of grid cells as a list of grid points, clockwise with a to the right, b down */
+  function cellLoops(occ) {
+    const out = new Map(), add = (p, q) => { const k = p.join(","); if (!out.has(k)) out.set(k, []); out.get(k).push(q); };
+    occ.forEach((k) => {
+      const [i, j] = k.split(",").map(Number), has = (x, y) => occ.has(x + "," + y);
+      if (!has(i, j - 1)) add([i, j], [i + 1, j]);
+      if (!has(i + 1, j)) add([i + 1, j], [i + 1, j + 1]);
+      if (!has(i, j + 1)) add([i + 1, j + 1], [i, j + 1]);
+      if (!has(i - 1, j)) add([i, j + 1], [i, j]);
     });
-    // smooth the natural parts a little
-    for (let pass = 0; pass < 2; pass++) pts.forEach((p, i) => { if (p.wall) return; const q0 = pts[(i - 1 + pts.length) % pts.length], q1 = pts[(i + 1) % pts.length]; p.a = (q0.a + 2 * p.a + q1.a) / 4; p.b = (q0.b + 2 * p.b + q1.b) / 4; });
-    return pts;
+    const loops = [];
+    for (;;) {
+      const startK = [...out.keys()].find((k) => out.get(k).length);
+      if (!startK) break;
+      const loop = [];
+      let cur = startK.split(",").map(Number), prevDir = null;
+      for (let guard = 0; guard < 10000; guard++) {
+        const k = cur.join(","), cands = out.get(k);
+        if (!cands || !cands.length) break;
+        // at a pinch take the convex (right-hand) turn so loops stay simple
+        let pick = 0;
+        if (cands.length > 1 && prevDir) pick = cands.findIndex((q) => { const d = [q[0] - cur[0], q[1] - cur[1]]; return prevDir[0] * d[1] - prevDir[1] * d[0] > 0; });
+        if (pick < 0) pick = 0;
+        const nx = cands.splice(pick, 1)[0];
+        loop.push(cur);
+        prevDir = [nx[0] - cur[0], nx[1] - cur[1]];
+        cur = nx;
+        if (cur.join(",") === startK) break;
+      }
+      // drop collinear points
+      const clean = loop.filter((p, i) => { const a = loop[(i - 1 + loop.length) % loop.length], c = loop[(i + 1) % loop.length]; return (p[0] - a[0]) * (c[1] - p[1]) - (p[1] - a[1]) * (c[0] - p[0]) !== 0; });
+      if (clean.length >= 4) loops.push(clean);
+    }
+    return loops;
   }
 
-  /* fresh islands: a venture site nobody has built yet shows an empty, tappable lot */
-  const BUILD_LABEL = { youtube: "Studio", freelance: "Office", bynode: "Workshop", wood: "Mill", coffee: "Café", fitness: "Gym", goals: "Lighthouse", marina: "Marina", epcm: "Day-job HQ" };
-  function buildTown({ sections = [], islandLevel = 1, hidden = [] }) {
-    const HID = new Set(hidden);
+  function buildTown({ sections = [], islandLevel = 1, plan = null }) {
+    plan = plan || classicPlan();
     const roads = [], blocks = [], objs = [], plots = {}, lamps = [], docks = { marina: [], port: [] };
-    const coasts = [], piers = [], paths = [];
+    const coasts = [], piers = [], paths = [], seams = [];
     const nodes = new Map(), edges = [];
     const peds = { nodes: [], edges: [] };
     const nodeAt = (a, b) => {
@@ -7843,88 +8052,261 @@ select.inp {
       roads.push({ a0: n0.a, b0: n0.b, a1: n1.a, b1: n1.b, w, main });
       return e;
     };
+    const put = (o) => { objs.push(o); return o; };
+    const ISLES = {};
 
-    /* ---- islands ---- */
-    Object.values(ISLES).forEach((I) => {
-      const { A, B } = I;
-      A.forEach((a) => B.forEach((b) => nodeAt(a, b)));
-      const M = I.merges || [];
-      const cutA = (ai, j) => M.some(([i, jj, d]) => d === "a" && i + 1 === ai && jj === j);
-      const cutB = (bj, i) => M.some(([ii, j, d]) => d === "b" && j + 1 === bj && ii === i);
-      A.forEach((a, ai) => { for (let j = 0; j < B.length - 1; j++) if (!cutA(ai, j)) addEdge(nodeAt(a, B[j]), nodeAt(a, B[j + 1]), roadW(I, "A", a), I.mainA.includes(a)); });
-      B.forEach((b, bj) => { for (let i = 0; i < A.length - 1; i++) if (!cutB(bj, i)) addEdge(nodeAt(A[i], b), nodeAt(A[i + 1], b), roadW(I, "B", b), I.mainB.includes(b)); });
-      const ow = 15;
-      I.ring = { a0: A[0], a1: A[A.length - 1], b0: B[0], b1: B[B.length - 1] };
-      I.box = { a0: A[0] - ow - VERGE, a1: A[A.length - 1] + ow + VERGE, b0: B[0] - ow - VERGE, b1: B[B.length - 1] + ow + VERGE };
-      const coast = buildCoast(I, I.box, hash("coast-" + I.id));
-      I.coast2 = coast;
-      coasts.push({ isle: I.id, pts: coast, poly: coast.map((p) => [p.a, p.b]) });
-      const plan = I.id === "life" ? LIFE_PLAN : WORK_PLAN;
-      const used = new Set();
-      const cell = (i, j) => ({ a0: A[i] + roadW(I, "A", A[i]) / 2, a1: A[i + 1] - roadW(I, "A", A[i + 1]) / 2, b0: B[j] + roadW(I, "B", B[j]) / 2, b1: B[j + 1] - roadW(I, "B", B[j + 1]) / 2 });
-      M.forEach(([i, j, d]) => {
-        const i2 = d === "a" ? i + 1 : i, j2 = d === "b" ? j + 1 : j;
-        used.add(i + "," + j); used.add(i2 + "," + j2);
-        const c1 = cell(i, j), c2 = cell(i2, j2);
-        const k = { id: I.id + ":" + i + ":" + j + "+", isle: I.id, a0: c1.a0, a1: c2.a1, b0: c1.b0, b1: c2.b1, type: plan[i][j], kind: "block", merged: d,
-          cornerNodes: [[A[i], B[j]], [A[i2 + 1], B[j]], [A[i2 + 1], B[j2 + 1]], [A[i], B[j2 + 1]]] };
-        const mid = d === "a" ? A[i + 1] : B[j + 1];
-        k.zones = d === "a"
-          ? [{ ...c1, a1: mid - 6, id: k.id + "z0", type: plan[i][j], parent: k }, { ...c2, a0: mid + 6, id: k.id + "z1", type: plan[i2][j2], parent: k }]
-          : [{ ...c1, b1: mid - 6, id: k.id + "z0", type: plan[i][j], parent: k }, { ...c2, b0: mid + 6, id: k.id + "z1", type: plan[i2][j2], parent: k }];
-        k.walk = d === "a" ? [[mid, k.b0 + WALK], [mid, k.b1 - WALK]] : [[k.a0 + WALK, mid], [k.a1 - WALK, mid]];
-        blocks.push(k);
-      });
-      for (let i = 0; i < A.length - 1; i++)
-        for (let j = 0; j < B.length - 1; j++) {
-          if (used.has(i + "," + j)) continue;
-          const c = cell(i, j);
-          const corners = [[A[i], B[j]], [A[i + 1], B[j]], [A[i + 1], B[j + 1]], [A[i], B[j + 1]]];
-          blocks.push({ id: I.id + ":" + i + ":" + j, isle: I.id, ...c, type: plan[i][j], kind: "block", cornerNodes: corners });
+    /* ---- streets for one island: a road on every grid segment between two different parcels ---- */
+    const makeIsle = (id, spec, opt = {}) => {
+      const { A, B } = spec;
+      const cellP = new Map();
+      spec.parcels.forEach((p) => { p.cells = p.at ? cellsOf(p) : p.cells; p.cells.forEach(([i, j]) => cellP.set(i + "," + j, p)); });
+      const joinSet = new Set((spec.joins || []).flatMap(([x, y]) => [x + "|" + y, y + "|" + x]));
+      const P = (i, j) => cellP.get(i + "," + j);
+      const linked = (p, q) => !!(p && q && (p === q || joinSet.has(p.id + "|" + q.id)));
+      const roadBetween = (p, q) => !!(p || q) && !linked(p, q);
+      const cl = [...cellP.keys()].map((k) => k.split(",").map(Number));
+      const i0 = Math.min(...cl.map((c) => c[0])), i1 = Math.max(...cl.map((c) => c[0])) + 1, j0 = Math.min(...cl.map((c) => c[1])), j1 = Math.max(...cl.map((c) => c[1])) + 1;
+      const segA = new Set(), segB = new Set();
+      for (let i = i0; i <= i1; i++) for (let j = j0; j < j1; j++) if (roadBetween(P(i - 1, j), P(i, j))) segA.add(i + "," + j);
+      for (let j = j0; j <= j1; j++) for (let i = i0; i < i1; i++) if (roadBetween(P(i, j - 1), P(i, j))) segB.add(i + "," + j);
+      const deg = (i, j) => segA.has(i + "," + (j - 1)) + segA.has(i + "," + j) + segB.has(i - 1 + "," + j) + segB.has(i + "," + j);
+      const mainA = new Set((spec.main && spec.main.a) || []), mainB = new Set((spec.main && spec.main.b) || []);
+      let rbPt = Array.isArray(spec.roundabout) ? spec.roundabout : null;
+      if (spec.roundabout === "auto" && spec.parcels.length >= 7) {
+        const ci = cl.reduce((s, c) => s + c[0] + 0.5, 0) / cl.length, cj = cl.reduce((s, c) => s + c[1] + 0.5, 0) / cl.length;
+        let best = null;
+        for (let i = i0 + 1; i < i1; i++) for (let j = j0 + 1; j < j1; j++) if (deg(i, j) === 4) { const d = Math.hypot(i - ci, j - cj); if (!best || d < best.d) best = { d, p: [i, j] }; }
+        if (best) { rbPt = best.p; mainA.add(rbPt[0]); mainB.add(rbPt[1]); }
+      }
+      const forced = new Set(opt.forced || []);
+      // bridge landing: the middle of the east shore road
+      let bridgePt = null;
+      if (opt.bridgeEast) {
+        const cands = [];
+        for (let j = j0; j <= j1; j++) { const up = segA.has(i1 + "," + (j - 1)), dn = segA.has(i1 + "," + j); if (up || dn) cands.push({ j, both: up && dn }); }
+        const mid = (j0 + j1) / 2;
+        cands.sort((x, y) => (y.both - x.both) || Math.abs(x.j - mid) - Math.abs(y.j - mid));
+        if (cands.length) { bridgePt = [i1, cands[0].j]; forced.add(i1 + "," + cands[0].j); }
+      }
+      const nodePtA = (i, j) => segB.has(i - 1 + "," + j) || segB.has(i + "," + j) || forced.has(i + "," + j);
+      const nodePtB = (i, j) => segA.has(i + "," + (j - 1)) || segA.has(i + "," + j) || forced.has(i + "," + j);
+      for (let i = i0; i <= i1; i++) {
+        let run = null;
+        for (let j = j0; j <= j1; j++) {
+          const up = segA.has(i + "," + (j - 1)), dn = segA.has(i + "," + j);
+          if (up && run !== null && (nodePtA(i, j) || !dn)) { addEdge(nodeAt(A[i], B[run]), nodeAt(A[i], B[j]), mainA.has(i) ? 40 : 30, mainA.has(i)); run = dn ? j : null; }
+          else if (!up && dn) run = j;
         }
-    });
-    const bridgeE = addEdge(nodeAt(1380, 720), nodeAt(1900, 720), 40, true);
-    nodeAt(...ROUNDABOUT).rb = true;
-    [[720, 400], [720, 1000], [720, 1330], [420, 720], [1010, 720], [1380, 720], [1900, 720], [2230, 720]].forEach(([a, b]) => { const n = nodeAt(a, b); n.signal = n.edges.length >= 3; });
+      }
+      for (let j = j0; j <= j1; j++) {
+        let run = null;
+        for (let i = i0; i <= i1; i++) {
+          const lf = segB.has(i - 1 + "," + j), rt = segB.has(i + "," + j);
+          if (lf && run !== null && (nodePtB(i, j) || !rt)) { addEdge(nodeAt(A[run], B[j]), nodeAt(A[i], B[j]), mainB.has(j) ? 40 : 30, mainB.has(j)); run = rt ? i : null; }
+          else if (!lf && rt) run = i;
+        }
+      }
+      if (rbPt) nodeAt(A[rbPt[0]], B[rbPt[1]]).rb = true;
+      const I = { id, A, B, cellP, segA, segB, P, linked, parcels: spec.parcels, i0, i1, j0, j1, mainA, mainB, style: opt.style || "natural", seed: opt.seed || 1, bridgePt, name: opt.name, color: opt.color };
+      ISLES[id] = I;
+      return I;
+    };
+
+    const life = makeIsle("life", plan, { bridgeEast: !!plan.work, seed: hash("coast-life" + (plan.seed || "")), name: "Life Island", color: "#6DAE5B" });
+    let bridgeE = null, work = null;
+    if (plan.work && life.bridgePt) {
+      const [bi, bj] = life.bridgePt, aw = life.A[bi] + 520, by = life.B[bj];
+      const wp = [
+        { id: "w:hq", type: "epcmHQ", cells: [[0, 0]] }, { id: "w:hub", type: "hub", cells: [[0, 1]] },
+        { id: "w:ref", type: "refinery", cells: [[1, 0]] }, { id: "w:yard", type: "portyard", cells: [[1, 1]] },
+      ];
+      work = makeIsle("work", { A: [aw, aw + 330, aw + 620], B: [by - 420, by, by + 450], parcels: wp, joins: [["w:ref", "w:yard"]], main: { b: [1] } }, { style: "quay", seed: hash("coast-work"), forced: ["0,1"], name: "Work Island", color: "#3E7CB1" });
+      bridgeE = addEdge(nodeAt(life.A[bi], by), nodeAt(aw, by), 40, true);
+    }
     nodes.forEach((n) => {
+      const d = n.edges.length;
+      n.signal = !n.rb && d >= 3 && (d === 4 || n.edges.some((e) => e.main));
       n.w = Math.max(...n.edges.map((e) => e.w));
       n.wa = Math.max(0, ...n.edges.filter((e) => e.axis === "b").map((e) => e.w));
       n.wb = Math.max(0, ...n.edges.filter((e) => e.axis === "a").map((e) => e.w));
-      n.bend = n.edges.length === 2 && n.edges[0].axis !== n.edges[1].axis;
-      n.through = n.edges.length === 2 && n.edges[0].axis === n.edges[1].axis;
+      n.bend = d === 2 && n.edges[0].axis !== n.edges[1].axis;
+      n.through = d === 2 && n.edges[0].axis === n.edges[1].axis;
       if (n.bend) {
-        const d = n.edges.map((e) => { const o = e.n0 === n ? e.n1 : e.n0; return [Math.sign(o.a - n.a), Math.sign(o.b - n.b)]; });
-        n.bendC = [n.a + (d[0][0] + d[1][0]) * RC, n.b + (d[0][1] + d[1][1]) * RC];
+        const dd = n.edges.map((e) => { const o = e.n0 === n ? e.n1 : e.n0; return [Math.sign(o.a - n.a), Math.sign(o.b - n.b)]; });
+        n.bendC = [n.a + (dd[0][0] + dd[1][0]) * RC, n.b + (dd[0][1] + dd[1][1]) * RC];
       }
     });
-    // block corner radii: small kerb radius, or matching the bend
-    blocks.forEach((k) => {
-      k.radii = k.cornerNodes.map(([a, b]) => { const n = nodeAt(a, b); return n.bend ? RC - 15 : n.rb ? 30 : CURB; });
+
+    /* ---- blocks: each parcel cut into rectangular pieces; pieces of one parcel meet at footpath seams ---- */
+    Object.values(ISLES).forEach((I) => {
+      const { A, B, segA, segB } = I;
+      const pieceOf = new Map();
+      const runs = (cells) => {
+        const by = (ax) => {
+          const m = new Map();
+          cells.forEach((c) => { const k = ax === "a" ? c[1] : c[0]; if (!m.has(k)) m.set(k, []); m.get(k).push(c); });
+          const out = [];
+          m.forEach((row) => { row.sort((x, y) => (ax === "a" ? x[0] - y[0] : x[1] - y[1])); let cur = [row[0]]; for (let k = 1; k < row.length; k++) { const p = row[k - 1], q = row[k]; if ((ax === "a" ? q[0] - p[0] : q[1] - p[1]) === 1) cur.push(q); else { out.push(cur); cur = [q]; } } out.push(cur); });
+          return out;
+        };
+        const ra = by("a"), rb = by("b");
+        return rb.length < ra.length ? rb : ra;
+      };
+      I.parcels.forEach((p) => {
+        const def = PARCELS[p.type];
+        const groups = def && def.wing && !p.classic ? [[p.cells[0]], p.cells.slice(1)] : [p.cells];
+        groups.forEach((g, gi) => {
+          if (!g.length) return;
+          runs(g).forEach((run, ri) => {
+            const ia = Math.min(...run.map((c) => c[0])), ib = Math.max(...run.map((c) => c[0])), ja = Math.min(...run.map((c) => c[1])), jb = Math.max(...run.map((c) => c[1]));
+            const lineW = (ax, idx) => ((ax === "a" ? I.mainA : I.mainB).has(idx) ? 40 : 30);
+            const sideOff = (ax, idx, k0, k1) => { let road = false; for (let k = k0; k <= k1; k++) if ((ax === "a" ? segA : segB).has(ax === "a" ? idx + "," + k : k + "," + idx)) road = true; return road ? lineW(ax, idx) / 2 : 6; };
+            const offL = sideOff("a", ia, ja, jb), offR = sideOff("a", ib + 1, ja, jb), offT = sideOff("b", ja, ia, ib), offB = sideOff("b", jb + 1, ia, ib);
+            const k = { id: I.id + ":" + p.id + ":" + gi + ":" + ri, isle: I.id, a0: A[ia] + offL, a1: A[ib + 1] - offR, b0: B[ja] + offT, b1: B[jb + 1] - offB, kind: "block", parcel: p, role: gi === 0 && ri === 0 ? "main" : "wing", cells: run };
+            k.road = { "-a": offL > 6, "+a": offR > 6, "-b": offT > 6, "+b": offB > 6 };
+            k.type = p.status === "building" && p.type !== "goals" ? (k.role === "main" ? "site" : "wing:site") : p.classic ? p.type : k.role === "main" || !def || !def.wing ? FILL_OF[p.type] || p.type : "wing:" + def.wing;
+            const corner = (gi2, gj2, sA, sB) => { if (!segA.has(sA) || !segB.has(sB)) return 4; const n = nodes.get(A[gi2] + "," + B[gj2]); return !n ? CURB : n.bend ? RC - 15 : n.rb ? 30 : CURB; };
+            k.radii = [corner(ia, ja, ia + "," + ja, ia + "," + ja), corner(ib + 1, ja, ib + 1 + "," + ja, ib + "," + ja), corner(ib + 1, jb + 1, ib + 1 + "," + jb, ib + "," + (jb + 1)), corner(ia, jb + 1, ia + "," + jb, ia + "," + (jb + 1))];
+            run.forEach((c) => pieceOf.set(c.join(","), k));
+            blocks.push(k);
+          });
+        });
+      });
+      // seams: grid segments between two different pieces with no road
+      const seamSegs = [];
+      pieceOf.forEach((k, key) => {
+        const [i, j] = key.split(",").map(Number);
+        const r = pieceOf.get(i + 1 + "," + j), d = pieceOf.get(i + "," + (j + 1));
+        if (r && r !== k && !segA.has(i + 1 + "," + j)) seamSegs.push({ ax: "a", line: i + 1, k0: j, p: k, q: r });
+        if (d && d !== k && !segB.has(i + "," + (j + 1))) seamSegs.push({ ax: "b", line: j + 1, k0: i, p: k, q: d });
+      });
+      seamSegs.forEach((s) => {
+        const pts = s.ax === "a" ? [[A[s.line], B[s.k0] + WALK], [A[s.line], B[s.k0 + 1] - WALK]] : [[A[s.k0] + WALK, B[s.line]], [A[s.k0 + 1] - WALK, B[s.line]]];
+        seams.push({ pts, p: s.p, q: s.q });
+        paths.push({ pts, kind: "inner" });
+      });
+    });
+
+    /* ---- outline: the urban edge (footway base) and the outer footway, rounded to match the road bends ---- */
+    const offsetLoop = (I, loop, o, rCv, rCc) => {
+      const W = (g) => [I.A[g[0]], I.B[g[1]]], out = [], n = loop.length;
+      for (let k = 0; k < n; k++) {
+        const v = W(loop[k]), pv = W(loop[(k - 1 + n) % n]), nv = W(loop[(k + 1) % n]);
+        const din = [Math.sign(v[0] - pv[0]), Math.sign(v[1] - pv[1])], dout = [Math.sign(nv[0] - v[0]), Math.sign(nv[1] - v[1])];
+        const nin = [din[1], -din[0]], nout = [dout[1], -dout[0]];
+        const c = [v[0] + o * (nin[0] + nout[0]), v[1] + o * (nin[1] + nout[1])];
+        const convex = din[0] * dout[1] - din[1] * dout[0] > 0;
+        const nd = nodes.get(v[0] + "," + v[1]), bend = nd && nd.bend;
+        const r = convex ? (bend ? rCv : o + 6) : bend ? rCc : 6;
+        const sg = convex ? -1 : 1, C = [c[0] + sg * r * (nin[0] + nout[0]), c[1] + sg * r * (nin[1] + nout[1])];
+        const s = [c[0] - din[0] * r, c[1] - din[1] * r], e = [c[0] + dout[0] * r, c[1] + dout[1] * r];
+        let t0 = Math.atan2(s[1] - C[1], s[0] - C[0]), t1 = Math.atan2(e[1] - C[1], e[0] - C[0]);
+        while (t1 - t0 > Math.PI) t1 -= TAU; while (t0 - t1 > Math.PI) t1 += TAU;
+        const steps = Math.max(2, Math.round((r * Math.abs(t1 - t0)) / 12));
+        for (let q = 0; q <= steps; q++) { const t = lerp(t0, t1, q / steps); out.push([C[0] + Math.cos(t) * r, C[1] + Math.sin(t) * r]); }
+      }
+      return out;
+    };
+    Object.values(ISLES).forEach((I) => {
+      const loops = cellLoops(new Set(I.cellP.keys()));
+      const outer = loops.reduce((m, l) => (!m || Math.abs(polyArea(l)) > Math.abs(polyArea(m)) ? l : m), null);
+      I.loop = outer;
+      I.base = offsetLoop(I, outer, 15 + VERGE, RC + 15 + VERGE, RC - 15 - VERGE);
+      I.foot = offsetLoop(I, outer, 15 + WALK, RC + 15 + WALK, RC - 15 - WALK);
+      I.box = I.base.reduce((m, [a, b]) => ({ a0: Math.min(m.a0, a), a1: Math.max(m.a1, a), b0: Math.min(m.b0, b), b1: Math.max(m.b1, b) }), { a0: 1e9, a1: -1e9, b0: 1e9, b1: -1e9 });
+    });
+
+    /* ---- harbours: a marina basin or a lighthouse breakwater on a coastal parcel's open side ---- */
+    let marinaWater = null;
+    const harbourZones = [], carve = [];
+    const pier = (r, type = "pier") => { const p = { ...r, type }; piers.push(p); return p; };
+    life.parcels.filter((p) => p.harbour).forEach((p) => {
+      const occ = new Map([...life.cellP.keys()].map((k) => [k, 1]));
+      const side = p.harbour.side || coastSide(p, occ);
+      if (!side) return;
+      const [i, j] = p.cells[0], A = life.A, B = life.B, ca0 = A[i], ca1 = A[i + 1], cb0 = B[j], cb1 = B[j + 1];
+      const L = side[1] === "b" ? ca1 - ca0 : cb1 - cb0, E = 15 + VERGE + 60;
+      const at = (u, v) => (side === "+b" ? [ca0 + u, cb1 + E + v] : side === "-b" ? [ca0 + u, cb0 - E - v] : side === "+a" ? [ca1 + E + v, cb0 + u] : [ca0 - E - v, cb0 + u]);
+      const R = (u0, u1, v0, v1) => { const p1 = at(u0, v0), p2 = at(u1, v1); return { a0: Math.min(p1[0], p2[0]), a1: Math.max(p1[0], p2[0]), b0: Math.min(p1[1], p2[1]), b1: Math.max(p1[1], p2[1]) }; };
+      const yawU = side[1] === "b" ? 0 : Math.PI / 2;
+      if (p.harbour.kind === "marina") {
+        pier(R(-20, 12, -6, 222)); pier(R(L - 12, L + 20, -6, 222)); pier(R(12, L * 0.55, 190, 222));
+        const water = R(12, L - 12, 0, 190);
+        carve.push(water); harbourZones.push(R(-50, L + 50, -110, 10));
+        if (!marinaWater) marinaWater = water;
+        [0.24, 0.5, 0.76].forEach((t, n) => {
+          const u = L * t;
+          objs.push({ id: "pontoon" + p.id + n, kind: "ground-pontoon", ...R(u - 4, u + 4, 0, 128) });
+          [30, 70, 110].forEach((dv, m) => { const [a, b] = at(u + (m % 2 ? 16 : -16), dv); docks.marina.push({ a, b, yaw: yawU + (m % 2 ? 0 : Math.PI) }); });
+        });
+      } else {
+        pier(R(L / 2 - 16, L / 2 + 16, -6, 238));
+        pier(R(L / 2 - 47, L / 2 + 47, 228, 308), "lighthousePad");
+        harbourZones.push(R(L / 2 - 80, L / 2 + 80, -110, 10));
+        const [a, b] = at(L / 2, 268);
+        const bld = p.status === "building";
+        plots.goals = put({ id: "goals", kind: "building", drawer: bld ? "construction" : "lighthouse", site: bld, name: p.name || "Lighthouse", landmark: "goals", a, b, w: bld ? 90 : 60, d: bld ? 90 : 60, H: bld ? 110 : 200, face: { "+b": "-b", "-b": "+b", "+a": "-a", "-a": "+a" }[side], noDoor: true, status: p.status });
+      }
+    });
+
+    /* ---- coastlines: a noisy distance contour round the urban edge, seawalls at the harbours ---- */
+    Object.values(ISLES).forEach((I) => {
+      const res = 8, pad = 340, r = rng(I.seed);
+      const ph = [r() * 9, r() * 9, r() * 9, r() * 9, r() * 9];
+      const bx = I.box, x0 = bx.a0 - pad, y0 = bx.b0 - pad, w = Math.ceil((bx.a1 - bx.a0 + 2 * pad) / res) + 1, h = Math.ceil((bx.b1 - bx.b0 + 2 * pad) / res) + 1;
+      const D = edt(rasterPoly(I.base, w, h, x0, y0, res), w, h);
+      const bumps = I.base.filter((_, k) => k % Math.max(1, Math.floor(I.base.length / 5)) === 2).map((p) => ({ a: p[0], b: p[1], h: (r() < 0.5 ? -1 : 1) * (30 + r() * 45), s: 90 + r() * 90 }));
+      const zoneW = (a, b) => { let m = 0; harbourZones.forEach((z) => { const dx = Math.max(z.a0 - a, 0, a - z.a1), dy = Math.max(z.b0 - b, 0, b - z.b1); m = Math.max(m, clamp(1 - Math.hypot(dx, dy) / 70, 0, 1)); }); return m; };
+      const margin = (a, b) => {
+        if (I.style === "quay") return 70;
+        let m = 118 + 42 * (0.55 * Math.sin(a / 97 + ph[0]) + 0.3 * Math.sin(b / 61 + ph[1]) + 0.15 * Math.sin((a + b) / 37 + ph[2]));
+        bumps.forEach((q) => { m += q.h * Math.exp(-(((a - q.a) ** 2 + (b - q.b) ** 2) / (q.s * q.s))); });
+        return lerp(Math.max(72, m), 60, zoneW(a, b));
+      };
+      const F = new Float64Array(w * h);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const a = x0 + x * res, b = y0 + y * res;
+        let f = D[y * w + x] * res - margin(a, b);
+        if (carve.some((c) => a > c.a0 - 2 && a < c.a1 + 2 && b > c.b0 - 2 && b < c.b1 + 2)) f = Math.max(f, 12);
+        if (x === 0 || y === 0 || x === w - 1 || y === h - 1) f = Math.max(f, 1);
+        F[y * w + x] = f;
+      }
+      const loops = contour(F, w, h, x0, y0, res);
+      let loop = loops.reduce((m, l) => (!m || Math.abs(polyArea(l)) > Math.abs(polyArea(m)) ? l : m), null) || I.base;
+      loop = loop.filter((_, k) => k % 2 === 0);
+      const n = loop.length, sgn = polyArea(loop) > 0 ? 1 : -1;
+      const pts = loop.map((p, k) => {
+        const q0 = loop[(k - 1 + n) % n], q1 = loop[(k + 1) % n];
+        let na = (q1[1] - q0[1]) * sgn, nb = -(q1[0] - q0[0]) * sgn; const L2 = Math.hypot(na, nb) || 1; na /= L2; nb /= L2;
+        const wall = I.style === "quay" || zoneW(p[0], p[1]) > 0.5;
+        const beach = clamp((Math.sin((p[0] * 0.7 + p[1] * 0.3) / 180 + ph[3]) - 0.45) * 3, 0, 1);
+        return { a: p[0], b: p[1], na, nb, wall, sand: wall ? 0 : lerp(14 + 6 * Math.sin(p[0] / 53 + ph[4]), 56, beach) };
+      });
+      // check the normals point out to sea
+      const probe = pts[0], px = Math.round((probe.a + probe.na * 16 - x0) / res), py = Math.round((probe.b + probe.nb * 16 - y0) / res);
+      if (px >= 0 && py >= 0 && px < w && py < h && F[py * w + px] < 0) pts.forEach((p) => { p.na = -p.na; p.nb = -p.nb; });
+      for (let pass = 0; pass < 2; pass++) pts.forEach((p, i) => { if (p.wall) return; const q0 = pts[(i - 1 + n) % n], q1 = pts[(i + 1) % n]; p.a = (q0.a + 2 * p.a + q1.a) / 4; p.b = (q0.b + 2 * p.b + q1.b) / 4; });
+      coasts.push({ isle: I.id, pts, poly: pts.map((p) => [p.a, p.b]) });
     });
 
     /* ---- land tests ---- */
     const landAt = (a, b) => coasts.some((c) => inPoly(c.poly, a, b)) || piers.some((p) => inRect(p, a, b));
-    // bridge deck spans the water between the two coasts
-    { let a0 = 1380, a1 = 1900; while (a0 < 1900 && inPoly(coasts[0].poly, a0, 720)) a0 += 2; while (a1 > 1380 && inPoly(coasts[1].poly, a1, 720)) a1 -= 2; bridgeE.bridge = { a0: a0 - 6, a1: a1 + 6 }; }
+    const inUrban = (a, b, m = 0) => Object.values(ISLES).some((I) => a > I.box.a0 - m && a < I.box.a1 + m && b > I.box.b0 - m && b < I.box.b1 + m && inPoly(I.base, a, b));
+    if (bridgeE) {
+      const by = bridgeE.n0.b; let a0 = bridgeE.n0.a, a1 = bridgeE.n1.a;
+      while (a0 < bridgeE.n1.a && inPoly(coasts[0].poly, a0, by)) a0 += 2;
+      while (a1 > bridgeE.n0.a && inPoly(coasts[1].poly, a1, by)) a1 -= 2;
+      bridgeE.bridge = { a0: a0 - 6, a1: a1 + 6 };
+    }
+    // Tender Port jetties along the work island's quay
+    const quayB = work ? work.box.b1 + 72 : 0, aw = work ? work.A[0] : 0;
+    if (work) {
+      [[50, 90], [410, 450]].forEach(([u0, u1]) => pier({ a0: aw + u0, a1: aw + u1, b0: quayB - 6, b1: quayB + 190 }, "jetty"));
+      [18, 122, 378, 482].forEach((u) => docks.port.push({ a: aw + u, b: quayB + 104, yaw: Math.PI / 2, big: true }));
+      docks.port.push({ a: aw + 250, b: quayB + 30, yaw: 0, big: true });
+      docks.tugs = [{ a: aw + 70, b: quayB + 222, yaw: Math.PI / 2, kind: "launch", color: "#E0474C" }, { a: aw + 430, b: quayB + 226, yaw: Math.PI / 2 + 0.3, kind: "launch", color: "#F2C14E" }];
+    }
 
-    /* ---- marina, breakwaters and lighthouse on the Life Island's south shore ---- */
-    const L = ISLES.life, sWall = L.box.b1 + 60;
-    const pier = (a0, a1, b0, b1, type = "pier") => { const p = { a0, a1, b0, b1, type }; piers.push(p); return p; };
-    pier(700, 732, sWall - 6, sWall + 222);
-    pier(732, 1010, sWall + 190, sWall + 222);
-    pier(1180, 1212, sWall - 6, sWall + 238);
-    pier(1150, 1244, sWall + 228, sWall + 308, "lighthousePad");
-    const marinaWater = { a0: 732, a1: 1180, b0: sWall, b1: sWall + 190 };
-    [820, 910, 1000, 1090].forEach((a, k) => {
-      objs.push({ id: "pontoon" + k, kind: "ground-pontoon", a0: a - 4, a1: a + 4, b0: sWall, b1: sWall + 128 });
-      [30, 70, 110].forEach((db, m) => docks.marina.push({ a: a + (m % 2 ? 16 : -16), b: sWall + db, yaw: m % 2 ? 0 : Math.PI }));
-    });
-    const W = ISLES.work, quayB = W.box.b1 + 72;
-    // Tender Port: two jetties with berths on both sides and one along the quay
-    [[1950, 1990], [2310, 2350]].forEach(([a0, a1]) => pier(a0, a1, quayB - 6, quayB + 190, "jetty"));
-    [[1918, Math.PI / 2], [2022, Math.PI / 2], [2278, Math.PI / 2], [2382, Math.PI / 2]].forEach(([a, yaw], k) => docks.port.push({ a, b: quayB + 104, yaw, big: true }));
-    docks.port.push({ a: 2150, b: quayB + 30, yaw: 0, big: true });
-    docks.tugs = [{ a: 1970, b: quayB + 222, yaw: Math.PI / 2, kind: "launch", color: "#E0474C" }, { a: 2330, b: quayB + 226, yaw: Math.PI / 2 + 0.3, kind: "launch", color: "#F2C14E" }];
 
     /* ---- lots and buildings ---- */
     const inner = (k, m = 16) => ({ a0: k.a0 + m, a1: k.a1 - m, b0: k.b0 + m, b1: k.b1 - m });
@@ -7952,12 +8334,12 @@ select.inp {
       // back row first so indexes are stable: order by row then a
       return out.sort((x, y) => x.b0 - y.b0 || x.a0 - y.a0);
     };
+    // face the street: a lot edge on the block's edge where a road (not a footpath seam) runs
     const face = (lot, k) => {
-      const I = inner(k);
-      if (Math.abs(lot.b1 - I.b1) < 1) return "+b"; if (Math.abs(lot.a1 - I.a1) < 1) return "+a";
-      if (Math.abs(lot.b0 - I.b0) < 1) return "-b"; if (Math.abs(lot.a0 - I.a0) < 1) return "-a"; return "+b";
+      const I = inner(k), rd = k.road || { "+b": 1, "+a": 1, "-b": 1, "-a": 1 };
+      const on = { "+b": Math.abs(lot.b1 - I.b1) < 1, "+a": Math.abs(lot.a1 - I.a1) < 1, "-b": Math.abs(lot.b0 - I.b0) < 1, "-a": Math.abs(lot.a0 - I.a0) < 1 };
+      return ["+b", "+a", "-b", "-a"].find((f) => on[f] && rd[f]) || ["+b", "+a", "-b", "-a"].find((f) => on[f]) || "+b";
     };
-    const put = (o) => { objs.push(o); return o; };
     const building = (k, lot, spec) => {
       const a = (lot.a0 + lot.a1) / 2, b = (lot.b0 + lot.b1) / 2;
       const w = lot.a1 - lot.a0 - (spec.pad ?? 10), d = lot.b1 - lot.b0 - (spec.pad ?? 10);
@@ -7967,13 +8349,8 @@ select.inp {
       if (!spec.noDoor) o.door = { a: a + off[0], b: b + off[1] };
       return o;
     };
-    // a landmark venue, or its empty build lot when the player hasn't built it yet
-    const site = (id, k, lot, spec) => {
-      if (!HID.has(id)) return (plots[id] = building(k, lot, spec));
-      const o = building(k, lot, { id: "build:" + id, drawer: "buildlot", label: BUILD_LABEL[id] || "Build", landmark: "build:" + id, H: 36, pad: spec.pad ?? 16, face: spec.face, noDoor: true });
-      plots["build:" + id] = o;
-      return o;
-    };
+    // a landmark venue (its id is what the app opens when it's tapped)
+    const site = (id, k, lot, spec) => (plots[id] = building(k, lot, spec));
     const sectionBy = {};
     sections.forEach((s) => (sectionBy[s.slot] = s));
     const firstFreeSlot = () => { for (let s = 0; s < SECTION_LOTS.length; s++) if (!sectionBy[s]) return s; return -1; };
@@ -8098,7 +8475,7 @@ select.inp {
         filler(k, Q[2], "shop", 2); put({ kind: "ground-garden", ...Q[3] }); scatter(Q[3], 3, null, ["tree", "pine"], 13);
       } else if (t === "cafe") {
         site("coffee", k, Q[3], { drawer: "cafe", id: "coffee", landmark: "coffee", H: 80, pad: 22, face: "+b" });
-        if (!HID.has("coffee")) [[Q[3].a0 + 14, Q[3].b1 + 2], [Q[3].a0 + 44, Q[3].b1 + 2]].forEach(([a, b]) => put({ kind: "prop", p: "umbrella", a, b, c: "#D9734E" }));
+        [[Q[3].a0 + 14, Q[3].b1 + 2], [Q[3].a0 + 44, Q[3].b1 + 2]].forEach(([a, b]) => put({ kind: "prop", p: "umbrella", a, b, c: "#D9734E" }));
         filler(k, Q[0], "shop", 0); filler(k, Q[1], "apartment", 1); put({ kind: "ground-garden", ...Q[2] }); scatter(Q[2], 3, null, ["tree"], 17);
       } else if (t === "mill") {
         site("wood", k, { a0: I.a0, a1: I.a1, b0: mb - 20, b1: I.b1 }, { drawer: "mill", id: "wood", landmark: "wood", H: 100, pad: 16, face: "+b" });
@@ -8113,6 +8490,64 @@ select.inp {
         put({ kind: "ground-square", ...Q[3] });
         put({ kind: "prop", p: "umbrella", a: Q[3].a0 + 30, b: Q[3].b0 + 40, c: "#2A9D8F" });
         put({ kind: "prop", p: "umbrella", a: Q[3].a1 - 30, b: Q[3].b1 - 30, c: "#E9B949" });
+      } else if (t === "site") {
+        // a new venture: fenced site, crane and builders until its first task is done
+        const p = k.parcel, lm = p.landmark || (PARCELS[p.type] || {}).landmark || p.id;
+        plots[lm] = building(k, { a0: I.a0 + 10, a1: I.a1 - 10, b0: I.b0 + 10, b1: I.b1 - 10 }, { drawer: "construction", id: lm, landmark: lm, name: p.name || (PARCELS[p.type] || {}).label || "New", H: 110, pad: 18, noDoor: true, site: true });
+        k.site = { a: (I.a0 + I.a1) / 2, b: (I.b0 + I.b1) / 2, ra: (I.a1 - I.a0) / 2 - 20, rb: (I.b1 - I.b0) / 2 - 20, lm };
+      } else if (t === "wing:site") {
+        // the rest of the plot waits as meadow with material piles
+        put({ kind: "ground-garden", ...whole });
+        const r = rng(hash(k.id));
+        for (let n = 0; n < 3; n++) put({ kind: "prop", p: n % 2 ? "logs" : "crate", a: lerp(I.a0 + 30, I.a1 - 30, r()), b: lerp(I.b0 + 30, I.b1 - 30, r()) });
+        scatter(I, 4, null, ["tree"], hash(k.id));
+      } else if (t === "lookout") {
+        const lm = "goals-park";
+        put({ kind: "ground-park", ...whole, pond: null });
+        scatter(I, 9, (a, b) => Math.abs(a - ma) < 30 && Math.abs(b - mb) < 30, ["tree", "pine"], hash(k.id));
+        put({ kind: "prop", p: "bench", a: ma - 20, b: mb + 16, axis: "a" }); put({ kind: "prop", p: "bench", a: ma + 16, b: mb - 20, axis: "b" });
+        lamps.push({ a: ma, b: mb });
+      } else if (t === "bank" || t === "faith" || t === "townhall" || t === "section" || t === "dealership" || t === "dreamhouse" || t === "airport") {
+        const p = k.parcel, def = PARCELS[p.type] || {}, lm = p.landmark || def.landmark || p.id;
+        const drawer = t === "section" ? "section" : t === "airport" ? "terminal" : t;
+        const big = { a0: I.a0 + 6, a1: I.a1 - 6, b0: I.b0 + 6, b1: lerp(I.b0, I.b1, t === "faith" ? 0.78 : 0.7) };
+        plots[lm] = building(k, big, { drawer, id: lm, landmark: lm, style: p.style, sKind: p.sKind || "office", color: p.color, name: p.name, H: t === "faith" ? 150 : 100, pad: 14, face: face({ ...big, b1: I.b1 }, k) });
+        const front = { a0: I.a0, a1: I.a1, b0: big.b1 + 10, b1: I.b1 };
+        put({ kind: "ground-garden", ...front });
+        scatter(front, 3, null, ["tree"], hash(k.id));
+        if (t === "bank") put({ kind: "prop", p: "planterTree", a: ma, b: front.b0 + 20 });
+      } else if (t.startsWith("wing:")) {
+        // the thinner/wider arm of a non-rectangular parcel
+        const w = t.slice(5), p = k.parcel, lm = p.landmark || (PARCELS[p.type] || {}).landmark || p.id, r = rng(hash(k.id));
+        if (w === "annex") {
+          const long = I.a1 - I.a0 > I.b1 - I.b0;
+          const lot = long ? { a0: I.a0, a1: I.a1, b0: I.b0, b1: I.b0 + Math.min(110, (I.b1 - I.b0) * 0.6) } : { a0: I.a0, a1: I.a0 + Math.min(110, (I.a1 - I.a0) * 0.6), b0: I.b0, b1: I.b1 };
+          building(k, lot, { drawer: "annex", landmark: lm, color: p.color || "#7E6BC4", H: 44, pad: 10 });
+          const rest = long ? { ...I, b0: lot.b1 + 12 } : { ...I, a0: lot.a1 + 12 };
+          put({ kind: "ground-garden", ...rest }); scatter(rest, 4, null, ["tree", "pine"], hash(k.id));
+        } else if (w === "backlot") {
+          put({ kind: "ground-yard", ...whole });
+          building(k, { a0: I.a0, a1: I.a1, b0: I.b0, b1: I.b0 + Math.min(120, (I.b1 - I.b0) * 0.55) }, { drawer: "annex", landmark: lm, color: "#44545A", H: 60, pad: 16, stage: true });
+          for (let n = 0; n < 3; n++) put({ kind: "parked", a: lerp(I.a0 + 30, I.a1 - 30, (n + 0.5) / 3), b: I.b1 - 36, yaw: Math.PI / 2, vk: n === 1 ? "truck" : "van", c: ["#E0474C", "#F6EDDF", "#44545A"][n] });
+        } else if (w === "yard") {
+          put({ kind: "ground-yard", ...whole });
+          const cols = ["#2A9D8F", "#E9B949", "#7E6BC4", "#E0474C"];
+          for (let n = 0; n < 4; n++) put({ kind: "container", a: I.a0 + 30 + (n % 2) * 44, b: I.b0 + 40 + ((n / 2) | 0) * 28, h: 1 + (n % 2), c: cols[n] });
+          building(k, { a0: ma, a1: I.a1, b0: I.b0, b1: I.b1 }, { drawer: "annex", landmark: lm, color: p.color || "#2A9D8F", H: 38, pad: 14 });
+        } else if (w === "timber") {
+          put({ kind: "ground-yard", ...whole });
+          for (let n = 0; n < 6; n++) put({ kind: "prop", p: "logs", a: lerp(I.a0 + 30, I.a1 - 30, r()), b: lerp(I.b0 + 30, I.b1 - 30, r()) });
+          scatter({ a0: I.a0, a1: I.a1, b0: I.b1 - 50, b1: I.b1 }, 5, null, ["pine"], hash(k.id));
+        } else if (w === "field") {
+          put({ kind: "ground-track", ...whole });
+          k.track = whole;
+        } else if (w === "courtyard") {
+          put({ kind: "ground-square", ...whole });
+          [[I.a0 + 24, I.b0 + 24], [I.a1 - 24, I.b0 + 24], [I.a0 + 24, I.b1 - 24], [I.a1 - 24, I.b1 - 24]].forEach(([a, b]) => put({ kind: "prop", p: "planterTree", a, b }));
+          building(k, { a0: ma - 26, a1: ma + 26, b0: mb - 26, b1: mb + 26 }, { drawer: "fountain", H: 40, pad: 0, noDoor: true });
+        } else {
+          put({ kind: "ground-garden", ...whole }); scatter(I, 6, null, ["tree", "pine"], hash(k.id));
+        }
       } else if (t.startsWith("cs:")) {
         construction(k, whole, t.slice(3));
       } else if (t === "epcmHQ") {
@@ -8121,11 +8556,9 @@ select.inp {
         for (let s = 0; s < 7; s++) put({ kind: "parked", a: I.a0 + 25 + s * 38, b: I.b1 - 55, yaw: Math.PI / 2, vk: s % 3 ? "hatch" : "bakkie", c: ["#F6EDDF", "#44545A", "#3E7CB1", "#D9534F"][s % 4] });
         scatter({ a0: I.a1 - 60, a1: I.a1, b0: I.b0, b1: I.b1 - 120 }, 4, null, ["pine"], 23);
       } else if (t === "refinery") {
-        if (HID.has("epcm")) { put({ kind: "ground-garden", ...whole }); scatter(whole, 14, null, ["tree", "pine"], 31); }
-        else building(k, whole, { drawer: "refinery", id: "epcmPlant", landmark: "epcm", H: 190, pad: 6, noDoor: true });
+        building(k, whole, { drawer: "refinery", id: "epcmPlant", landmark: "epcm", H: 190, pad: 6, noDoor: true });
       } else if (t === "hub") {
-        if (!HID.has("epcm")) plots.hub = building(k, { a0: I.a0, a1: I.a1, b0: I.b0, b1: I.b0 + 170 }, { drawer: "hubWarehouse", id: "hub", landmark: "hub", H: 90, pad: 12, face: "+b" });
-        else scatter({ a0: I.a0, a1: I.a1, b0: I.b0, b1: I.b0 + 170 }, 8, null, ["tree"], 37);
+        plots.hub = building(k, { a0: I.a0, a1: I.a1, b0: I.b0, b1: I.b0 + 170 }, { drawer: "hubWarehouse", id: "hub", landmark: "hub", H: 90, pad: 12, face: "+b" });
         put({ kind: "ground-yard", a0: I.a0, a1: I.a1, b0: I.b0 + 180, b1: I.b1 });
         scatter({ a0: I.a0, a1: I.a0 + 60, b0: I.b0 + 190, b1: I.b1 }, 4, null, ["tree"], 29);
       } else if (t === "portyard") {
@@ -8135,11 +8568,9 @@ select.inp {
         for (let row = 0; row < 3; row++) for (let s = 0; s < 3; s++) put({ kind: "container", a: I.a0 + 180 + s * 40, b: I.b0 + 70 + row * 26, h: 1 + ((row + s) % 3), c: cols[(row * 3 + s) % cols.length] });
       }
     };
-    blocks.forEach((k) => (k.zones ? k.zones.forEach((z) => fillBlock(z)) : fillBlock(k)));
-    // Tender Port on the quay and the lighthouse on the breakwater tip
-    if (!HID.has("epcm")) plots.port = put({ id: "port", kind: "building", drawer: "portCranes", landmark: "port", a: 2250, b: quayB - 34, w: 300, d: 40, H: 130, face: "+b", noDoor: true });
-    if (!HID.has("goals")) plots.goals = put({ id: "goals", kind: "building", drawer: "lighthouse", landmark: "goals", a: 1196, b: sWall + 272, w: 60, d: 60, H: 200, face: "-b", noDoor: true });
-    else plots["build:goals"] = put({ id: "build:goals", kind: "building", drawer: "buildlot", label: "Lighthouse", landmark: "build:goals", a: 1196, b: sWall + 272, w: 60, d: 60, H: 36, face: "-b", noDoor: true });
+    blocks.forEach((k) => fillBlock(k));
+    // Tender Port cranes on the quay
+    if (work) plots.port = put({ id: "port", kind: "building", drawer: "portCranes", landmark: "port", a: aw + 350, b: quayB - 34, w: 300, d: 40, H: 130, face: "+b", noDoor: true });
 
     /* ---- street trees in the verges of every block ---- */
     blocks.forEach((k) => {
@@ -8158,7 +8589,7 @@ select.inp {
     coasts.forEach((c, ci) => {
       const I = Object.values(ISLES).find((x) => x.id === c.isle);
       const box = I.box;
-      const inBox = (a, b, m = 0) => a > box.a0 - m && a < box.a1 + m && b > box.b0 - m && b < box.b1 + m;
+      const inBox = (a, b, m = 0) => inUrban(a, b, m) || inUrban(a + m, b, 0) || inUrban(a - m, b, 0) || inUrban(a, b + m, 0) || inUrban(a, b - m, 0);
       // footpath: follow the coast inland of the sand
       const fp = c.pts.map((p) => { const d = p.sand + 22; return { a: p.a - p.na * d, b: p.b - p.nb * d, wall: p.wall }; });
       const runs = []; let cur = [];
@@ -8176,8 +8607,7 @@ select.inp {
         if (!inPoly(c.poly, a, b) || inBox(a, b, 6) || nearPath(a, b)) continue;
         const cd = coastDist(a, b);
         if (cd < 12) continue;
-        if (Math.abs(b - 720) < 40 && a > box.a1 - 10 && c.isle === "life") continue;
-        if (Math.abs(b - 720) < 40 && a < box.a0 + 10 && c.isle === "work") continue;
+        if (bridgeE && Math.abs(b - bridgeE.n0.b) < 40 && a > bridgeE.n0.a - 10 && a < bridgeE.n1.a + 10) continue;
         if (objs.some((o) => o.kind === "tree" && Math.hypot(o.a - a, o.b - b) < 20)) continue;
         const beachy = c.pts.some((p) => p.sand > 30 && Math.hypot(p.a - a, p.b - b) < 70);
         tree(a, b, beachy || cd < 30 ? "palm" : r() < 0.3 ? "pine" : "tree", 0.8 + r() * 0.35, (r() * 4) | 0);
@@ -8222,12 +8652,12 @@ select.inp {
     });
     Object.values(ISLES).forEach((I) => {
       const o = 15 + WALK;
-      const rr = rrect(I.ring.a0 - o, I.ring.a1 + o, I.ring.b0 - o, I.ring.b1 + o, RC + o, 16);
+      const rr = I.foot.map(([a, b]) => ({ a, b }));
       ways.push({ closed: true, pts: rr.map((p) => [p.a, p.b]), outer: I.id });
     });
-    paths.forEach((pp) => ways.push({ closed: false, pts: pp.pts, coast: true }));
+    paths.filter((pp) => pp.kind !== "inner").forEach((pp) => ways.push({ closed: false, pts: pp.pts, coast: true }));
     // footpaths where a street used to run through a merged block
-    blocks.filter((k) => k.walk).forEach((k) => { ways.push({ closed: false, pts: k.walk, innerOf: k.id }); paths.push({ pts: k.walk, kind: "inner" }); });
+    seams.forEach((sm) => ways.push({ closed: false, pts: sm.pts, seam: sm }));
     piers.forEach((p) => { const alongA = p.a1 - p.a0 > p.b1 - p.b0; ways.push({ closed: false, pts: alongA ? [[p.a0, (p.b0 + p.b1) / 2], [p.a1, (p.b0 + p.b1) / 2]] : [[(p.a0 + p.a1) / 2, p.b0 - 20], [(p.a0 + p.a1) / 2, p.b1]], pier: true }); });
     ways.forEach((w) => {
       w.cum = [0];
@@ -8272,9 +8702,9 @@ select.inp {
       });
     });
     // inner footpaths join the block's own ring at both ends
-    const innerEnds = ways.filter((w) => w.innerOf).map((w) => [w, w.pts.map(([a, b]) => anchor(a, b, "ie", 2.5))]);
+
     // bridge footways join the two outer footways
-    const bw = [720 - 20 - WALK, 720 + 20 + WALK].map((b) => [anchor(ISLES.life.ring.a1 + 15 + WALK, b, "br", 2.5), anchor(ISLES.work.ring.a0 - 15 - WALK, b, "br", 2.5)]);
+    const bw = bridgeE ? [bridgeE.n0.b - 20 - WALK, bridgeE.n0.b + 20 + WALK].map((b) => [anchor(bridgeE.n0.a + 15 + WALK, b, "br", 3), anchor(bridgeE.n1.a - 15 - WALK, b, "br", 3)]) : [];
     // doors
     objs.filter((o) => o.kind === "building" && o.door).forEach((o) => {
       const w0 = ways.find((w2) => w2.k && o.a > w2.k.a0 && o.a < w2.k.a1 && o.b > w2.k.b0 && o.b < w2.k.b1);
@@ -8305,7 +8735,15 @@ select.inp {
       w.nodes = uniq.map((p) => p.node);
     });
     crossings.forEach((c) => { c.pe = plink(c.p.node, c.q.node, { crossing: c }); });
-    innerEnds.forEach(([w, ends]) => ends.forEach((x, i) => { if (x) plink(i === 0 ? w.nodes[0] : w.nodes[w.nodes.length - 1], x.node); }));
+    // footpath seams join the walkways of the two pieces they run between
+    ways.filter((w) => w.seam).forEach((w) => {
+      const rings = ways.filter((w2) => w2.k === w.seam.p || w2.k === w.seam.q);
+      [w.nodes[0], w.nodes[w.nodes.length - 1]].forEach((nd) => rings.forEach((rw) => {
+        let best = null, bd = 60;
+        rw.nodes.forEach((q) => { const d = Math.hypot(q.a - nd.a, q.b - nd.b); if (d < bd) { bd = d; best = q; } });
+        if (best) plink(nd, best, { link: true });
+      }));
+    });
     bw.forEach(([p, q]) => p && q && plink(p.node, q.node, { bridgeWalk: true }));
     objs.filter((o) => o.doorRing).forEach((o) => { const dn = pnode(o.door.a, o.door.b, "step"); dn.door = o; plink(o.doorRing.node, dn); o.doorNode = dn; });
     // join coast paths and piers to the nearest footway
@@ -8324,7 +8762,7 @@ select.inp {
     const all = coasts.flatMap((c) => c.poly).concat(piers.flatMap((p) => [[p.a0, p.b0], [p.a1, p.b1]]));
     const bbox = all.reduce((m, [a, b]) => ({ x0: Math.min(m.x0, a - b), x1: Math.max(m.x1, a - b), y0: Math.min(m.y0, (a + b) / 2), y1: Math.max(m.y1, (a + b) / 2) }), { x0: 1e9, x1: -1e9, y0: 1e9, y1: -1e9 });
     const abox = all.reduce((m, [a, b]) => ({ a0: Math.min(m.a0, a), a1: Math.max(m.a1, a), b0: Math.min(m.b0, b), b1: Math.max(m.b1, b) }), { a0: 1e9, a1: -1e9, b0: 1e9, b1: -1e9 });
-    return { isles: ISLES, coasts, piers, paths, landAt, roads, blocks, objs, plots, nodes: [...nodes.values()], edges, signals, peds, crossings, docks, marinaWater, bridgeE, bbox, abox };
+    return { isles: ISLES, plan, coasts, piers, paths, landAt, roads, blocks, objs, plots, nodes: [...nodes.values()], edges, signals, peds, crossings, docks, marinaWater, bridgeE, bbox, abox };
   }
 
   /* ===================== buildings (drawn into cached sprites) ===================== */
@@ -8474,8 +8912,83 @@ select.inp {
     pn.line([-26, o.d / 2 - 8, 0], [-26, o.d / 2 - 8, 8], "#6F5A45", 1.4); pn.line([6, o.d / 2 - 8, 0], [6, o.d / 2 - 8, 8], "#6F5A45", 1.4);
     pn.box(s.x, s.y, s.z, s.w, s.d, s.h, "#F2C14E");
     pn.sign(s, "L", 0.5, 0.62, o.name, "#F2C14E", "#4A3A10", 5.4, false);
-    pn.sign(s, "L", 0.5, 0.2, "Level " + o.level, "#44545A", "#FFF", 4.6, false);
+    pn.sign(s, "L", 0.5, 0.2, o.site ? "Opens after 1st task" : "Level " + o.level, "#44545A", "#FFF", 4.2, false);
   };
+  /* ---- shapes for the new venues ---- */
+  const dome = (pn, x, y, z, R, c, tip = "#F0C06A") => {
+    for (let k = 0; k < 6; k++) { const r = R * Math.cos(Math.asin(k / 6)); pn.cyl(x, y, z + (k * R) / 6, Math.max(1, r), R / 6 + 0.6, c, { noTop: k < 5 }); }
+    pn.cyl(x, y, z + R, 0.9, 7, tip);
+  };
+  const spire = (pn, x, y, z, w, h, c) => {
+    const t = [x, y, z + h], a = [x - w / 2, y - w / 2, z], b = [x + w / 2, y - w / 2, z], cc = [x + w / 2, y + w / 2, z], d = [x - w / 2, y + w / 2, z];
+    pn.poly([d, cc, t], c); pn.poly([b, cc, t], shade(c, -0.2));
+  };
+  // the treasury: columns, pediment and a gold coin over the door
+  B.bank = (pn, o) => {
+    const w = Math.min(o.w, 120), d = Math.min(o.d, 90), bx = { x: 0, y: 0, z: 6, w, d, h: 50 };
+    pn.box(0, 0, 0, w + 12, d + 12, 3, "#E8DFD2"); pn.box(0, 4, 3, w + 6, d + 8, 3, "#F1E9DE");
+    pn.box(0, 0, 6, w, d, 50, "#F6EFE6");
+    const fr = FACE[o.face] || "L";
+    for (let k = 0; k < 6; k++) { const u = (k + 0.5) / 6; const p = pn.faceP({ ...bx, h: 0 }, fr, u, 0); pn.cyl(p[0] + (fr === "R" ? 4 : 0), p[1] + (fr === "L" ? 4 : 0), 6, 3.2, 44, "#FFFFFF"); }
+    facade(pn, bx, 2, o, { pitch: 24 });
+    pn.hip(0, 0, 56, w, d, 16, "#C9B7E0", 5);
+    pn.box(0, 0, 56, w + 6, d + 6, 3, "#EDE4F4");
+    const [sx, sy] = pn.P(0, d / 2 + 2, 66); if (!pn.E) { pn.ctx.fillStyle = "#F0C06A"; pn.ctx.beginPath(); pn.ctx.arc(sx, sy, 5, 0, TAU); pn.ctx.fill(); pn.ctx.fillStyle = "#FFF6D8"; pn.ctx.font = "700 6px Fredoka, sans-serif"; pn.ctx.textAlign = "center"; pn.ctx.textBaseline = "middle"; pn.ctx.fillText("R", sx, sy + 0.3); }
+  };
+  // faith: the building follows the style the player picked
+  B.faith = (pn, o) => {
+    const st = o.style || "chapel", w = Math.min(o.w, 130), d = Math.min(o.d, 110);
+    pn.box(0, 0, 0, w + 10, d + 10, 2, "#EFE6DA");
+    if (st === "mosque") {
+      pn.box(0, 0, 2, w * 0.8, d * 0.8, 40, "#FBF6EE");
+      facade(pn, { x: 0, y: 0, z: 2, w: w * 0.8, d: d * 0.8, h: 40 }, 1, o, { pitch: 22 });
+      dome(pn, 0, 0, 42, Math.min(w, d) * 0.3, "#8FD0C6");
+      [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sy]) => dome(pn, sx * w * 0.32, sy * d * 0.32, 42, 7, "#8FD0C6"));
+      pn.cyl(w * 0.5, -d * 0.45, 2, 5, 96, "#FBF6EE", { bands: [[70, 74, "#8FD0C6"]] }); dome(pn, w * 0.5, -d * 0.45, 98, 5, "#8FD0C6");
+    } else if (st === "church") {
+      pn.box(0, 8, 2, w * 0.55, d * 0.85, 40, "#F7EFE6"); facade(pn, { x: 0, y: 8, z: 2, w: w * 0.55, d: d * 0.85, h: 40 }, 1, o, { pitch: 18 });
+      pn.gable(0, 8, 42, w * 0.55, d * 0.85, 28, "#C9A7C7", "b", "#F7EFE6", 4);
+      pn.box(0, -d * 0.4, 2, 26, 26, 76, "#F7EFE6"); pn.windowQ({ x: 0, y: -d * 0.4, z: 2, w: 26, d: 26, h: 76 }, "L", 0.3, 0.7, 0.66, 0.86);
+      spire(pn, 0, -d * 0.4, 78, 30, 46, "#B38DB1"); pn.line([0, -d * 0.4, 124], [0, -d * 0.4, 138], "#F0C06A", 1.6); pn.line([-4, -d * 0.4, 133], [4, -d * 0.4, 133], "#F0C06A", 1.6);
+    } else if (st === "temple") {
+      [[0, w * 0.8, 28, "#F3C9A8"], [28, w * 0.62, 22, "#F6D6B8"], [50, w * 0.44, 18, "#F8E1C8"]].forEach(([z, ww, hh, c], k) => {
+        pn.box(0, 0, z + 2, ww, ww * (d / w), hh, c); pn.hip(0, 0, z + 2 + hh, ww + 18, ww * (d / w) + 18, 8, k === 2 ? "#E4826A" : "#D9736A", 2);
+      });
+      pn.cyl(0, 0, 84, 2, 18, "#F0C06A");
+    } else if (st === "synagogue") {
+      pn.box(0, 0, 2, w * 0.78, d * 0.72, 50, "#F4EDE2"); facade(pn, { x: 0, y: 0, z: 2, w: w * 0.78, d: d * 0.72, h: 50 }, 2, o, { pitch: 20 });
+      pn.box(0, 0, 52, w * 0.8, d * 0.74, 4, "#E9DEC9"); dome(pn, 0, 0, 56, 18, "#9EC1E6");
+      const fr = FACE[o.face] || "L", fp = pn.faceP({ x: 0, y: 0, z: 2, w: w * 0.78, d: d * 0.72, h: 50 }, fr, 0.5, 0.82);
+      const [px, py] = pn.P(fp[0], fp[1], fp[2]); if (!pn.E) { pn.ctx.strokeStyle = "#6E88C4"; pn.ctx.lineWidth = 1.2; [0, Math.PI].forEach((o2) => { pn.ctx.beginPath(); for (let k = 0; k < 3; k++) { const t = o2 - Math.PI / 2 + (k * TAU) / 3; k ? pn.ctx.lineTo(px + Math.cos(t) * 5, py + Math.sin(t) * 5) : pn.ctx.moveTo(px + Math.cos(t) * 5, py + Math.sin(t) * 5); } pn.ctx.closePath(); pn.ctx.stroke(); }); }
+    } else if (st === "gurdwara") {
+      pn.box(0, 0, 2, w * 0.7, d * 0.7, 44, "#FFFDF8"); facade(pn, { x: 0, y: 0, z: 2, w: w * 0.7, d: d * 0.7, h: 44 }, 2, o, { pitch: 18 });
+      dome(pn, 0, 0, 46, 20, "#F0C06A", "#F0C06A");
+      [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sy]) => { pn.box(sx * w * 0.3, sy * d * 0.3, 46, 10, 10, 8, "#FFFDF8"); dome(pn, sx * w * 0.3, sy * d * 0.3, 54, 6, "#F0C06A", "#F0C06A"); });
+      pn.line([w * 0.52, d * 0.42, 0], [w * 0.52, d * 0.42, 70], "#8E86A8", 1.2); pn.poly([[w * 0.52, d * 0.42, 70], [w * 0.52, d * 0.42, 60], [w * 0.52 + 12, d * 0.42, 65]], "#F0A04A");
+    } else if (st === "garden") {
+      pn.box(0, 0, 0.4, w * 0.9, d * 0.9, 1, "#EFE2C8");
+      for (let k = 0; k < 5; k++) pn.line([-w * 0.4, -d * 0.35 + k * d * 0.12, 1.6], [w * 0.1, -d * 0.35 + k * d * 0.12, 1.6], "#E0CFAE", 1);
+      Bt2(pn, 1.2); pn.box(w * 0.22, d * 0.1, 0, 44, 36, 4, "#C9A07A");
+      [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sy]) => pn.box(w * 0.22 + sx * 18, d * 0.1 + sy * 14, 4, 3, 3, 26, "#B5835A"));
+      pn.hip(w * 0.22, d * 0.1, 30, 44, 36, 12, "#7FB5A8", 6);
+    } else {
+      pn.box(0, 0, 2, w * 0.6, d * 0.8, 36, "#F7F1E8"); facade(pn, { x: 0, y: 0, z: 2, w: w * 0.6, d: d * 0.8, h: 36 }, 1, o, { pitch: 20 });
+      pn.gable(0, 0, 38, w * 0.6, d * 0.8, 24, "#9FB8D8", "b", "#F7F1E8", 4); spire(pn, 0, -d * 0.3, 50, 14, 30, "#8AA6CC");
+    }
+  };
+  // a long thin wing in the owner's colour (offices, sheds, sound stages)
+  B.annex = (pn, o) => {
+    const bx = { x: 0, y: 0, z: 0, w: o.w, d: o.d, h: o.H - 12 };
+    const wall = o.stage ? "#5A5F7A" : shade(o.color || "#7E6BC4", 0.7);
+    pn.box(0, 0, 0, o.w, o.d, bx.h, wall);
+    if (!o.stage) facade(pn, bx, Math.max(1, Math.round(bx.h / 18)), o, { pitch: 22, noDoor: false });
+    else { pn.box(0, 0, bx.h, o.w + 2, o.d + 2, 3, "#E4826A"); pn.sign({ ...bx, h: bx.h }, FACE[o.face] || "L", 0.5, 0.6, "STAGE 1", "#E4826A", "#FFF", 5, false); }
+    pn.box(0, 0, bx.h, o.w, o.d, 2, shade(o.color || "#7E6BC4", 0.2));
+  };
+  // savings buildings (drawn in full later in this build)
+  B.terminal = (pn, o) => { pn.box(0, 0, 0, o.w, o.d * 0.7, 34, "#EEF2F8"); facade(pn, { x: 0, y: 0, z: 0, w: o.w, d: o.d * 0.7, h: 34 }, 1, o, { pitch: 16 }); pn.box(0, 0, 34, o.w + 6, o.d * 0.7 + 6, 4, "#9EC1E6"); pn.cyl(o.w * 0.35, -o.d * 0.2, 38, 5, 26, "#F6F2EC"); pn.box(o.w * 0.35, -o.d * 0.2, 64, 16, 16, 8, "#9EC1E6"); };
+  B.dealership = (pn, o) => { pn.box(0, 0, 0, o.w * 0.9, o.d * 0.7, 30, "#E9F1F6"); pn.box(0, 0, 30, o.w * 0.92, o.d * 0.72, 4, "#E4826A"); facade(pn, { x: 0, y: 0, z: 0, w: o.w * 0.9, d: o.d * 0.7, h: 30 }, 1, o, { pitch: 30, shopfront: true }); };
+  B.dreamhouse = (pn, o) => B.house(pn, { ...o, wall: "#F7E1E6", roof: "#C98FA8", floors: 2, seed: 11 });
   /* user-created sections pick a building style from their kind */
   B.section = (pn, o) => {
     const k = o.sKind;
@@ -8891,8 +9404,7 @@ select.inp {
     });
     /* ---- town: footway base, roads, then rounded blocks ---- */
     Object.values(T.isles).forEach((I) => {
-      const r = RC + 15 + VERGE;
-      pn.poly(rrect4(I.box.a0, I.box.a1, I.box.b0, I.box.b1, [r, r, r, r], 0.4), "#F2E6D6", "#E3D1BE", 1.2);
+      pn.poly(I.base.map(([a, b]) => [a, b, 0.4]), "#F2E6D6", "#E3D1BE", 1.2);
     });
     const road = "#8E8CAA";
     const arcBand = (n, r0, r1, z) => {
@@ -9144,7 +9656,7 @@ select.inp {
     /* ---- cars ---- */
     const CAR_COLS = ["#D9534F", "#3E7CB1", "#F2C14E", "#2A9D8F", "#F6EDDF", "#7E6BC4", "#E07B39", "#44545A", "#6DAE5B", "#C2577A", "#1F3A5F"];
     const spawnable = T.edges.filter((e) => !e.bridge && e.len > 150);
-    const nCars = opts.cars || 30;
+    const nCars = opts.cars || Math.max(3, Math.min(30, Math.round(T.edges.length * 0.55)));
     for (let k = 0; k < nCars; k++) {
       const kind = k === 0 || k === 13 ? "bus" : k % 9 === 4 ? "truck" : k % 5 === 1 ? "van" : k % 4 === 2 ? "bakkie" : k % 3 ? "hatch" : "sedan";
       const e = spawnable[k % spawnable.length], dir = R() < 0.5 ? 1 : -1;
@@ -9315,7 +9827,7 @@ select.inp {
       w.path = p && p.length ? p : null; w.i = 0; w.segT = 0;
       if (!w.path) w.wait = 1 + R() * 3;
     };
-    const nPeds = opts.peds || 56;
+    const nPeds = opts.peds || Math.max(8, Math.min(56, Math.round(T.blocks.length * 2.8)));
     for (let k = 0; k < nPeds; k++) {
       const n = pick(ringNodes);
       const w = { id: "p" + k, look: randomLook(R), node: n, a: n.a, b: n.b, speed: 12 + R() * 7, phase: R() * TAU, wait: R() * 2, name: pick(["Sam", "Lebo", "Zara", "Theo", "Naledi", "Kai", "Amara", "Ravi", "Jess", "Sipho", "Mia", "Omar", "Lindiwe", "Ben", "Aisha", "Tumi", "Noah", "Priya", "Luca", "Thandi"]) };
@@ -9384,6 +9896,7 @@ select.inp {
       if (n % 2) return;
       S.animals.push({ kind: "cat", a: k.a1 - 20, b: k.b1 - 20, home: { a: k.a1 - 24, b: k.b1 - 24, ra: 14, rb: 14 }, wait: 4 + R() * 6, col: pick(["#E07B39", "#3B3B3B", "#B9A58C", "#EDE3D1"]), phase: 0 });
     });
+    T.blocks.filter((k) => k.site).forEach((k) => { for (let n = 0; n < 3; n++) S.animals.push({ kind: "builder", look: builderLook(R), a: k.site.a + (R() - 0.5) * k.site.ra, b: k.site.b + (R() - 0.5) * k.site.rb, home: { a: k.site.a, b: k.site.b + k.site.rb * 0.6, ra: k.site.ra, rb: k.site.rb * 0.4 }, wait: R() * 3, phase: 0 }); });
     const AB = T.abox;
     for (let k = 0; k < 7; k++) S.gulls.push({ cx: lerp(AB.a0, AB.a1, R()), cy: lerp(AB.b0, AB.b1, R()), r: 120 + R() * 220, t: R() * TAU, sp: 0.1 + R() * 0.12, z: 80 + R() * 60 });
     for (let k = 0; S.dolphins.length < 5 && k < 400; k++) { const a = lerp(AB.a0 - 250, AB.a1 + 250, R()), b = lerp(AB.b0 - 250, AB.b1 + 250, R()); if (!T.landAt(a, b) && !T.landAt(a + 60, b) && !T.landAt(a - 60, b) && !T.landAt(a, b + 60) && !T.landAt(a, b - 60)) S.dolphins.push({ a, b, t: R() * 12, dir: R() < 0.5 ? 1 : -1 }); }
@@ -9395,7 +9908,7 @@ select.inp {
           m.tgt = { a: h.a + Math.cos(th) * (h.ra || 30) * 0.8 * rr, b: h.b + Math.sin(th) * (h.rb || 20) * 0.8 * rr };
         }
         const da = m.tgt.a - m.a, db = m.tgt.b - m.b, d = Math.hypot(da, db);
-        const sp = m.kind === "duck" ? 6 : m.kind === "pigeon" ? 8 : 10;
+        const sp = m.kind === "duck" ? 6 : m.kind === "pigeon" ? 8 : m.kind === "builder" ? 9 : 10;
         if (d < 1) { m.tgt = null; m.wait = m.kind === "cat" ? 5 + R() * 14 : 1 + R() * 4; m.moving = false; return; }
         const s = Math.min(d, sp * dt);
         m.a += (da / d) * s; m.b += (db / d) * s; m.da = da; m.db = db; m.moving = true; m.phase += dt * 9;
@@ -9416,11 +9929,13 @@ select.inp {
       ];
     };
     const ring = (m) => [[AB.a0 - m, AB.b0 - m], [(AB.a0 + AB.a1) / 2, AB.b0 - m * 1.2], [AB.a1 + m, AB.b0 - m], [AB.a1 + m * 1.2, (AB.b0 + AB.b1) / 2], [AB.a1 + m, AB.b1 + m], [(AB.a0 + AB.a1) / 2, AB.b1 + m * 1.2], [AB.a0 - m, AB.b1 + m], [AB.a0 - m * 1.2, (AB.b0 + AB.b1) / 2]];
-    const mw = T.marinaWater, gapA = (ISLES.life.box.a1 + ISLES.work.box.a0) / 2;
+    const mw = T.marinaWater, BE = T.bridgeE, W = T.isles.work;
     S.traffic = [
       { kind: "yacht", color: "#2A9D8F", route: ring(230), u: 0, speed: 18 },
       { kind: "cargo", color: "#8C3B3B", route: ring(360).reverse(), u: 0.5, speed: 14 },
-      { kind: "launch", color: "#F6EDDF", route: [[(mw.a0 + mw.a1) / 2 + 60, mw.b1 + 120], [gapA, ISLES.work.box.b1 + 180], [gapA, 1000], [gapA + 20, 880], [gapA - 10, 1200]], u: 0.2, speed: 16 },
+      // a launch that threads under the bridge between the islands (or just loops the harbour)
+      BE && W ? { kind: "launch", color: "#F6EDDF", route: [[(BE.bridge.a0 + BE.bridge.a1) / 2, W.box.b1 + 180], [(BE.bridge.a0 + BE.bridge.a1) / 2, BE.n0.b + 280], [(BE.bridge.a0 + BE.bridge.a1) / 2 + 20, BE.n0.b + 160], [(BE.bridge.a0 + BE.bridge.a1) / 2 - 10, BE.n0.b + 480]], u: 0.2, speed: 16 }
+        : { kind: "launch", color: "#F6EDDF", route: ring(150), u: 0.2, speed: 16 },
     ].map((b) => ({ ...b, path: withLen([...b.route, b.route[0]]), moving: true }));
     S.boats = [...S.traffic];
     function stepBoats(dt) {
@@ -9523,6 +10038,8 @@ select.inp {
       else if (o.p === "stall") { pn.box(0, 0, 0, 22, 12, 10, "#B98759"); [[-10, -5], [10, -5], [-10, 5], [10, 5]].forEach(([x, y]) => pn.line([x, y, 10], [x, y, 22], "#6F5A45", 1)); pn.box(0, 0, 22, 26, 16, 2, o.c); pn.box(-4, 2, 10, 6, 5, 3, "#E0474C"); pn.box(4, 2, 10, 6, 5, 3, "#F2C14E"); pn.glow(0, 0, 20, 10, "#FFE3A0", 1); }
       else if (o.p === "umbrella") umbrellaTable(pn, o.c);
       else if (o.p === "rock") Bt2(pn, o.s || 1);
+      else if (o.p === "crate") { crate(pn, 0, 0, 0, 10); crate(pn, 8, 3, 0, 8, "#B98759"); }
+      else if (o.p === "logs") { pn.box(0, 0, 0, 30, 6, 5, "#9C6B45"); pn.box(0, 7, 0, 30, 6, 5, "#8A5A3A"); pn.box(0, 3.5, 5, 30, 6, 5, "#A87B50"); }
       else if (o.p === "hay") { pn.cyl(0, 0, 0, 5, 6, "#E3C46B", { top: "#EFD68A" }); pn.cyl(9, 3, 0, 5, 6, "#D9B95C", { top: "#E8CE7E" }); }
     }
   }
@@ -9532,7 +10049,7 @@ select.inp {
     const wrap = React.useRef(null), cvs = React.useRef(null);
     const st = React.useRef(null);
     const cb = React.useRef({});
-    cb.current = { onOpen, onShip, onPlot, onAgent, onCrew, onAssign, landmarks, lightMode, reserveRight, paused: props.paused };
+    cb.current = { onOpen, onShip, onPlot, onAgent, onCrew, onAssign, landmarks, lightMode, reserveRight, paused: props.paused, opening: props.opening };
 
     /* one-time engine setup per town */
     React.useEffect(() => {
@@ -9542,7 +10059,7 @@ select.inp {
       // world bounds in screen units
       const { x0, x1, y0, y1 } = T.bbox;
       const bounds = { x0: x0 - 120, x1: x1 + 120, y0: y0 - 220, y1: y1 + 120 };
-      const sim = createSim(T, { cars: window.innerWidth < 700 ? 22 : 32, peds: window.innerWidth < 700 ? 40 : 60 });
+      const mob = window.innerWidth < 700, sim = createSim(T, { cars: Math.max(3, Math.min(mob ? 22 : 32, Math.round(T.edges.length * 0.9))), peds: Math.max(10, Math.min(mob ? 40 : 60, T.blocks.length * 4)) });
       const sprites = new Sprites();
       const chunks = new Map();
       const CH = 420;
@@ -9705,7 +10222,15 @@ select.inp {
           if (d.bnd) {
             const s = spriteFor(d, sc, lightState(d));
             d._s = s;
-            ctx.drawImage(s.cv, d.sx - s.ox, d.sy - s.oy, s.w, s.h);
+            const op = cb.current.opening, age = op && d.o.landmark === op.id ? (performance.now() - op.t) / 1000 : 99;
+            if (age < 3.4) {
+              // just opened: the building rises out of the ground, dust at the base, confetti on top
+              const p = clamp(age / 2.4, 0, 1), e = 1 - Math.pow(1 - p, 3), y0 = d.sy - s.oy;
+              ctx.save(); ctx.beginPath(); ctx.rect(d.sx - s.ox - 4, y0 + s.h * (1 - e) - 2, s.w + 8, s.h * e + 4); ctx.clip();
+              ctx.drawImage(s.cv, d.sx - s.ox, d.sy - s.oy, s.w, s.h); ctx.restore();
+              for (let q = 0; q < 10; q++) { const th = (q / 10) * TAU + age, rr = 20 + age * 18; ctx.fillStyle = `rgba(240,232,220,${0.5 * (1 - age / 3.4)})`; ctx.beginPath(); ctx.ellipse(d.sx + Math.cos(th) * rr, d.sy + Math.sin(th) * rr * 0.5, 9, 5, 0, 0, TAU); ctx.fill(); }
+              if (age > 1.8) for (let q = 0; q < 26; q++) { const h2 = (q * 97) % 100 / 100, fall = (age - 1.8) * 40; ctx.fillStyle = ["#E4826A", "#F0C06A", "#7CC2CB", "#9BC98A", "#B7A6DC"][q % 5]; ctx.fillRect(d.sx - 40 + h2 * 80 + Math.sin(age * 4 + q) * 6, y0 + 10 + fall + ((q * 37) % 30), 2.4, 3.6); }
+            } else ctx.drawImage(s.cv, d.sx - s.ox, d.sy - s.oy, s.w, s.h);
             if (S.hover && d.o.landmark && S.hover === d.o.landmark) { ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 0.14; ctx.drawImage(s.cv, d.sx - s.ox, d.sy - s.oy, s.w, s.h); ctx.restore(); }
             return;
           }
@@ -9735,6 +10260,7 @@ select.inp {
             }
             return;
           }
+          if (d.kind === "animal" && d.m.kind === "builder") { const m = d.m; drawPerson(ctx, d.sx, d.sy, m.look, ((m.da || 1) - (m.db || 0)) < 0 ? -1 : 1, true, m.phase, m.moving, 0.95, m.moving ? null : { kind: "hammer" }, time); return; }
           if (d.kind === "animal") { const m = d.m; drawAnimal(ctx, m.kind, d.sx, d.sy, ((m.da || 1) - (m.db || 0)) < 0 ? -1 : 1, m.phase, m.col, m.moving, time); return; }
         });
         // effects: chimney smoke, flare, fountain, dolphins
@@ -10011,7 +10537,7 @@ select.inp {
   });
   function roundRect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
 
-    return { buildTown, WorldMap, lightAt };
+    return { buildTown, WorldMap, lightAt, PARCELS, classicPlan, layoutPlan, placeParcel, checkPlan, freshParcels, cellsOf, freshLines, FRESH_N };
   })();
 
   /* ===================== Valley Isle · building interiors =====================
@@ -12568,6 +13094,9 @@ select.inp {
         icon: React.createElement("span", { className: "lv-badge" }, t.level),
         onClose: p,
       },
+      e.building && React.createElement("div", { className: "site-banner" },
+        React.createElement("b", null, "Under construction"),
+        React.createElement("span", null, s.length ? "Finish any task below to cut the ribbon and open " + e.name + "." : "Add its first task, then finish it to cut the ribbon and open " + e.name + ".")),
       React.createElement(
         "div",
         { className: "sec-stats" },
@@ -14478,53 +15007,93 @@ select.inp {
     );
   }
   /* ---- fresh start: welcome + build dialogs ---- */
+  /* a card per catalog entry: tick to pick, or tap to choose */
+  function PickCard({ c: c, on: on, onClick: f, taken: tk }) {
+    return React.createElement("button", { type: "button", className: "pick-card" + (on ? " on" : "") + (tk ? " taken" : ""), "aria-pressed": !!on, disabled: !!tk, onClick: f },
+      React.createElement("span", { className: "pick-dot", style: { background: c.color } }),
+      React.createElement("b", null, c.label),
+      React.createElement("span", null, tk ? "Already built" : c.blurb));
+  }
+  function FaithStyle({ value: v, onChange: f }) {
+    return React.createElement(Y, { label: "Which building?" },
+      React.createElement("div", { className: "flex flex-wrap gap-2" },
+        FAITH_STYLES.map((st) => React.createElement("button", { key: st.id, type: "button", className: "chip-btn" + (v === st.id ? " on" : ""), "aria-pressed": v === st.id, onClick: () => f(st.id) }, st.label))));
+  }
   function WelcomeDlg({ onStart: e, sandbox: sb, onExit: x }) {
-    let [f, setF] = React.useState({ owner: "", islandName: "", mode: "fresh" }),
+    let [f, setF] = React.useState({ owner: "", islandName: "", mode: "fresh", picks: ["houses"], faith: "mosque", step: 1 }),
       ok = f.owner.trim().length > 0,
-      go = () => ok && e({ ...f, owner: f.owner.trim(), islandName: f.islandName.trim() || f.owner.trim() + "\u2019s Isle" }),
+      name = () => f.islandName.trim() || f.owner.trim() + "’s Isle",
+      go = () => ok && (f.mode === "fresh" && f.step === 1 ? setF({ ...f, step: 2 }) : e({ ...f, owner: f.owner.trim(), islandName: name() })),
+      toggle = (t) => setF({ ...f, picks: f.picks.includes(t) ? f.picks.filter((x) => x !== t) : [...f.picks, t] }),
       opt = (id, title, text) =>
         React.createElement("button", { type: "button", className: "start-opt" + (f.mode === id ? " on" : ""), "aria-pressed": f.mode === id, onClick: () => setF({ ...f, mode: id }) },
-          React.createElement("b", null, title), React.createElement("span", null, text));
+          React.createElement("b", null, title), React.createElement("span", null, text)),
+      group = (g, title) => React.createElement("div", { key: g },
+        React.createElement("div", { className: "pick-group" }, title),
+        React.createElement("div", { className: "pick-grid" }, CATALOG.filter((c) => c.group === g).map((c) => React.createElement(PickCard, { key: c.type, c, on: f.picks.includes(c.type), onClick: () => toggle(c.type) }))));
     return React.createElement("div", { className: "modal-back welcome-back" },
-      React.createElement("div", { className: "hud-card modal-card welcome-card", role: "dialog", "aria-label": "Welcome to Valley Isle" },
-        React.createElement("div", { className: "welcome-emblem" }, React.createElement(qn, null)),
-        React.createElement("h2", { className: "welcome-title" }, "Welcome to your island"),
-        React.createElement("p", { className: "welcome-sub" }, "Every part of your life gets a building. Finish tasks and the island grows with you."),
-        React.createElement("div", { className: "grid gap-3" },
-          React.createElement(Y, { label: "What should we call you?" },
-            React.createElement("input", { className: "inp", autoFocus: !0, value: f.owner, placeholder: "Your name", onChange: (a) => setF({ ...f, owner: a.target.value }), onKeyDown: (a) => a.key === "Enter" && go() })),
-          React.createElement(Y, { label: "Name your island" },
-            React.createElement("input", { className: "inp", value: f.islandName, placeholder: f.owner.trim() ? f.owner.trim() + "\u2019s Isle" : "e.g. Valley Isle", onChange: (a) => setF({ ...f, islandName: a.target.value }), onKeyDown: (a) => a.key === "Enter" && go() })),
-          React.createElement("div", { className: "start-opts" },
-            opt("fresh", "Start with just my home", "Your cottage stands on the island. Tap an empty plot to build each part of your life when you need it."),
-            opt("classic", "Explore the sample island", "Everything already built: studio, workshop, caf\xE9, gym, the work island and a crew."))),
+      React.createElement("div", { className: "hud-card modal-card welcome-card" + (f.step === 2 ? " wide" : ""), role: "dialog", "aria-label": "Welcome to Valley Isle" },
+        f.step === 1
+          ? React.createElement(React.Fragment, null,
+              React.createElement("div", { className: "welcome-emblem" }, React.createElement(qn, null)),
+              React.createElement("h2", { className: "welcome-title" }, "Welcome to your island"),
+              React.createElement("p", { className: "welcome-sub" }, "Every part of your life gets a building. Finish tasks and the island grows with you."),
+              React.createElement("div", { className: "grid gap-3" },
+                React.createElement(Y, { label: "What should we call you?" },
+                  React.createElement("input", { className: "inp", autoFocus: !0, value: f.owner, placeholder: "Your name", onChange: (a) => setF({ ...f, owner: a.target.value }), onKeyDown: (a) => a.key === "Enter" && go() })),
+                React.createElement(Y, { label: "Name your island" },
+                  React.createElement("input", { className: "inp", value: f.islandName, placeholder: f.owner.trim() ? f.owner.trim() + "’s Isle" : "e.g. Valley Isle", onChange: (a) => setF({ ...f, islandName: a.target.value }), onKeyDown: (a) => a.key === "Enter" && go() })),
+                React.createElement("div", { className: "start-opts" },
+                  opt("fresh", "Build my own island", "Pick the parts of your life you want. Your island takes its shape from what you choose."),
+                  opt("classic", "Explore the sample island", "Everything already built: studio, workshop, caf\xE9, gym, the work island and a crew."))))
+          : React.createElement(React.Fragment, null,
+              React.createElement("h2", { className: "welcome-title" }, "What goes on " + name() + "?"),
+              React.createElement("p", { className: "welcome-sub" }, "Your home is already there. Everything you pick starts as a building site and opens when you finish its first task. You can add more, move things around and reshape the island any time."),
+              React.createElement("div", { className: "pick-scroll" },
+                group("work", "Work & business"), group("life", "Life"),
+                f.picks.includes("faith") && React.createElement("div", { className: "mt-2" }, React.createElement(FaithStyle, { value: f.faith, onChange: (v) => setF({ ...f, faith: v }) })),
+                group("scenery", "Scenery"))),
         React.createElement("div", { className: "welcome-foot" },
           sb && React.createElement(Q, { variant: "ghost", onClick: x }, "Leave sandbox"),
-          React.createElement(Q, { variant: "gold", disabled: !ok, onClick: go }, "Raise my island"))));
+          f.step === 2 && React.createElement(Q, { variant: "ghost", onClick: () => setF({ ...f, step: 1 }) }, "Back"),
+          React.createElement(Q, { variant: "gold", disabled: !ok, onClick: go }, f.mode === "fresh" && f.step === 1 ? "Next" : "Raise my island"))));
   }
-  function BuildDlg({ id: e, onClose: t, onBuild: s }) {
-    let b = BUILDABLE.find((a) => a.id === e) || BUILDABLE[0],
-      [f, setF] = React.useState({ name: b.name, sub: b.sub, color: b.color, crew: !!b.crew }),
-      ok = f.name.trim().length > 0;
+  function BuildDlg({ preset: e, taken: tk, onClose: t, onBuild: s }) {
+    let [f, setF] = React.useState(() => {
+        let c = CATALOG.find((x) => x.type === e);
+        return c ? { type: c.type, name: c.name || c.label, sub: c.sub || "", color: c.color, crew: !!c.crew, faith: "mosque" } : { type: null };
+      }),
+      c = CATALOG.find((x) => x.type === f.type),
+      choose = (x) => x.type === "section" ? s("section", {}) : setF({ type: x.type, name: x.name || x.label, sub: x.sub || "", color: x.color, crew: !!x.crew, faith: "mosque" }),
+      ok = c && (c.group === "scenery" || f.name.trim().length > 0);
     return React.createElement(cs, {
-        title: "Build " + (/^[aeiou]/i.test(b.label) ? "an " : "a ") + b.label,
-        color: f.color,
+        title: c ? "Build " + (/^[aeiou]/i.test(c.label) ? "an " : "a ") + c.label : "Build something new",
+        color: c ? f.color : "#E9B949",
         onClose: t,
+        width: c ? 520 : 640,
         footer: React.createElement(React.Fragment, null,
+          c && !e && React.createElement(Q, { variant: "ghost", onClick: () => setF({ type: null }) }, "Back"),
           React.createElement(Q, { variant: "ghost", onClick: t }, "Not yet"),
-          React.createElement(Q, { variant: "gold", disabled: !ok, onClick: () => ok && s(e, { ...f, name: f.name.trim(), sub: f.sub.trim() || b.sub }) }, React.createElement(Ls, { size: 16 }), "Build it")),
+          c && React.createElement(Q, { variant: "gold", disabled: !ok, onClick: () => ok && s(f.type, { ...f, name: (f.name || c.label).trim(), sub: f.sub.trim() || c.sub || "" }) }, React.createElement(Ls, { size: 16 }), c.group === "scenery" ? "Place it" : "Start building")),
       },
-      React.createElement("div", { className: "build-hero" },
-        React.createElement("p", null, b.blurb, ". ", "It gets its own room inside, levels up as you finish its tasks, and your crew can be sent to work there.")),
-      React.createElement("div", { className: "grid grid-cols-2 gap-3" },
-        React.createElement(Y, { label: "Name" }, React.createElement("input", { className: "inp", autoFocus: !0, value: f.name, onChange: (a) => setF({ ...f, name: a.target.value }) })),
-        React.createElement(Y, { label: "Short description" }, React.createElement("input", { className: "inp", value: f.sub, onChange: (a) => setF({ ...f, sub: a.target.value }) })),
-        React.createElement(Y, { label: "Colour", className: "col-span-2" },
-          React.createElement("div", { className: "flex flex-wrap gap-2" },
-            gs.map((c) => React.createElement("button", { key: c, type: "button", className: "swatch" + (f.color === c ? " on" : ""), style: { background: c }, onClick: () => setF({ ...f, color: c }), "aria-label": "Colour " + c, "aria-pressed": f.color === c })))),
-        b.crew && React.createElement("label", { className: "col-span-2 crew-opt" },
-          React.createElement("input", { type: "checkbox", checked: f.crew, onChange: (a) => setF({ ...f, crew: a.target.checked }) }),
-          React.createElement("span", null, React.createElement("b", null, "Hire the studio crew"), " \xB7 Scriptwriter, Image Gen, Voiceover, Editor, Thumbnail and Publisher, each with their own look."))));
+      !c
+        ? React.createElement("div", null,
+            React.createElement("p", { className: "build-hero" }, "New buildings start as a site with a crane. Finish their first task and they open. After that you can drag them anywhere in Edit layout."),
+            [["work", "Work & business"], ["life", "Life"], ["scenery", "Scenery"]].map(([g, title]) => React.createElement("div", { key: g },
+              React.createElement("div", { className: "pick-group" }, title),
+              React.createElement("div", { className: "pick-grid" }, CATALOG.filter((x) => x.group === g).map((x) => React.createElement(PickCard, { key: x.type, c: x, taken: x.id && tk && tk.includes(x.id), onClick: () => choose(x) }))))))
+        : React.createElement("div", null,
+            React.createElement("p", { className: "build-hero" }, c.blurb + (c.group === "scenery" ? "." : ". It starts as a building site and opens when you finish its first task there.")),
+            c.group !== "scenery" && React.createElement("div", { className: "grid grid-cols-2 gap-3" },
+              React.createElement(Y, { label: "Name" }, React.createElement("input", { className: "inp", autoFocus: !0, value: f.name, onChange: (a) => setF({ ...f, name: a.target.value }) })),
+              React.createElement(Y, { label: "Short description" }, React.createElement("input", { className: "inp", value: f.sub, onChange: (a) => setF({ ...f, sub: a.target.value }) })),
+              c.styles && React.createElement("div", { className: "col-span-2" }, React.createElement(FaithStyle, { value: f.faith, onChange: (v) => setF({ ...f, faith: v }) })),
+              React.createElement(Y, { label: "Colour", className: "col-span-2" },
+                React.createElement("div", { className: "flex flex-wrap gap-2" },
+                  gs.map((col) => React.createElement("button", { key: col, type: "button", className: "swatch" + (f.color === col ? " on" : ""), style: { background: col }, onClick: () => setF({ ...f, color: col }), "aria-label": "Colour " + col, "aria-pressed": f.color === col })))),
+              c.crew && React.createElement("label", { className: "col-span-2 crew-opt" },
+                React.createElement("input", { type: "checkbox", checked: f.crew, onChange: (a) => setF({ ...f, crew: a.target.checked }) }),
+                React.createElement("span", null, React.createElement("b", null, "Hire the studio crew"), " \xB7 Scriptwriter, Image Gen, Voiceover, Editor, Thumbnail and Publisher, each with their own look.")))));
   }
   var {
     useState: He,
@@ -14837,7 +15406,26 @@ select.inp {
       hasData = !!((s && s.length) || (n && n.length) || (o && o.length) || (i && i.length) || (l && l.length)),
       islMode = isl ? isl.mode : sandbox || (t && !hasData) ? "new" : "classic",
       fresh = islMode !== "classic",
-      built = (isl && isl.built) || {},
+      lmOf = (p) => (CATALOG.find((c) => c.type === p.type) || {}).id || (p.type === "section" ? p.id : null),
+      // a venture opens once something has been finished there (its first task, or its tool's first use)
+      doneBy = (() => {
+        let m = {};
+        (s || []).forEach((t2) => t2.status === "done" && (m[t2.venture] = (m[t2.venture] || 0) + 1));
+        ((u && u.entries) || []).length && (m.fitness = (m.fitness || 0) + 1);
+        (l || []).length && (m.goals = (m.goals || 0) + 1);
+        return m;
+      })(),
+      // pre-layout fresh islands (a 'built' map) get packed into a layout on the fly
+      baseLayout = fresh
+        ? (isl && isl.layout) || (() => {
+            let b2 = (isl && isl.built) || {}, types = Object.keys(b2).map((id) => (CATALOG.find((c) => c.id === id) || {}).type).filter((t2) => t2 && t2 !== "epcm");
+            return { seed: 7, work: !!b2.epcm, workInfo: b2.epcm, parcels: World.freshParcels(types).map((p) => ({ ...p, ...(b2[lmOf(p)] || {}) })) };
+          })()
+        : (isl && isl.layout) || { classic: !0, moves: {}, extra: [] },
+      extraParcels = (fresh ? baseLayout.parcels : baseLayout.extra) || [],
+      ventureP = extraParcels.filter((p) => lmOf(p) && p.type !== "marina" && p.type !== "section"),
+      buildingIds = new Set(extraParcels.filter((p) => p.status === "building" && lmOf(p) && !doneBy[lmOf(p)]).map(lmOf)),
+      hasVenture = (id) => (fresh ? id === "personal" || extraParcels.some((p) => lmOf(p) === id) || (id === "epcm" && baseLayout.work) : !0) || extraParcels.some((p) => lmOf(p) === id),
       C = o || [],
       G = [...(l || [])].sort(
         (a, g) => (a.createdAt || 0) - (g.createdAt || 0),
@@ -14861,11 +15449,24 @@ select.inp {
             .map((a) => ({ ...a })),
         [i],
       ),
-      QsL = fresh ? Qs.filter((a) => a.id === "personal" || built[a.id]).map((a) => ({ ...a, ...(built[a.id] || {}) })) : Qs,
-      hiddenL = fresh ? BUILDABLE.map((b) => b.id).filter((id) => !built[id]) : [],
+      QsL = (() => {
+        let fromP = (p) => { let id = lmOf(p), base = Qs.find((q) => q.id === id) || EXTRA_Q[id] || {}; return { ...base, id, name: p.name || base.name, sub: p.sub || base.sub, color: p.color || base.color, style: p.style, building: buildingIds.has(id) }; };
+        return fresh
+          ? [Qs.find((q) => q.id === "personal"), ...ventureP.filter((p) => lmOf(p) !== "personal").map(fromP), ...(baseLayout.work ? [{ ...Qs.find((q) => q.id === "epcm"), ...(baseLayout.workInfo || {}) }] : [])]
+          : [...Qs, ...ventureP.filter((p) => !Qs.some((q) => q.id === lmOf(p))).map(fromP)];
+      })(),
+      planKey = JSON.stringify([fresh, baseLayout, [...buildingIds]]),
+      planL = _t(() => {
+        let st = (p) => ({ ...p, status: buildingIds.has(lmOf(p)) ? "building" : "open" });
+        if (fresh) return World.layoutPlan({ ...baseLayout, parcels: baseLayout.parcels.map(st) });
+        let cp = World.classicPlan();
+        cp.parcels.forEach((p) => { let m = baseLayout.moves && baseLayout.moves[p.id]; m && ((p.at = m.at), (p.rot = m.rot || 0)); });
+        (baseLayout.extra || []).forEach((p) => cp.parcels.push(st(p)));
+        return cp;
+      }, [planKey]),
       Ge = _t(
-        () => [...QsL, ...pe.map((a) => ({ ...a, plot: Us(a.slot) }))],
-        [pe, QsL.map((a) => a.id + a.name + a.color).join("|")],
+        () => [...QsL, ...pe.map((a) => ({ ...a, plot: Us(a.slot), building: buildingIds.has(a.id) }))],
+        [pe, QsL.map((a) => a.id + a.name + a.color + a.building).join("|"), [...buildingIds].join(",")],
       ),
       te = _t(() => Object.fromEntries(Ge.map((a) => [a.id, a])), [Ge]),
       ue = Be(),
@@ -14901,8 +15502,8 @@ select.inp {
       Oe = H >= 0.66 ? 3 : H >= 0.33 ? 2 : 1,
       je = ws(Object.values(se).reduce((a, g) => a + g, 0) + Ee * 40, 60),
       townL = _t(
-        () => World.buildTown({ sections: pe, islandLevel: je.level, hidden: hiddenL }),
-        [pe.map((a) => [a.id, a.slot, a.kind, a.color, a.name].join(":")).join("|"), je.level, hiddenL.join(",")],
+        () => World.buildTown({ sections: fresh ? [] : pe, islandLevel: je.level, plan: planL }),
+        [pe.map((a) => [a.id, a.slot, a.kind, a.color, a.name].join(":")).join("|"), je.level, planKey],
       ),
       { streak: Ve, activeToday: Xe } = sn(r == null ? void 0 : r.days),
       Ye = nn(xe, ue),
@@ -14937,7 +15538,7 @@ select.inp {
       Me.push({
         id: a.id,
         kind: a.kind,
-        name: a.name,
+        name: a.building ? a.name + " \xB7 building" : a.name,
         color: a.color,
         x: (townL.plots[a.id] || { sx: 0 }).sx,
         y: (townL.plots[a.id] || { sy: 0 }).sy,
@@ -15003,11 +15604,11 @@ select.inp {
         data: gt,
         sig: JSON.stringify(["port", gt, It]),
       }),
-      townL.plots.marina && (!fresh || built.marina) && Me.push({
+      townL.plots.marina && Me.push({
         id: "marina",
         kind: "port",
-        name: (built.marina && built.marina.name) || "Marina",
-        color: (built.marina && built.marina.color) || "#2A9D8F",
+        name: ((extraParcels.find((p) => p.type === "marina") || {}).name) || "Marina",
+        color: ((extraParcels.find((p) => p.type === "marina") || {}).color) || "#2A9D8F",
         x: townL.plots.marina.sx,
         y: townL.plots.marina.sy,
         tier: 1,
@@ -15021,11 +15622,7 @@ select.inp {
       Me.forEach((a) => {
         a.id === "port" && (a.name = "Tender Port", a.level = Ke.filter((g) => g.type === "tender").length);
       }),
-      // empty venture sites on a fresh island
-      hiddenL.forEach((id) => {
-        let o = townL.plots["build:" + id], b = BUILDABLE.find((x) => x.id === id);
-        o && b && Me.push({ id: "build:" + id, kind: "build", name: b.label, color: "#B4ABCB", x: o.sx, y: o.sy, tier: 1, level: "+", open: 0, alert: !1, crew: [], data: null, sig: "build:" + id });
-      }));
+      0);
     let
       Ps = Object.fromEntries(Me.map((a) => [a.id, a])),
       Os = (a) => {
@@ -15293,6 +15890,10 @@ select.inp {
           F = 0;
         for (; g.has(F); ) F++;
         let S = "s_" + Date.now().toString(36);
+        if (fresh) {
+          let p2 = World.placeParcel(baseLayout.parcels, "section", { id: S, name: a.name.trim(), color: a.color, sKind: a.kind, status: "building" });
+          p2 && saveLayout({ ...baseLayout, parcels: [...baseLayout.parcels, { id: S, type: "section", at: p2.at, rot: p2.rot, name: a.name.trim(), color: a.color, sKind: a.kind, status: "building" }] });
+        }
         U("sections/" + S, () =>
           e
             .collection("sections")
@@ -15308,23 +15909,46 @@ select.inp {
             }),
         );
       },
+      saveLayout = (lay) => U("settings/island", () => e.doc("settings/island").set({ ...(isl || { mode: fresh ? "fresh" : "classic" }), layout: lay })),
       onboard = (a) => {
-        let me = { id: "me", name: a.owner, kind: "human", color: "#2A9D8F" };
-        U("settings/island", () => e.doc("settings/island").set({ mode: a.mode, owner: a.owner, islandName: a.islandName, built: {}, createdAt: Date.now() }));
+        let me = { id: "me", name: a.owner, kind: "human", color: "#2A9D8F" },
+          picks = a.mode === "fresh" ? a.picks.filter((t2) => t2 !== "epcm") : [],
+          parcels = World.freshParcels(picks).map((p) => {
+            let c = CATALOG.find((x) => x.type === p.type) || {};
+            return c.group === "scenery" || p.type === "home" ? { ...p, id: p.type === "home" ? "home" : p.type + ":" + Math.random().toString(36).slice(2, 7) } : { ...p, name: c.name, sub: c.sub, color: c.color, status: "building", ...(p.type === "faith" ? { style: a.faith } : {}) };
+          }),
+          lay = a.mode === "fresh" ? { seed: (Math.random() * 1e6) | 0, parcels, work: a.picks.includes("epcm") } : null;
+        U("settings/island", () => e.doc("settings/island").set({ mode: a.mode, owner: a.owner, islandName: a.islandName, createdAt: Date.now(), ...(lay ? { layout: lay } : {}) }));
         (a.mode === "classic" ? ks.map((w) => (w.id === "me" ? me : w)) : [me]).forEach((w) =>
           U("workers/" + w.id, () => e.collection("workers").doc(w.id).set(w)));
-        Re(a.mode === "classic" ? "Welcome to the sample island, " + a.owner + "." : "Welcome home, " + a.owner + ". Tap an empty plot to build.", "gold");
+        Re(a.mode === "classic" ? "Welcome to the sample island, " + a.owner + "." : "Welcome home, " + a.owner + ". Tap a building site to give it its first task.", "gold");
       },
-      buildVenture = (id, a) => {
-        let next = { ...built, [id]: { name: a.name, sub: a.sub, color: a.color } };
-        (M(null), Fe.level && Fe.level());
-        U("settings/island", () => e.doc("settings/island").set({ ...(isl || { mode: "fresh" }), mode: "fresh", built: next }));
+      buildVenture = (type, a) => {
+        let c = CATALOG.find((x) => x.type === type);
+        if (!c) return;
+        if (type === "section") return M({ type: "section" });
+        M(null);
+        if (c.work) {
+          saveLayout({ ...baseLayout, work: !0, workInfo: { name: a.name, sub: a.sub, color: a.color } });
+          Re(a.name + " is on its own island now, over the bridge.", "gold");
+          return;
+        }
+        let parcels = fresh ? baseLayout.parcels : [...World.classicPlan().parcels.map((p) => { let m = baseLayout.moves && baseLayout.moves[p.id]; return m ? { ...p, ...m } : p; }), ...(baseLayout.extra || [])],
+          p = World.placeParcel(parcels, type, {
+            id: c.id || type + ":" + Math.random().toString(36).slice(2, 7),
+            ...(c.group === "scenery" ? {} : { name: a.name, sub: a.sub, color: a.color, status: "building" }),
+            ...(type === "faith" ? { style: a.faith } : {}),
+          });
+        if (!p) return Re("There's no room left that fits it. Try moving things in Edit layout.", "bad");
+        let clean = { id: p.id, type: p.type, at: p.at, rot: p.rot, ...(p.name ? { name: p.name, sub: p.sub, color: p.color, status: p.status } : {}), ...(p.style ? { style: p.style } : {}) };
+        saveLayout(fresh ? { ...baseLayout, parcels: [...baseLayout.parcels, clean] } : { ...baseLayout, extra: [...(baseLayout.extra || []), clean] });
         if (a.crew) {
           let have = new Set((n || []).map((w) => w.id));
           [...(have.has("me") ? [] : [Ce[0] || { id: "me", name: "You", kind: "human", color: "#2A9D8F" }]), ...STUDIO_CREW.filter((w) => !have.has(w.id))].forEach((w) =>
             U("workers/" + w.id, () => e.collection("workers").doc(w.id).set(w)));
         }
-        Re(a.name + " is built!" + (a.crew ? " The studio crew is on the square." : ""), "gold");
+        Fe.pop && Fe.pop();
+        Re(c.group === "scenery" ? c.label + " placed." : a.name + ": building site ready. Finish its first task to open it." + (a.crew ? " The studio crew is waiting on the square." : ""), "gold");
       },
       Kn = (a) => {
         let g = xe.filter((F) => F.venture === a.id);
@@ -15494,8 +16118,8 @@ select.inp {
         }),
       Ie = (a) => {
         if (fresh) {
-          let need = a.type === "fitness" && !built.fitness ? "fitness" : a.type === "goals" && !built.goals ? "goals" : a.type === "port" && !a.via && !built.epcm && !built.marina ? "marina" : null;
-          if (need) return (Fe.tap(), $(null), M({ type: "build", id: need }));
+          let need = a.type === "fitness" && !hasVenture("fitness") ? "gym" : a.type === "goals" && !hasVenture("goals") ? "goals" : a.type === "port" && !a.via && !townL.plots.marina && !townL.plots.port ? "marina" : null;
+          if (need) return (Fe.tap(), $(null), M({ type: "build", preset: need }));
         }
         ($(a), Fe.tap(), ne(!1));
         let g =
@@ -15518,7 +16142,6 @@ select.inp {
         );
       },
       lo = ds((a) => {
-        if (typeof a === "string" && a.startsWith("build:")) return (Fe.tap(), M({ type: "build", id: a.slice(6) }));
         Ie(
           a === "port" || a === "hub" || a === "marina"
             ? { type: "port", via: a }
@@ -15596,6 +16219,21 @@ select.inp {
         }
       hs.current = a;
     }, [k, Hs]);
+    // a building site that just got its first finished task: raise the building with a little ceremony
+    let prevBuilding = Lt(null),
+      [opening, setOpening] = He(null);
+    at(() => {
+      if (!k) return;
+      let now = [...buildingIds], prev = prevBuilding.current;
+      prevBuilding.current = now;
+      if (!prev) return;
+      let opened = prev.filter((id) => !buildingIds.has(id));
+      if (!opened.length) return;
+      let g = te[opened[0]];
+      setOpening({ id: opened[0], t: performance.now() });
+      Fe.level && Fe.level();
+      Re((g ? g.name : "Your new building") + " is open! Ribbon cut, doors open.", "gold");
+    }, [k, [...buildingIds].join(",")]);
     let Xs = Lt(!1);
     at(() => {
       if (!k || Xs.current) return;
@@ -15667,11 +16305,10 @@ select.inp {
         leads: Ke.map((a) => ({ id: a.id, type: a.type, color: (kt[a.type] || {}).color || "#1F7A8C" })),
         workers: Ce,
         lightMode: lightMode,
+        opening: opening,
         paused: !!v,
         onPlot: (a) => {
-          a.build
-            ? M({ type: "build", id: a.build })
-            : a.free
+          a.free
             ? M({ type: "section" })
             : (Fe.tap(),
               Re(
@@ -15856,7 +16493,7 @@ select.inp {
           onToggle: Wt.onToggle,
           onEdit: Wt.onEdit,
           onHabits: () => Ie({ type: "fitness", tab: "habits" }),
-          noHabits: fresh && !built.fitness,
+          noHabits: !hasVenture("fitness"),
         }),
       ),
       React.createElement(
@@ -15989,11 +16626,11 @@ select.inp {
           {
             variant: "gold",
             className: "dock-main",
-            onClick: () => M({ type: "section" }),
-            title: "Add a new section to the island",
+            onClick: () => M({ type: "build" }),
+            title: "Build something new on the island",
           },
           React.createElement(Ls, { size: 18 }),
-          React.createElement("span", { className: "hide-xs" }, "Expand"),
+          React.createElement("span", { className: "hide-xs" }, "Build"),
         ),
       ),
       (() => {
@@ -16154,7 +16791,7 @@ select.inp {
       (E == null ? void 0 : E.type) === "section" &&
         React.createElement(Pn, { onClose: () => M(null), onCreate: Yn }),
       (E == null ? void 0 : E.type) === "build" &&
-        React.createElement(BuildDlg, { key: E.id, id: E.id, onClose: () => M(null), onBuild: buildVenture }),
+        React.createElement(BuildDlg, { key: E.preset || "any", preset: E.preset, taken: Ge.map((g) => g.id).concat(townL.plots.marina ? ["marina"] : [], baseLayout.work || !fresh ? ["epcm"] : []), onClose: () => M(null), onBuild: buildVenture }),
       islMode === "new" &&
         React.createElement(WelcomeDlg, { onStart: onboard, sandbox: sandbox, onExit: () => setSandbox(!1) }),
       (E == null ? void 0 : E.type) === "confirm" &&
