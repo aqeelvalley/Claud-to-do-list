@@ -171,6 +171,29 @@
   const COATS = ["#E4726A", "#F2A65A", "#5FA8A0", "#6C8FC8", "#9C7CC8", "#F2C45A", "#E88AA8", "#7FB07A", "#F4EDE2", "#4E5A7A", "#D95F5F"];
   const HATS = ["#E4726A", "#F2C45A", "#6C8FC8", "#4E5A7A", "#F4EDE2", "#7FB07A"];
   const TRAITS = ["wave", "phone", "sip", "stretch", "look", "hum"];
+  /* crew roles get a signature outfit, prop and working animation (faceless, so the
+     silhouette does the talking). Matched by id first, then by name. */
+  const ROLES = {
+    script: { build: "tall", hat: { kind: "beret", c: "#3E9B6B" }, style: "bun", bubble: "✎" },
+    imagegen: { build: "slim", hat: { kind: "bucket", c: "#F2A7C8" }, style: "curly", bubble: "✦", scarf: "#F0C06A" },
+    voice: { build: "round", hat: { kind: "phones", c: "#7E6BC4" }, style: "short", bubble: "♪" },
+    editor: { build: "slim", hat: { kind: "visor", c: "#E0A526" }, style: "long", bubble: "✂" },
+    thumb: { build: "kid", hat: { kind: "cap", c: "#1F8FA3" }, style: "short", bubble: "★" },
+    publish: { build: "tall", hat: { kind: "phones", c: "#D9734E" }, style: "bald", bubble: "▶", scarf: "#FFF6EC" },
+  };
+  const ROLE_BUBBLE = Object.fromEntries(Object.entries(ROLES).map(([k, v]) => [k, v.bubble]));
+  function roleOf(wk) {
+    if (ROLES[wk.id]) return wk.id;
+    const n = (wk.name || "").toLowerCase();
+    return /script|writ|copy/.test(n) ? "script" : /image|art|design|illustr/.test(n) ? "imagegen" : /voice|audio|podcast|narrat/.test(n) ? "voice"
+      : /edit|video|cut/.test(n) ? "editor" : /thumb|graphic/.test(n) ? "thumb" : /publish|social|market|post/.test(n) ? "publish" : null;
+  }
+  function dressRole(look, role) {
+    const R = ROLES[role]; if (!R) return look;
+    look.role = role; look.build = R.build; look.h = R.build === "kid" ? 0.84 : R.build === "tall" ? 1.12 : 1.02;
+    look.hat = R.hat; look.style = R.style; look.scarf = R.scarf || null; look.acc = null;
+    return look;
+  }
   function randomLook(r) {
     const pick = (a) => a[(r() * a.length) | 0];
     const build = pick(["slim", "slim", "round", "tall", "kid"]);
@@ -208,7 +231,16 @@
     // arms: little nubs that swing, or do the character's thing when idle
     const act0 = act && act.kind;
     const armY = top + 2.2;
+    const role = !moving && look.role;
     const handAt = (side) => {
+      if (role === "thumb") return [side * (wid * 0.7 + 0.8), armY - 7 + Math.sin(t * 2) * 0.4];
+      if (role && side === 1) {
+        if (role === "voice") return [wid * 0.45 + 0.8, top - 1.4 + Math.sin(t * 5) * 0.4];
+        if (role === "publish") return [wid * 0.6 + 1, top - 0.8];
+        if (role === "editor") return [wid * 0.8 + 1, armY - 4];
+        return [wid * 0.5 + 0.6, armY - 2.2]; // script, imagegen: at the chest
+      }
+      if (role && side === -1 && (role === "script" || role === "imagegen")) return [wid * 0.2 + Math.sin(t * (role === "script" ? 9 : 4)) * 0.6, armY - 1.6];
       if (!moving && side === 1 && act0 === "wave") return [wid * 0.9 + 1.2, armY - 5 + Math.sin(t * 12) * 1.2];
       if (!moving && side === 1 && (act0 === "phone" || act0 === "sip")) return [wid * 0.5 + 0.6, armY - 2.4];
       if (!moving && act0 === "stretch") return [side * (wid * 0.8 + 1), armY - 6];
@@ -227,6 +259,16 @@
         else if (look.acc === "balloon") { ctx.strokeStyle = "rgba(60,50,80,0.6)"; ctx.lineWidth = 0.4; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.quadraticCurveTo(hx + 2, hy - 7, hx + 1, hy - 13 + Math.sin(t * 2) * 0.6); ctx.stroke(); ctx.fillStyle = look.accC; ctx.beginPath(); ctx.ellipse(hx + 1, hy - 15.5 + Math.sin(t * 2) * 0.6, 2.2, 2.7, 0, 0, TAU); ctx.fill(); }
       }
     });
+    // role props (idle only; while walking the hat carries the identity)
+    if (role) {
+      const [hx, hy] = handAt(1);
+      if (role === "script") { ctx.fillStyle = "#FFF6EC"; ctx.fillRect(hx - 1.6, hy - 2.6, 2.8, 3.4); ctx.fillStyle = "#C9C0DA"; ctx.fillRect(hx - 1.2, hy - 1.9, 2, 0.35); ctx.fillRect(hx - 1.2, hy - 1.1, 1.6, 0.35); const [px, py] = handAt(-1); ctx.strokeStyle = "#F0C06A"; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + 1.2, py - 1.8); ctx.stroke(); }
+      else if (role === "imagegen") { ctx.fillStyle = "#F7EEDF"; ctx.beginPath(); ctx.ellipse(hx, hy - 0.8, 2.4, 1.6, -0.3, 0, TAU); ctx.fill(); ["#E4826A", "#7CC2CB", "#F0C06A", "#9BC98A"].forEach((c, k) => { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(hx - 1.3 + k * 0.85, hy - 1.1 + (k % 2) * 0.6, 0.38, 0, TAU); ctx.fill(); }); const [px, py] = handAt(-1); ctx.strokeStyle = "#8E6CCB"; ctx.lineWidth = 0.45; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + 0.8, py - 2.4); ctx.stroke(); ctx.fillStyle = "#E4826A"; ctx.beginPath(); ctx.arc(px + 0.8, py - 2.4, 0.4, 0, TAU); ctx.fill(); }
+      else if (role === "voice") { ctx.strokeStyle = "#3E3A52"; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx + 0.4, hy + 1.8); ctx.stroke(); ctx.fillStyle = "#5A4E7A"; ctx.beginPath(); ctx.arc(hx, hy - 0.4, 0.9, 0, TAU); ctx.fill(); }
+      else if (role === "editor") { const open = Math.max(0, Math.sin(t * 3)) * 0.6; ctx.fillStyle = "#3E3A52"; ctx.fillRect(hx - 1.6, hy - 2.6, 3.4, 2.4); ctx.save(); ctx.translate(hx - 1.6, hy - 2.6); ctx.rotate(-open); ctx.fillStyle = "#FFF6EC"; ctx.fillRect(0, -0.9, 3.4, 0.9); ctx.fillStyle = "#3E3A52"; for (let k = 0; k < 3; k++) ctx.fillRect(0.3 + k * 1.1, -0.9, 0.5, 0.9); ctx.restore(); }
+      else if (role === "thumb") { const cy = armY - 11 + Math.sin(t * 2) * 0.4; ctx.fillStyle = "#FFF6EC"; ctx.fillRect(-4.6, cy, 9.2, 5.6); ctx.fillStyle = "#7CC2CB"; ctx.fillRect(-4, cy + 0.6, 8, 4.4); ctx.fillStyle = "#E4826A"; ctx.beginPath(); ctx.moveTo(-1, cy + 1.4); ctx.lineTo(1.8, cy + 2.8); ctx.lineTo(-1, cy + 4.2); ctx.closePath(); ctx.fill(); }
+      else if (role === "publish") { ctx.fillStyle = "#F7EEDF"; ctx.beginPath(); ctx.moveTo(hx, hy - 0.5); ctx.lineTo(hx + 3.6, hy - 2); ctx.lineTo(hx + 3.6, hy + 1.4); ctx.closePath(); ctx.fill(); ctx.fillStyle = "#E4826A"; ctx.fillRect(hx + 3.4, hy - 2, 0.6, 3.4); const w = (t * 2) % 1; ctx.strokeStyle = `rgba(228,130,106,${1 - w})`; ctx.lineWidth = 0.4; ctx.beginPath(); ctx.arc(hx + 4, hy - 0.3, 1.5 + w * 2.5, -0.7, 0.7); ctx.stroke(); }
+    }
     // head
     const hr = look.build === "kid" ? 2.7 : 2.3, hy = top - hr + 0.2 + (act0 === "look" && !moving ? Math.sin(t * 3) * 0.3 : 0);
     ctx.fillStyle = look.skin; ctx.beginPath(); ctx.arc(0, hy, hr, 0, TAU); ctx.fill();
@@ -243,6 +285,10 @@
       const c = look.hat.c; ctx.fillStyle = c;
       if (look.hat.kind === "beanie") { ctx.beginPath(); ctx.arc(0, hy - 0.4, hr + 0.3, Math.PI, 0); ctx.fill(); ctx.beginPath(); ctx.arc(0, hy - hr - 0.9, 0.9, 0, TAU); ctx.fill(); }
       else if (look.hat.kind === "cap") { ctx.beginPath(); ctx.arc(0, hy - 0.4, hr + 0.25, Math.PI, 0); ctx.fill(); ctx.fillRect(front ? 0 : -hr - 1.6, hy - 0.8, hr + 1.6, 0.9); }
+      else if (look.hat.kind === "beret") { ctx.beginPath(); ctx.ellipse(-0.4, hy - hr + 0.2, hr + 0.9, 1.2, -0.18, 0, TAU); ctx.fill(); ctx.fillRect(-0.6, hy - hr - 1.6, 0.6, 0.9); }
+      else if (look.hat.kind === "bucket") { ctx.beginPath(); ctx.arc(0, hy - 0.5, hr + 0.2, Math.PI, 0); ctx.fill(); ctx.beginPath(); ctx.ellipse(0, hy - 0.4, hr + 1.3, 0.7, 0, 0, TAU); ctx.fill(); }
+      else if (look.hat.kind === "visor") { ctx.fillRect(-hr - 0.2, hy - 1.2, hr * 2 + 0.4, 0.8); ctx.beginPath(); ctx.ellipse(front ? hr * 0.7 : -hr * 0.7, hy - 0.8, 1.6, 0.5, 0, 0, TAU); ctx.fill(); }
+      else if (look.hat.kind === "phones") { ctx.strokeStyle = c; ctx.lineWidth = 0.7; ctx.beginPath(); ctx.arc(0, hy, hr + 0.5, Math.PI * 1.05, Math.PI * 1.95); ctx.stroke(); ctx.fillStyle = shade(c, -0.15); ctx.beginPath(); ctx.ellipse(front ? -hr - 0.1 : hr + 0.1, hy + 0.3, 0.8, 1.3, 0, 0, TAU); ctx.fill(); ctx.beginPath(); ctx.ellipse(front ? hr * 0.6 : -hr * 0.6, hy + 0.3, 0.7, 1.2, 0, 0, TAU); ctx.fill(); }
       else if (look.hat.kind === "sun") { ctx.beginPath(); ctx.ellipse(0, hy - 0.9, hr + 2.2, 0.9, 0, 0, TAU); ctx.fill(); ctx.beginPath(); ctx.arc(0, hy - 1, hr * 0.8, Math.PI, 0); ctx.fill(); }
       else { ctx.fillRect(-hr * 0.8, hy - hr - 1.6, hr * 1.6, 2.4); ctx.fillRect(-hr - 0.8, hy - 0.9, hr * 2 + 1.6, 0.8); }
     }

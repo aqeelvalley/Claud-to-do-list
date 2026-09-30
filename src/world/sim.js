@@ -333,7 +333,7 @@
         const base = wk.base || null;
         if (!w) {
           const look = randomLook(rng(hash(wk.id)));
-          look.top = wk.color; look.h = 1.02; look.crew = { flag: wk.color, you: wk.kind === "human" }; look.acc = null; look.scarf = null;
+          look.top = wk.color; look.h = 1.02; look.crew = { flag: wk.color, you: wk.kind === "human" }; look.acc = null; look.scarf = null; dressRole(look, roleOf(wk));
           const tgt = base && doorOf(base);
           const start = tgt || squareNode;
           w = { id: "crew:" + wk.id, look, node: start, a: start.a, b: start.b, speed: 17, phase: 0, wait: tgt ? 0 : 1 + k, name: wk.name, crew: { id: wk.id, role: wk.kind === "human" ? "You" : wk.name, color: wk.color, base, target: tgt, status: tgt ? "working" : "idle", queue: [] } };

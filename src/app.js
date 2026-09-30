@@ -177,6 +177,26 @@
       { x: 650, y: 330 },
       { x: -810, y: -160 },
     ];
+  /* what a fresh island can build on its empty venture sites (ids match the classic buildings) */
+  var BUILDABLE = [
+    { id: "youtube", label: "Studio", kind: "film", blurb: "Video, content and creative work", name: "Studio", sub: "Film studio", color: "#E0474C", crew: "studio" },
+    { id: "freelance", label: "Office", kind: "drafting", blurb: "Freelance, consulting and services", name: "Freelance", sub: "Drafting studio", color: "#7E6BC4" },
+    { id: "bynode", label: "Workshop", kind: "maker", blurb: "Making and selling products", name: "Workshop", sub: "Maker space", color: "#2A9D8F" },
+    { id: "wood", label: "Mill", kind: "mill", blurb: "Crafts, trades and hands-on work", name: "Woodworking", sub: "Timber mill", color: "#B5773A" },
+    { id: "coffee", label: "Café", kind: "cafe", blurb: "Shop, café or retail", name: "Caf\xE9", sub: "Seaside caf\xE9", color: "#D9734E" },
+    { id: "fitness", label: "Gym", kind: "gym", blurb: "Workouts, weights and daily habits", name: "Fitness", sub: "Gym & track", color: "#F08A4B" },
+    { id: "goals", label: "Lighthouse", kind: "lighthouse", blurb: "Goals and the money treasury", name: "Goals", sub: "Lighthouse \xB7 treasury", color: "#E9B949" },
+    { id: "marina", label: "Marina", kind: "port", blurb: "Side-business leads dock here by boat", name: "Marina", sub: "Leads & orders", color: "#2A9D8F" },
+    { id: "epcm", label: "Day-job HQ", kind: "refinery", blurb: "Your job: HQ, plus the work island's logistics hub and tender port", name: "Day job", sub: "Work island", color: "#3E7CB1" },
+  ];
+  var STUDIO_CREW = [
+    { id: "script", name: "Scriptwriter", kind: "role", color: "#3E9B6B" },
+    { id: "imagegen", name: "Image Gen", kind: "role", color: "#C04FB0" },
+    { id: "voice", name: "Voiceover", kind: "role", color: "#7E6BC4" },
+    { id: "editor", name: "Editor", kind: "role", color: "#E0A526" },
+    { id: "thumb", name: "Thumbnail", kind: "role", color: "#1F8FA3" },
+    { id: "publish", name: "Publisher", kind: "role", color: "#D9734E" },
+  ];
   function Us(e) {
     if (e < ys.length) return { ...ys[e], r: 190 };
     let t = e - ys.length,
@@ -7985,6 +8005,55 @@
       ),
     );
   }
+  /* ---- fresh start: welcome + build dialogs ---- */
+  function WelcomeDlg({ onStart: e, sandbox: sb, onExit: x }) {
+    let [f, setF] = React.useState({ owner: "", islandName: "", mode: "fresh" }),
+      ok = f.owner.trim().length > 0,
+      go = () => ok && e({ ...f, owner: f.owner.trim(), islandName: f.islandName.trim() || f.owner.trim() + "\u2019s Isle" }),
+      opt = (id, title, text) =>
+        React.createElement("button", { type: "button", className: "start-opt" + (f.mode === id ? " on" : ""), "aria-pressed": f.mode === id, onClick: () => setF({ ...f, mode: id }) },
+          React.createElement("b", null, title), React.createElement("span", null, text));
+    return React.createElement("div", { className: "modal-back welcome-back" },
+      React.createElement("div", { className: "hud-card modal-card welcome-card", role: "dialog", "aria-label": "Welcome to Valley Isle" },
+        React.createElement("div", { className: "welcome-emblem" }, React.createElement(qn, null)),
+        React.createElement("h2", { className: "welcome-title" }, "Welcome to your island"),
+        React.createElement("p", { className: "welcome-sub" }, "Every part of your life gets a building. Finish tasks and the island grows with you."),
+        React.createElement("div", { className: "grid gap-3" },
+          React.createElement(Y, { label: "What should we call you?" },
+            React.createElement("input", { className: "inp", autoFocus: !0, value: f.owner, placeholder: "Your name", onChange: (a) => setF({ ...f, owner: a.target.value }), onKeyDown: (a) => a.key === "Enter" && go() })),
+          React.createElement(Y, { label: "Name your island" },
+            React.createElement("input", { className: "inp", value: f.islandName, placeholder: f.owner.trim() ? f.owner.trim() + "\u2019s Isle" : "e.g. Valley Isle", onChange: (a) => setF({ ...f, islandName: a.target.value }), onKeyDown: (a) => a.key === "Enter" && go() })),
+          React.createElement("div", { className: "start-opts" },
+            opt("fresh", "Start with just my home", "Your cottage stands on the island. Tap an empty plot to build each part of your life when you need it."),
+            opt("classic", "Explore the sample island", "Everything already built: studio, workshop, caf\xE9, gym, the work island and a crew."))),
+        React.createElement("div", { className: "welcome-foot" },
+          sb && React.createElement(Q, { variant: "ghost", onClick: x }, "Leave sandbox"),
+          React.createElement(Q, { variant: "gold", disabled: !ok, onClick: go }, "Raise my island"))));
+  }
+  function BuildDlg({ id: e, onClose: t, onBuild: s }) {
+    let b = BUILDABLE.find((a) => a.id === e) || BUILDABLE[0],
+      [f, setF] = React.useState({ name: b.name, sub: b.sub, color: b.color, crew: !!b.crew }),
+      ok = f.name.trim().length > 0;
+    return React.createElement(cs, {
+        title: "Build " + (/^[aeiou]/i.test(b.label) ? "an " : "a ") + b.label,
+        color: f.color,
+        onClose: t,
+        footer: React.createElement(React.Fragment, null,
+          React.createElement(Q, { variant: "ghost", onClick: t }, "Not yet"),
+          React.createElement(Q, { variant: "gold", disabled: !ok, onClick: () => ok && s(e, { ...f, name: f.name.trim(), sub: f.sub.trim() || b.sub }) }, React.createElement(Ls, { size: 16 }), "Build it")),
+      },
+      React.createElement("div", { className: "build-hero" },
+        React.createElement("p", null, b.blurb, ". ", "It gets its own room inside, levels up as you finish its tasks, and your crew can be sent to work there.")),
+      React.createElement("div", { className: "grid grid-cols-2 gap-3" },
+        React.createElement(Y, { label: "Name" }, React.createElement("input", { className: "inp", autoFocus: !0, value: f.name, onChange: (a) => setF({ ...f, name: a.target.value }) })),
+        React.createElement(Y, { label: "Short description" }, React.createElement("input", { className: "inp", value: f.sub, onChange: (a) => setF({ ...f, sub: a.target.value }) })),
+        React.createElement(Y, { label: "Colour", className: "col-span-2" },
+          React.createElement("div", { className: "flex flex-wrap gap-2" },
+            gs.map((c) => React.createElement("button", { key: c, type: "button", className: "swatch" + (f.color === c ? " on" : ""), style: { background: c }, onClick: () => setF({ ...f, color: c }), "aria-label": "Colour " + c, "aria-pressed": f.color === c })))),
+        b.crew && React.createElement("label", { className: "col-span-2 crew-opt" },
+          React.createElement("input", { type: "checkbox", checked: f.crew, onChange: (a) => setF({ ...f, crew: a.target.checked }) }),
+          React.createElement("span", null, React.createElement("b", null, "Hire the studio crew"), " \xB7 Scriptwriter, Image Gen, Voiceover, Editor, Thumbnail and Publisher, each with their own look."))));
+  }
   var {
     useState: He,
     useEffect: at,
@@ -7993,7 +8062,10 @@
     useCallback: ds,
   } = React;
   function jo() {
-    let [e, t] = He({ db: void 0, live: !1 });
+    let [e, t] = He({ db: void 0, live: !1 }),
+      [sb, setSb] = He(null); // sandbox: an empty, unsaved island to try the new-player start
+    let out = sb ? { db: sb, live: !1, sandbox: !0 } : { ...e, sandbox: !1 };
+    out.setSandbox = (on) => setSb(on ? an(null) : null);
     return (
       at(() => {
         let s = !0;
@@ -8020,7 +8092,7 @@
           }
         );
       }, []),
-      e
+      out
     );
   }
   function Ht(e, t) {
@@ -8136,9 +8208,10 @@
     onToggle: i,
     onHabits: l,
     onEdit: d,
+    noHabits: nh,
   }) {
-    let p = s.filter((c) => c.status === "done").length + (n ? 1 : 0),
-      u = s.length + 1;
+    let p = s.filter((c) => c.status === "done").length + (n && !nh ? 1 : 0),
+      u = s.length + (nh ? 0 : 1);
     return React.createElement(
       "section",
       {
@@ -8207,7 +8280,8 @@
               ),
             );
           }),
-          React.createElement(
+          nh && !s.length && React.createElement("div", { className: "quest-empty" }, "Nothing due today. Tap an empty plot to build something new."),
+          !nh && React.createElement(
             "div",
             { className: "quest" + (n ? " done" : "") },
             React.createElement(
@@ -8243,7 +8317,8 @@
     );
   }
   function Ho() {
-    let { db: e, live: t } = jo(),
+    let { db: e, live: t, sandbox: sandbox, setSandbox: setSandbox } = jo(),
+      isl = St(e, "settings/island"),
       s = Ht(e, "tasks"),
       n = Ht(e, "workers"),
       o = Ht(e, "leads"),
@@ -8255,7 +8330,7 @@
       c = St(e, "fitness/habits"),
       r = St(e, "stats/activity"),
       y = St(e, "stats/treasury"),
-      k = s !== null && n !== null && o !== null && i !== null,
+      k = s !== null && n !== null && o !== null && i !== null && isl !== void 0,
       [f, w] = He(!1),
       [v, $] = He(null),
       [E, M] = He(null),
@@ -8285,6 +8360,12 @@
         return () => clearTimeout(a);
       }, []));
     let xe = s || [],
+      // "classic": the full sample island. "fresh": only what the player has built.
+      // No settings yet: an island with any data stays classic; an empty one starts onboarding.
+      hasData = !!((s && s.length) || (n && n.length) || (o && o.length) || (i && i.length) || (l && l.length)),
+      islMode = isl ? isl.mode : sandbox || (t && !hasData) ? "new" : "classic",
+      fresh = islMode !== "classic",
+      built = (isl && isl.built) || {},
       C = o || [],
       G = [...(l || [])].sort(
         (a, g) => (a.createdAt || 0) - (g.createdAt || 0),
@@ -8295,8 +8376,10 @@
             ? [...n].sort((a, g) =>
                 a.kind === g.kind ? 0 : a.kind === "human" ? -1 : 1,
               )
-            : ks,
-        [n],
+            : fresh
+              ? [{ id: "me", name: (isl && isl.owner) || "You", kind: "human", color: "#2A9D8F" }]
+              : ks,
+        [n, fresh, isl && isl.owner],
       ),
       Qe = _t(() => Object.fromEntries(Ce.map((a) => [a.id, a])), [Ce]),
       pe = _t(
@@ -8306,9 +8389,11 @@
             .map((a) => ({ ...a })),
         [i],
       ),
+      QsL = fresh ? Qs.filter((a) => a.id === "personal" || built[a.id]).map((a) => ({ ...a, ...(built[a.id] || {}) })) : Qs,
+      hiddenL = fresh ? BUILDABLE.map((b) => b.id).filter((id) => !built[id]) : [],
       Ge = _t(
-        () => [...Qs, ...pe.map((a) => ({ ...a, plot: Us(a.slot) }))],
-        [pe],
+        () => [...QsL, ...pe.map((a) => ({ ...a, plot: Us(a.slot) }))],
+        [pe, QsL.map((a) => a.id + a.name + a.color).join("|")],
       ),
       te = _t(() => Object.fromEntries(Ge.map((a) => [a.id, a])), [Ge]),
       ue = Be(),
@@ -8337,15 +8422,15 @@
       (a, g) => a + wt.filter((F) => g && g[F.id]).length,
       0,
     );
-    ((se.fitness += Z.length * 15 + _.length * 5 + ke * 3),
-      (se.goals += G.filter((a) => a.progress >= 100).length * 40));
+    (se.fitness != null && (se.fitness += Z.length * 15 + _.length * 5 + ke * 3),
+      se.goals != null && (se.goals += G.filter((a) => a.progress >= 100).length * 40));
     let Ee = C.filter((a) => a.stage === "won").length,
       be = Object.fromEntries(Object.entries(se).map(([a, g]) => [a, ws(g)])),
       Oe = H >= 0.66 ? 3 : H >= 0.33 ? 2 : 1,
       je = ws(Object.values(se).reduce((a, g) => a + g, 0) + Ee * 40, 60),
       townL = _t(
-        () => World.buildTown({ sections: pe, islandLevel: je.level }),
-        [pe.map((a) => [a.id, a.slot, a.kind, a.color, a.name].join(":")).join("|"), je.level],
+        () => World.buildTown({ sections: pe, islandLevel: je.level, hidden: hiddenL }),
+        [pe.map((a) => [a.id, a.slot, a.kind, a.color, a.name].join(":")).join("|"), je.level, hiddenL.join(",")],
       ),
       { streak: Ve, activeToday: Xe } = sn(r == null ? void 0 : r.days),
       Ye = nn(xe, ue),
@@ -8416,7 +8501,7 @@
       },
       Tt = q.some((a) => a.deadline && I(a.deadline) && xt(a.deadline) >= 0),
       It = Ke.some((a) => a.deadline && I(a.deadline) && xt(a.deadline) >= 0);
-    (Me.push({
+    (townL.plots.hub && Me.push({
       id: "hub",
       kind: "hub",
       name: Se.hub.name,
@@ -8431,7 +8516,7 @@
       data: lt,
       sig: JSON.stringify(["hub", lt, Tt]),
     }),
-      Me.push({
+      townL.plots.port && Me.push({
         id: "port",
         kind: "port",
         name: Se.port.name,
@@ -8446,11 +8531,11 @@
         data: gt,
         sig: JSON.stringify(["port", gt, It]),
       }),
-      Me.push({
+      townL.plots.marina && (!fresh || built.marina) && Me.push({
         id: "marina",
         kind: "port",
-        name: "Marina",
-        color: "#2A9D8F",
+        name: (built.marina && built.marina.name) || "Marina",
+        color: (built.marina && built.marina.color) || "#2A9D8F",
         x: townL.plots.marina.sx,
         y: townL.plots.marina.sy,
         tier: 1,
@@ -8463,6 +8548,11 @@
       }),
       Me.forEach((a) => {
         a.id === "port" && (a.name = "Tender Port", a.level = Ke.filter((g) => g.type === "tender").length);
+      }),
+      // empty venture sites on a fresh island
+      hiddenL.forEach((id) => {
+        let o = townL.plots["build:" + id], b = BUILDABLE.find((x) => x.id === id);
+        o && b && Me.push({ id: "build:" + id, kind: "build", name: b.label, color: "#B4ABCB", x: o.sx, y: o.sy, tier: 1, level: "+", open: 0, alert: !1, crew: [], data: null, sig: "build:" + id });
       }));
     let
       Ps = Object.fromEntries(Me.map((a) => [a.id, a])),
@@ -8693,7 +8783,7 @@
       },
       Hn = async (a) => {
         if (!n || !n.length)
-          for (let S of ks)
+          for (let S of fresh ? Ce.slice(0, 1) : ks)
             await U("workers/" + S.id, () =>
               e.collection("workers").doc(S.id).set(S),
             );
@@ -8745,6 +8835,24 @@
               createdAt: Date.now(),
             }),
         );
+      },
+      onboard = (a) => {
+        let me = { id: "me", name: a.owner, kind: "human", color: "#2A9D8F" };
+        U("settings/island", () => e.doc("settings/island").set({ mode: a.mode, owner: a.owner, islandName: a.islandName, built: {}, createdAt: Date.now() }));
+        (a.mode === "classic" ? ks.map((w) => (w.id === "me" ? me : w)) : [me]).forEach((w) =>
+          U("workers/" + w.id, () => e.collection("workers").doc(w.id).set(w)));
+        Re(a.mode === "classic" ? "Welcome to the sample island, " + a.owner + "." : "Welcome home, " + a.owner + ". Tap an empty plot to build.", "gold");
+      },
+      buildVenture = (id, a) => {
+        let next = { ...built, [id]: { name: a.name, sub: a.sub, color: a.color } };
+        (M(null), Fe.level && Fe.level());
+        U("settings/island", () => e.doc("settings/island").set({ ...(isl || { mode: "fresh" }), mode: "fresh", built: next }));
+        if (a.crew) {
+          let have = new Set((n || []).map((w) => w.id));
+          [...(have.has("me") ? [] : [Ce[0] || { id: "me", name: "You", kind: "human", color: "#2A9D8F" }]), ...STUDIO_CREW.filter((w) => !have.has(w.id))].forEach((w) =>
+            U("workers/" + w.id, () => e.collection("workers").doc(w.id).set(w)));
+        }
+        Re(a.name + " is built!" + (a.crew ? " The studio crew is on the square." : ""), "gold");
       },
       Kn = (a) => {
         let g = xe.filter((F) => F.venture === a.id);
@@ -8913,6 +9021,10 @@
           },
         }),
       Ie = (a) => {
+        if (fresh) {
+          let need = a.type === "fitness" && !built.fitness ? "fitness" : a.type === "goals" && !built.goals ? "goals" : a.type === "port" && !a.via && !built.epcm && !built.marina ? "marina" : null;
+          if (need) return (Fe.tap(), $(null), M({ type: "build", id: need }));
+        }
         ($(a), Fe.tap(), ne(!1));
         let g =
           a.type === "section"
@@ -8934,6 +9046,7 @@
         );
       },
       lo = ds((a) => {
+        if (typeof a === "string" && a.startsWith("build:")) return (Fe.tap(), M({ type: "build", id: a.slice(6) }));
         Ie(
           a === "port" || a === "hub" || a === "marina"
             ? { type: "port", via: a }
@@ -9015,6 +9128,7 @@
     at(() => {
       if (!k || Xs.current) return;
       Xs.current = !0;
+      if (islMode === "new") return; // the welcome dialog does the greeting
       let a = Qe.me,
         g = Ye.filter((F) => F.status !== "done").length;
       setTimeout(
@@ -9083,7 +9197,9 @@
         lightMode: lightMode,
         paused: !!v,
         onPlot: (a) => {
-          a.free
+          a.build
+            ? M({ type: "build", id: a.build })
+            : a.free
             ? M({ type: "section" })
             : (Fe.tap(),
               Re(
@@ -9129,7 +9245,7 @@
             React.createElement(
               "div",
               { className: "crest-title" },
-              "Valley Isle",
+              (fresh && isl && isl.islandName) || "Valley Isle",
             ),
             React.createElement(
               "div",
@@ -9246,8 +9362,9 @@
       !t &&
         React.createElement(
           "div",
-          { className: "banner" },
-          "Preview mode \xB7 changes here aren't saved",
+          { className: "banner" + (sandbox ? " sandbox" : "") },
+          sandbox ? "Sandbox \xB7 a new player's island, nothing is saved " : "Preview mode \xB7 changes here aren't saved",
+          sandbox && React.createElement("button", { type: "button", className: "banner-btn", onClick: () => (R([]), setSandbox(!1)) }, "Back to my island"),
         ),
       f &&
         React.createElement(
@@ -9267,6 +9384,7 @@
           onToggle: Wt.onToggle,
           onEdit: Wt.onEdit,
           onHabits: () => Ie({ type: "fitness", tab: "habits" }),
+          noHabits: fresh && !built.fitness,
         }),
       ),
       React.createElement(
@@ -9339,6 +9457,18 @@
           N
             ? React.createElement(kn, { size: 18 })
             : React.createElement(vn, { size: 18 }),
+        ),
+        React.createElement(
+          Pe,
+          {
+            label: sandbox ? "Leave the new-player sandbox" : "Try a new player's start (sandbox, nothing saved)",
+            className: "map-btn" + (sandbox ? " on" : ""),
+            onClick: () => (Fe.tap(), $(null), M(null), R([]), setSandbox(!sandbox)),
+          },
+          React.createElement("svg", { width: 18, height: 18, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" },
+            React.createElement("path", { d: "M12 21v-8" }),
+            React.createElement("path", { d: "M12 13c0-4 3-6 7-6 0 4-3 6-7 6z" }),
+            React.createElement("path", { d: "M12 15c0-3-2.5-5-6-5 0 3 2.5 5 6 5z" })),
         ),
       ),
       React.createElement(
@@ -9551,6 +9681,10 @@
         }),
       (E == null ? void 0 : E.type) === "section" &&
         React.createElement(Pn, { onClose: () => M(null), onCreate: Yn }),
+      (E == null ? void 0 : E.type) === "build" &&
+        React.createElement(BuildDlg, { key: E.id, id: E.id, onClose: () => M(null), onBuild: buildVenture }),
+      islMode === "new" &&
+        React.createElement(WelcomeDlg, { onStart: onboard, sandbox: sandbox, onExit: () => setSandbox(!1) }),
       (E == null ? void 0 : E.type) === "confirm" &&
         React.createElement(Dn, {
           text: E.text,

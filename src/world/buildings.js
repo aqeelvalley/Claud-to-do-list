@@ -97,6 +97,23 @@
     pn.box(s.x, s.y, s.z, s.w, s.d, s.h, "#FFF8EC");
     pn.sign(s, "L", 0.5, 0.5, "FOR SALE", "#2A9D8F", "#FFF", 5.5, false);
   };
+  // an empty venture site on a fresh island: pegged-out plot, string line, a sign and a flag
+  B.buildlot = (pn, o) => {
+    const hw = o.w / 2 - 8, hd = o.d / 2 - 8;
+    pn.poly([[-hw, -hd, 0.3], [hw, -hd, 0.3], [hw, hd, 0.3], [-hw, hd, 0.3]], "#E9E0EE");
+    pn.poly([[-hw + 5, -hd + 5, 0.4], [hw - 5, -hd + 5, 0.4], [hw - 5, hd - 5, 0.4], [-hw + 5, hd - 5, 0.4]], "#F4EEF4");
+    const c = [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]];
+    c.forEach(([x, y], k) => { const [x2, y2] = c[(k + 1) % 4]; pn.line([x, y, 5], [x2, y2, 5], "#E4826A", 0.7); });
+    c.forEach(([x, y]) => pn.box(x, y, 0, 2.4, 2.4, 7, "#F7EEDF"));
+    // sign facing the street
+    const f = o.face || "+b", along = f === "+a" || f === "-a";
+    const sx = f === "+a" ? hw - 6 : f === "-a" ? -hw + 6 : 0, sy = f === "+b" ? hd - 6 : f === "-b" ? -hd + 6 : 0;
+    if (along) { pn.box(sx, sy - 9, 0, 1.4, 1.4, 12, "#8E86A8"); pn.box(sx, sy + 9, 0, 1.4, 1.4, 12, "#8E86A8"); pn.box(sx, sy, 10, 2, 30, 13, "#FFF6EC"); pn.sign({ x: sx, y: sy, z: 10, w: 2, d: 30, h: 13 }, "R", 0.5, 0.5, "+ BUILD", "#E4826A", "#FFF", 5.5, false); }
+    else { pn.box(sx - 9, sy, 0, 1.4, 1.4, 12, "#8E86A8"); pn.box(sx + 9, sy, 0, 1.4, 1.4, 12, "#8E86A8"); pn.box(sx, sy, 10, 30, 2, 13, "#FFF6EC"); pn.sign({ x: sx, y: sy, z: 10, w: 30, d: 2, h: 13 }, "L", 0.5, 0.5, "+ BUILD", "#E4826A", "#FFF", 5.5, false); }
+    // surveyor's flag in the middle
+    pn.line([0, 0, 0], [0, 0, 24], "#5A4E7A", 0.8);
+    pn.poly([[0, 0, 24], [0, 0, 17], [-8, 8, 20.5]], "#F0C06A");
+  };
   B.construction = (pn, o) => {
     const w = o.w - 30, d = o.d - 30;
     pn.poly([[-o.w / 2 + 4, -o.d / 2 + 4, 0.2], [o.w / 2 - 4, -o.d / 2 + 4, 0.2], [o.w / 2 - 4, o.d / 2 - 4, 0.2], [-o.w / 2 + 4, o.d / 2 - 4, 0.2]], "#C8A374", "#A9854F", 1);

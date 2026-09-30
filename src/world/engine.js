@@ -200,7 +200,7 @@
     // building & tree shadows (sun from the upper left)
     ctx.fillStyle = "rgba(40,50,70,0.16)";
     T.objs.forEach((o) => {
-      if (o.kind !== "building" || !o.H || o.drawer === "forsale") return;
+      if (o.kind !== "building" || !o.H || o.drawer === "forsale" || o.drawer === "buildlot") return;
       const hw = (o.w - 20) / 2, hd = (o.d - 20) / 2, len = Math.min(90, (o.H || 40) * 0.42);
       const pts = [[o.a - hw, o.b - hd], [o.a + hw + len, o.b - hd - len * 0.2], [o.a + hw + len, o.b + hd - len * 0.2], [o.a + hw, o.b + hd], [o.a - hw, o.b + hd]];
       pn.path(pts.map((p) => [p[0], p[1], 0.5])); ctx.fill();

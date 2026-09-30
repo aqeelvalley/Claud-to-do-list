@@ -2665,3 +2665,26 @@ select.inp {
 .flame-in { animation: flame 0.4s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: center bottom; }
 .beam-spin { animation: beamSpin 6s linear infinite; transform-box: view-box; }
 @keyframes beamSpin { 0% { transform: scaleX(1); opacity: 0.9; } 50% { transform: scaleX(-1); opacity: 0.5; } 100% { transform: scaleX(1); opacity: 0.9; } }
+
+/* ---- fresh start ---- */
+.welcome-back { z-index: 60; background: rgba(70, 61, 99, 0.28); }
+.welcome-card { max-width: 460px; padding: 26px 24px 20px; text-align: left; }
+.welcome-emblem { width: 56px; height: 56px; margin: 0 auto 8px; }
+.welcome-emblem svg { width: 56px; height: 56px; }
+.welcome-title { font: 700 22px Fredoka, sans-serif; color: var(--ink); text-align: center; margin: 0; }
+.welcome-sub { font-size: 14px; color: var(--ink2); text-align: center; margin: 6px 0 18px; }
+.start-opts { display: grid; gap: 8px; margin-top: 4px; }
+.start-opt { display: grid; gap: 2px; text-align: left; padding: 11px 14px; border-radius: 14px; border: 1.5px solid var(--line); background: var(--paper); color: var(--ink2); font-size: 12.5px; line-height: 1.35; cursor: pointer; }
+.start-opt b { font: 600 14.5px Fredoka, sans-serif; color: var(--ink); }
+.start-opt.on { border-color: var(--terra); background: #fdefe9; }
+.start-opt:focus-visible { outline: 2px solid var(--terra); outline-offset: 2px; }
+.welcome-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.build-hero { display: flex; gap: 12px; align-items: center; margin-bottom: 14px; color: var(--ink2); font-size: 13.5px; line-height: 1.4; }
+.build-hero p { margin: 0; }
+.crew-opt { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 12px; background: var(--paper2); font-size: 12.5px; color: var(--ink2); line-height: 1.4; cursor: pointer; }
+.crew-opt b { color: var(--ink); }
+.crew-opt input { margin-top: 2px; accent-color: var(--terra); width: 16px; height: 16px; flex: none; }
+.banner.sandbox { pointer-events: auto; background: #efe9f6; border-color: #c9bfdc; display: flex; align-items: center; gap: 8px; }
+.banner-btn { font: 600 12px Fredoka, sans-serif; color: #fff; background: var(--terra); border: 0; border-radius: 999px; padding: 3px 10px; cursor: pointer; }
+@media (max-width: 767px) { .banner.sandbox { font-size: 11.5px; white-space: normal; width: calc(100vw - 32px); justify-content: center; } }
+.quest-empty { font-size: 12.5px; color: var(--ink2); padding: 8px 4px 4px; line-height: 1.4; }

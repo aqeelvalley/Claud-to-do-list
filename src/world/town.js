@@ -118,7 +118,10 @@
     return pts;
   }
 
-  function buildTown({ sections = [], islandLevel = 1 }) {
+  /* fresh islands: a venture site nobody has built yet shows an empty, tappable lot */
+  const BUILD_LABEL = { youtube: "Studio", freelance: "Office", bynode: "Workshop", wood: "Mill", coffee: "Café", fitness: "Gym", goals: "Lighthouse", marina: "Marina", epcm: "Day-job HQ" };
+  function buildTown({ sections = [], islandLevel = 1, hidden = [] }) {
+    const HID = new Set(hidden);
     const roads = [], blocks = [], objs = [], plots = {}, lamps = [], docks = { marina: [], port: [] };
     const coasts = [], piers = [], paths = [];
     const nodes = new Map(), edges = [];
@@ -259,6 +262,13 @@
       if (!spec.noDoor) o.door = { a: a + off[0], b: b + off[1] };
       return o;
     };
+    // a landmark venue, or its empty build lot when the player hasn't built it yet
+    const site = (id, k, lot, spec) => {
+      if (!HID.has(id)) return (plots[id] = building(k, lot, spec));
+      const o = building(k, lot, { id: "build:" + id, drawer: "buildlot", label: BUILD_LABEL[id] || "Build", landmark: "build:" + id, H: 36, pad: spec.pad ?? 16, face: spec.face, noDoor: true });
+      plots["build:" + id] = o;
+      return o;
+    };
     const sectionBy = {};
     sections.forEach((s) => (sectionBy[s.slot] = s));
     const firstFreeSlot = () => { for (let s = 0; s < SECTION_LOTS.length; s++) if (!sectionBy[s]) return s; return -1; };
@@ -373,27 +383,27 @@
         scatter(Q[2], 4, null, ["tree", "pine"], 7); scatter(Q[3], 3, null, ["tree"], 8);
         filler(k, Q[1], "house", 1);
       } else if (t === "freelance") {
-        plots.freelance = building(k, { a0: I.a0, a1: I.a1, b0: I.b0, b1: mb + 10 }, { drawer: "drafting", id: "freelance", landmark: "freelance", H: 110, pad: 22, face: "+b" });
+        site("freelance", k, { a0: I.a0, a1: I.a1, b0: I.b0, b1: mb + 10 }, { drawer: "drafting", id: "freelance", landmark: "freelance", H: 110, pad: 22, face: "+b" });
         filler(k, Q[2], "shop", 2); put({ kind: "ground-garden", ...Q[3] }); scatter(Q[3], 4, null, ["tree"], 11);
       } else if (t === "studio") {
-        plots.youtube = building(k, { a0: I.a0, a1: I.a1, b0: I.b0, b1: mb + 10 }, { drawer: "film", id: "youtube", landmark: "youtube", H: 110, pad: 20, face: "+b" });
+        site("youtube", k, { a0: I.a0, a1: I.a1, b0: I.b0, b1: mb + 10 }, { drawer: "film", id: "youtube", landmark: "youtube", H: 110, pad: 20, face: "+b" });
         filler(k, Q[2], "house", 2); filler(k, Q[3], "house", 3);
       } else if (t === "maker") {
-        plots.bynode = building(k, { a0: I.a0, a1: I.a1, b0: I.b0, b1: mb + 20 }, { drawer: "maker", id: "bynode", landmark: "bynode", H: 100, pad: 22, face: "+b" });
+        site("bynode", k, { a0: I.a0, a1: I.a1, b0: I.b0, b1: mb + 20 }, { drawer: "maker", id: "bynode", landmark: "bynode", H: 100, pad: 22, face: "+b" });
         filler(k, Q[2], "shop", 2); put({ kind: "ground-garden", ...Q[3] }); scatter(Q[3], 3, null, ["tree", "pine"], 13);
       } else if (t === "cafe") {
-        plots.coffee = building(k, Q[3], { drawer: "cafe", id: "coffee", landmark: "coffee", H: 80, pad: 22, face: "+b" });
-        [[Q[3].a0 + 14, Q[3].b1 + 2], [Q[3].a0 + 44, Q[3].b1 + 2]].forEach(([a, b]) => put({ kind: "prop", p: "umbrella", a, b, c: "#D9734E" }));
+        site("coffee", k, Q[3], { drawer: "cafe", id: "coffee", landmark: "coffee", H: 80, pad: 22, face: "+b" });
+        if (!HID.has("coffee")) [[Q[3].a0 + 14, Q[3].b1 + 2], [Q[3].a0 + 44, Q[3].b1 + 2]].forEach(([a, b]) => put({ kind: "prop", p: "umbrella", a, b, c: "#D9734E" }));
         filler(k, Q[0], "shop", 0); filler(k, Q[1], "apartment", 1); put({ kind: "ground-garden", ...Q[2] }); scatter(Q[2], 3, null, ["tree"], 17);
       } else if (t === "mill") {
-        plots.wood = building(k, { a0: I.a0, a1: I.a1, b0: mb - 20, b1: I.b1 }, { drawer: "mill", id: "wood", landmark: "wood", H: 100, pad: 16, face: "+b" });
+        site("wood", k, { a0: I.a0, a1: I.a1, b0: mb - 20, b1: I.b1 }, { drawer: "mill", id: "wood", landmark: "wood", H: 100, pad: 16, face: "+b" });
         filler(k, Q[0], "house", 0); put({ kind: "ground-garden", ...Q[1] }); scatter(Q[1], 4, null, ["pine", "tree"], 19);
       } else if (t === "gym") {
-        plots.fitness = building(k, { a0: I.a0, a1: I.a1, b0: I.b0, b1: I.b0 + 90 }, { drawer: "gym", id: "fitness", landmark: "fitness", H: 80, pad: 14, face: "+b" });
+        site("fitness", k, { a0: I.a0, a1: I.a1, b0: I.b0, b1: I.b0 + 90 }, { drawer: "gym", id: "fitness", landmark: "fitness", H: 80, pad: 14, face: "+b" });
         put({ kind: "ground-track", a0: I.a0, a1: I.a1, b0: I.b0 + 100, b1: I.b1 });
         k.track = { a0: I.a0, a1: I.a1, b0: I.b0 + 100, b1: I.b1 };
       } else if (t === "marina") {
-        plots.marina = building(k, Q[2], { drawer: "marinaOffice", id: "marina", landmark: "marina", H: 70, pad: 16, face: "+b" });
+        site("marina", k, Q[2], { drawer: "marinaOffice", id: "marina", landmark: "marina", H: 70, pad: 16, face: "+b" });
         filler(k, Q[0], "shop", 0); filler(k, Q[1], "shop", 1);
         put({ kind: "ground-square", ...Q[3] });
         put({ kind: "prop", p: "umbrella", a: Q[3].a0 + 30, b: Q[3].b0 + 40, c: "#2A9D8F" });
@@ -401,14 +411,16 @@
       } else if (t.startsWith("cs:")) {
         construction(k, whole, t.slice(3));
       } else if (t === "epcmHQ") {
-        plots.epcm = building(k, { a0: I.a0, a1: I.a1 - 70, b0: I.b0, b1: I.b1 - 120 }, { drawer: "epcmHQ", id: "epcm", landmark: "epcm", H: 170, pad: 12, face: "+b" });
+        site("epcm", k, { a0: I.a0, a1: I.a1 - 70, b0: I.b0, b1: I.b1 - 120 }, { drawer: "epcmHQ", id: "epcm", landmark: "epcm", H: 170, pad: 12, face: "+b" });
         put({ kind: "ground-parking", a0: I.a0, a1: I.a1, b0: I.b1 - 100, b1: I.b1 - 10 });
         for (let s = 0; s < 7; s++) put({ kind: "parked", a: I.a0 + 25 + s * 38, b: I.b1 - 55, yaw: Math.PI / 2, vk: s % 3 ? "hatch" : "bakkie", c: ["#F6EDDF", "#44545A", "#3E7CB1", "#D9534F"][s % 4] });
         scatter({ a0: I.a1 - 60, a1: I.a1, b0: I.b0, b1: I.b1 - 120 }, 4, null, ["pine"], 23);
       } else if (t === "refinery") {
-        building(k, whole, { drawer: "refinery", id: "epcmPlant", landmark: "epcm", H: 190, pad: 6, noDoor: true });
+        if (HID.has("epcm")) { put({ kind: "ground-garden", ...whole }); scatter(whole, 14, null, ["tree", "pine"], 31); }
+        else building(k, whole, { drawer: "refinery", id: "epcmPlant", landmark: "epcm", H: 190, pad: 6, noDoor: true });
       } else if (t === "hub") {
-        plots.hub = building(k, { a0: I.a0, a1: I.a1, b0: I.b0, b1: I.b0 + 170 }, { drawer: "hubWarehouse", id: "hub", landmark: "hub", H: 90, pad: 12, face: "+b" });
+        if (!HID.has("epcm")) plots.hub = building(k, { a0: I.a0, a1: I.a1, b0: I.b0, b1: I.b0 + 170 }, { drawer: "hubWarehouse", id: "hub", landmark: "hub", H: 90, pad: 12, face: "+b" });
+        else scatter({ a0: I.a0, a1: I.a1, b0: I.b0, b1: I.b0 + 170 }, 8, null, ["tree"], 37);
         put({ kind: "ground-yard", a0: I.a0, a1: I.a1, b0: I.b0 + 180, b1: I.b1 });
         scatter({ a0: I.a0, a1: I.a0 + 60, b0: I.b0 + 190, b1: I.b1 }, 4, null, ["tree"], 29);
       } else if (t === "portyard") {
@@ -420,8 +432,9 @@
     };
     blocks.forEach((k) => (k.zones ? k.zones.forEach((z) => fillBlock(z)) : fillBlock(k)));
     // Tender Port on the quay and the lighthouse on the breakwater tip
-    plots.port = put({ id: "port", kind: "building", drawer: "portCranes", landmark: "port", a: 2250, b: quayB - 34, w: 300, d: 40, H: 130, face: "+b", noDoor: true });
-    plots.goals = put({ id: "goals", kind: "building", drawer: "lighthouse", landmark: "goals", a: 1196, b: sWall + 272, w: 60, d: 60, H: 200, face: "-b", noDoor: true });
+    if (!HID.has("epcm")) plots.port = put({ id: "port", kind: "building", drawer: "portCranes", landmark: "port", a: 2250, b: quayB - 34, w: 300, d: 40, H: 130, face: "+b", noDoor: true });
+    if (!HID.has("goals")) plots.goals = put({ id: "goals", kind: "building", drawer: "lighthouse", landmark: "goals", a: 1196, b: sWall + 272, w: 60, d: 60, H: 200, face: "-b", noDoor: true });
+    else plots["build:goals"] = put({ id: "build:goals", kind: "building", drawer: "buildlot", label: "Lighthouse", landmark: "build:goals", a: 1196, b: sWall + 272, w: 60, d: 60, H: 36, face: "-b", noDoor: true });
 
     /* ---- street trees in the verges of every block ---- */
     blocks.forEach((k) => {

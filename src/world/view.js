@@ -221,8 +221,10 @@
             if (w.carried) { ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.beginPath(); ctx.ellipse(d.sx, d.sy, 7, 3, 0, 0, TAU); ctx.fill(); }
             drawPerson(ctx, d.sx, d.sy + lift, w.look, dx < 0 ? -1 : 1, dy >= 0, w.phase, w.moving || w.carried, w.crew ? 1.08 : 1, w.act, time);
             if (w.bubble && !w.crew) drawBubble(ctx, d.sx + 3, d.sy + lift - 17 * w.look.h, w.bubble.ch, 1);
+            // crew at work now and then show what they're making
+            else if (w.crew && w.look.role && !w.moving && ((time * 0.4 + (w.phase || 0)) % 3) < 1.1) drawBubble(ctx, d.sx + 10, d.sy + lift - 13 * w.look.h, ROLE_BUBBLE[w.look.role], 1);
             if (w.crew) {
-              const x = d.sx, y = d.sy + lift - 27 * w.look.h;
+              const x = d.sx, y = d.sy + lift - 27 * w.look.h - (w.look.role === "thumb" && !w.moving ? 8 : 0);
               ctx.fillStyle = w.crew.color; ctx.strokeStyle = "#FFF8EC"; ctx.lineWidth = 1.2;
               ctx.beginPath(); ctx.arc(x, y, 4.2, 0, TAU); ctx.fill(); ctx.stroke();
               ctx.fillStyle = "#FFF"; ctx.font = "700 5px Fredoka, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText((w.name || "?")[0], x, y + 0.3);
