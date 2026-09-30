@@ -213,13 +213,19 @@
     function stepWalker(w, dt) {
       if (w.carried) return;
       if (w.hidden) { w.wait -= dt; if (w.wait <= 0 && !w.working) { w.hidden = false; newTrip(w); } return; }
-      if (w.wait > 0) { w.wait -= dt; w.moving = false; if (w.wait <= 0 && !w.path) newTrip(w); return; }
+      if (w.wait > 0) {
+        w.wait -= dt; w.moving = false;
+        if (!w.act) w.act = { kind: w.greet ? "wave" : w.look.trait };
+        if (w.wait <= 0) { w.act = null; w.greet = false; if (!w.path) newTrip(w); }
+        return;
+      }
+      w.act = null;
       if (!w.path) { newTrip(w); return; }
       const step = w.path[w.i];
       if (!step) { w.path = null; w.arrive && w.arrive(); return; }
       const e = step.e;
       if (w.segT === 0 && e.crossing && !w.onCross) {
-        if (!canCross(w, e)) { w.moving = false; return; }
+        if (!canCross(w, e)) { w.moving = false; w.act = { kind: "look" }; if (!w.bubble && R() < 0.01) w.bubble = { ch: "\u2026", until: S.t + 1.6 }; return; }
         w.onCross = e.crossing; e.crossing.peds++;
       }
       const from = w.node, to = step.n;
@@ -340,8 +346,23 @@
     };
     S.nearestNode = (a, b) => ringNodes.reduce((best, n) => (Math.hypot(n.a - a, n.b - b) < Math.hypot(best.a - a, best.b - b) ? n : best), ringNodes[0]);
 
+    // passers-by sometimes stop, wave and share a thought
+    let greetT = 0;
+    const MOODS = ["\u2665", "!", "\u266A", "?", "\u2665"];
+    const greet = () => {
+      const vis = S.peds.filter((w) => !w.hidden && !w.carried && !w.onCross && w.moving);
+      for (let i = 0; i < vis.length; i++) for (let j = i + 1; j < vis.length; j++) {
+        const p = vis[i], q = vis[j];
+        if (Math.hypot(p.a - q.a, p.b - q.b) > 12 || R() > 0.25) continue;
+        if ((p.lastGreet || -99) > S.t - 20 || (q.lastGreet || -99) > S.t - 20) continue;
+        const ch = MOODS[(R() * MOODS.length) | 0];
+        [p, q].forEach((w) => { w.lastGreet = S.t; w.greet = true; w.wait = 1.4; w.bubble = { ch, until: S.t + 1.8 }; });
+      }
+      S.peds.forEach((w) => { if (!w.hidden && !w.bubble && !w.moving && R() < 0.02) w.bubble = { ch: w.look.trait === "hum" ? "\u266A" : w.look.trait === "sip" ? "\u2665" : "\u2026", until: S.t + 1.6 }; if (w.bubble && S.t > w.bubble.until) w.bubble = null; });
+    };
     S.step = (dt) => {
       S.t += dt;
+      greetT += dt; if (greetT > 0.6) { greetT = 0; greet(); }
       stepCars(dt);
       S.peds.forEach((w) => stepWalker(w, dt));
       stepAnimals(dt);

@@ -13,11 +13,34 @@
   };
   const hexOf = (r, g, b) => "#" + [r, g, b].map((v) => clamp(Math.round(v), 0, 255).toString(16).padStart(2, "0")).join("");
   const mix = (c1, c2, t) => { const p = rgb(c1), q = rgb(c2); return hexOf(lerp(p[0], q[0], t), lerp(p[1], q[1], t), lerp(p[2], q[2], t)); };
-  const shade = (c, t) => (t >= 0 ? mix(c, "#FFFFFF", t) : mix(c, "#1E1408", -t));
+  // flat style: shadows lean towards a dusky violet, highlights towards warm white
+  const shade = (c, t) => (t >= 0 ? mix(c, "#FFF8F0", t) : mix(c, "#3A3158", -t));
   const rgba = (c, a) => { const p = rgb(c); return `rgba(${p[0]},${p[1]},${p[2]},${a})`; };
   const hash = (s) => { let t = 2166136261; for (let k = 0; k < s.length; k++) { t ^= s.charCodeAt(k); t = Math.imul(t, 16777619); } return t >>> 0; };
   const rng = (seed) => { let t = seed >>> 0; return () => { t = (t + 0x6d2b79f5) >>> 0; let r = Math.imul(t ^ (t >>> 15), t | 1); r ^= r + Math.imul(r ^ (r >>> 7), r | 61); return ((r ^ (r >>> 14)) >>> 0) / 4294967296; }; };
-  const OUT = "rgba(60,40,22,0.28)";
+  const OUT = null; // flat art: no outlines
+  /* Monument-Valley pass: every solid pen colour is softened - saturation
+     capped, lightness lifted, cool darks nudged towards dusky violet. */
+  const PAST = new Map();
+  const pastel = (c) => {
+    if (typeof c !== "string" || c[0] !== "#") return c;
+    let v = PAST.get(c); if (v) return v;
+    const [r, g, b] = rgb(c).map((x) => x / 255);
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn;
+    let h = 0, s = 0;
+    if (d > 1e-6) {
+      s = d / (1 - Math.abs(2 * l - 1));
+      h = mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      h *= 60;
+    }
+    if (h > 190 && h < 240) h += (240 - h) * 0.35; // steel blues lean periwinkle
+    const L = 0.3 + 0.62 * l, S = s < 0.08 ? s : Math.min(0.72, s * 0.9 + 0.1);
+    const C = (1 - Math.abs(2 * L - 1)) * S, X = C * (1 - Math.abs(((h / 60) % 2) - 1)), m = L - C / 2;
+    const [r1, g1, b1] = h < 60 ? [C, X, 0] : h < 120 ? [X, C, 0] : h < 180 ? [0, C, X] : h < 240 ? [0, X, C] : h < 300 ? [X, 0, C] : [C, 0, X];
+    v = hexOf((r1 + m) * 255, (g1 + m) * 255, (b1 + m) * 255);
+    if (d <= 1e-6 && l < 0.5) v = mix(v, "#5A4E7A", 0.3); // greys/blacks go violet
+    PAST.set(c, v); return v;
+  };
 
   /* A pen draws iso geometry into a 2D context around an origin (ox, oy).
      opts.emit: draw the emissive layer instead. Ordinary geometry then erases
@@ -36,14 +59,15 @@
     const poly = (pts, fill, stroke = OUT, lw = 0.7) => {
       path(pts);
       if (E) { if (fill) erase(); return; }
-      if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+      if (fill) { ctx.fillStyle = pastel(fill); ctx.fill(); }
       if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.lineJoin = "round"; ctx.stroke(); }
     };
     const line = (p0, p1, color, lw = 1, cap = "round") => {
       if (E) return;
+      if (typeof color === "string" && color.startsWith("rgba")) return; // flat art: no texture lines
       const [x0, y0] = P(p0[0], p0[1], p0[2] || 0), [x1, y1] = P(p1[0], p1[1], p1[2] || 0);
       ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1);
-      ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.lineCap = cap; ctx.stroke();
+      ctx.strokeStyle = pastel(color); ctx.lineWidth = lw; ctx.lineCap = cap; ctx.stroke();
     };
     /* axis-aligned box centred on (x, y) */
     const box = (x, y, z, w, d, h, c, o = {}) => {
@@ -51,9 +75,9 @@
       const st = o.stroke === undefined ? OUT : o.stroke;
       if (h > 0) {
         poly([[x0, y1, z], [x1, y1, z], [x1, y1, z1], [x0, y1, z1]], o.left || c, st);
-        poly([[x1, y0, z], [x1, y1, z], [x1, y1, z1], [x1, y0, z1]], o.right || shade(c, -0.2), st);
+        poly([[x1, y0, z], [x1, y1, z], [x1, y1, z1], [x1, y0, z1]], o.right || shade(c, -0.34), st);
       }
-      poly([[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]], o.top || shade(c, 0.12), st);
+      poly([[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]], o.top || shade(c, 0.2), st);
     };
     /* quad on a face of a box: 'L' = +b face, 'R' = +a face; u across, v up (0..1) */
     const faceQ = (bx, face, u0, u1, v0, v1, inset = 0.4) => {
@@ -70,14 +94,16 @@
       const [cx, cyb] = P(x, y, z), cyt = cyb - h, rx = r * 1.4142, ry = r * 0.7071;
       ctx.beginPath(); ctx.moveTo(cx - rx, cyt); ctx.lineTo(cx - rx, cyb); ctx.ellipse(cx, cyb, rx, ry, 0, Math.PI, 0, true); ctx.lineTo(cx + rx, cyt); ctx.ellipse(cx, cyt, rx, ry, 0, 0, Math.PI, true); ctx.closePath();
       if (E) { erase(); return { cx, cyt, cyb, rx, ry }; }
-      const g = ctx.createLinearGradient(cx - rx, 0, cx + rx, 0);
-      g.addColorStop(0, shade(c, 0.12)); g.addColorStop(0.35, shade(c, 0.05)); g.addColorStop(1, shade(c, -0.3));
-      ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 0.7; ctx.stroke();
+      // flat two-tone: lit left half, shaded right half
+      ctx.fillStyle = pastel(c); ctx.fill();
+      const half = (col, zb, zt2) => { ctx.beginPath(); ctx.moveTo(cx, cyb - zt2 + ry); ctx.lineTo(cx, cyb - zb + ry); ctx.ellipse(cx, cyb - zb, rx, ry, 0, Math.PI / 2, 0, true); ctx.lineTo(cx + rx, cyb - zt2); ctx.ellipse(cx, cyb - zt2, rx, ry, 0, 0, Math.PI / 2, false); ctx.closePath(); ctx.fillStyle = pastel(col); ctx.fill(); };
+      half(shade(c, -0.24), 0, h);
       (o.bands || []).forEach(([z0, z1, bc]) => {
         ctx.beginPath(); ctx.moveTo(cx - rx, cyb - z1); ctx.lineTo(cx - rx, cyb - z0); ctx.ellipse(cx, cyb - z0, rx, ry, 0, Math.PI, 0, true); ctx.lineTo(cx + rx, cyb - z1); ctx.ellipse(cx, cyb - z1, rx, ry, 0, 0, Math.PI, false); ctx.closePath();
-        const gb = ctx.createLinearGradient(cx - rx, 0, cx + rx, 0); gb.addColorStop(0, shade(bc, 0.1)); gb.addColorStop(1, shade(bc, -0.3)); ctx.fillStyle = gb; ctx.fill();
+        ctx.fillStyle = pastel(bc); ctx.fill();
+        half(shade(bc, -0.24), z0, z1);
       });
-      if (!o.noTop) { ctx.beginPath(); ctx.ellipse(cx, cyt, rx, ry, 0, 0, TAU); ctx.fillStyle = o.top || shade(c, 0.18); ctx.fill(); ctx.stroke(); }
+      if (!o.noTop) { ctx.beginPath(); ctx.ellipse(cx, cyt, rx, ry, 0, 0, TAU); ctx.fillStyle = pastel(o.top || shade(c, 0.22)); ctx.fill(); }
       return { cx, cyt, cyb, rx, ry };
     };
     /* gable roof over a box footprint; ridge along 'a' or 'b' */
@@ -115,17 +141,14 @@
         if (litFn(k)) { path(faceQ(bx, face, u0, u1, v0, v1, 0.7)); ctx.fillStyle = k % 3 ? "#FFD58A" : "#FFE9B8"; ctx.fill(); }
         return;
       }
-      poly(faceQ(bx, face, u0 - 0.015, u1 + 0.015, v0 - 0.03, v1 + 0.03, 0.5), frame, null);
-      poly(faceQ(bx, face, u0, u1, v0, v1, 0.7), face === "L" ? "#6D98A6" : "#557F8D", "rgba(40,30,20,0.35)", 0.5);
-      poly(faceQ(bx, face, u0, lerp(u0, u1, 0.45), lerp(v0, v1, 0.55), v1, 0.8), "rgba(255,255,255,0.22)", null);
-      const um = (u0 + u1) / 2, vm = (v0 + v1) / 2;
-      line(faceP(bx, face, um, v0, 0.9), faceP(bx, face, um, v1, 0.9), frame, 0.9);
-      line(faceP(bx, face, u0, vm, 0.9), faceP(bx, face, u1, vm, 0.9), frame, 0.9);
-      poly(faceQ(bx, face, u0 - 0.03, u1 + 0.03, v0 - 0.06, v0 - 0.02, 1.4), shade(frame, -0.1), null);
+      // flat recessed window: a deep inset with a light reveal on one side and a sill
+      poly(faceQ(bx, face, u0, u1, v0, v1, 0.6), face === "L" ? "#4C5A80" : "#3D4969", null);
+      poly(faceQ(bx, face, u0, lerp(u0, u1, 0.16), v0, v1, 0.7), face === "L" ? "#6A78A0" : "#56628A", null);
+      poly(faceQ(bx, face, u0 - 0.02, u1 + 0.02, v0 - 0.05, v0, 1.2), shade(frame, -0.06), null);
     };
     const door = (bx, face, u, wu, hv, c = "#6E4A33") => {
-      poly(faceQ(bx, face, u - wu / 2 - 0.02, u + wu / 2 + 0.02, 0, hv + 0.04, 0.4), "#F6EDDF", null);
-      poly(faceQ(bx, face, u - wu / 2, u + wu / 2, 0.02, hv, 0.6), c, "rgba(40,30,20,0.4)", 0.6);
+      poly(faceQ(bx, face, u - wu / 2, u + wu / 2, 0, hv, 0.6), c, null);
+      poly(faceQ(bx, face, u - wu / 2, u - wu / 2 + wu * 0.2, 0, hv, 0.7), shade(c, 0.18), null);
       if (!E) {
         const k = faceP(bx, face, u + wu * 0.28, hv * 0.45, 0.9);
         const [kx, ky] = P(k[0], k[1], k[2]); ctx.fillStyle = "#E9B949"; ctx.fillRect(kx - 0.7, ky - 0.7, 1.4, 1.4);
@@ -171,6 +194,6 @@
       if (core) { ctx.fillStyle = "#FFFBEA"; ctx.beginPath(); ctx.arc(x, y, core, 0, TAU); ctx.fill(); }
     };
     /* fill the current raw path: colour mode paints, emissive mode erases */
-    const fillPath = (fill) => { if (E) erase(); else { ctx.fillStyle = fill; ctx.fill(); } };
+    const fillPath = (fill) => { if (E) erase(); else { ctx.fillStyle = pastel(fill); ctx.fill(); } };
     return { P, path, poly, line, box, faceQ, faceP, cyl, gable, hip, windowQ, door, awning, sign, glow, fillPath, ctx, E, winCount: () => winK };
   }

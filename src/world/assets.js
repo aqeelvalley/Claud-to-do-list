@@ -40,7 +40,7 @@
 
   const rect = (x0, x1, y0, y1) => [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
   const cham = (x0, x1, y0, y1, c) => [[x0 + c, y0], [x1 - c, y0], [x1, y0 + c], [x1, y1 - c], [x1 - c, y1], [x0 + c, y1], [x0, y1 - c], [x0, y0 + c]];
-  const GLASS = "#5E8E9C";
+  const GLASS = "#43527A";
 
   const VEHICLES = {
     hatch: { L: 19, W: 10 }, sedan: { L: 21, W: 10 }, bakkie: { L: 22, W: 10.5 },
@@ -56,13 +56,16 @@
     ctx.transform(ux * r, uy * r, 0, -r, 0, 0);
     ctx.beginPath(); ctx.arc(0, 0, 1, 0, TAU);
     if (pn.E) { pn.fillPath(); ctx.restore(); return; }
-    ctx.fillStyle = "#2B2F33"; ctx.fill();
-    ctx.beginPath(); ctx.arc(0, 0, 0.56, 0, TAU); ctx.fillStyle = "#B8C1C6"; ctx.fill();
-    ctx.strokeStyle = "#6E777C"; ctx.lineWidth = 0.14;
+    ctx.fillStyle = "#2E2A40"; ctx.fill();
+    ctx.beginPath(); ctx.arc(0, 0, 0.56, 0, TAU); ctx.fillStyle = "#D8D2E0"; ctx.fill();
+    ctx.strokeStyle = "#8C86A0"; ctx.lineWidth = 0.14;
     for (let k = 0; k < 3; k++) { const t = phase + (k * TAU) / 3; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(t) * 0.5, Math.sin(t) * 0.5); ctx.stroke(); }
     ctx.restore();
   }
-  /* draw a vehicle centred on the pen origin */
+  /* draw a vehicle centred on the pen origin.
+     Parts are drawn back-to-front: side-by-side parts (a van's box and
+     bonnet, a truck's cargo box and cab) sort by depth, and parts that sit
+     on top of another (a cabin, a load bed) are drawn right after their base. */
   function drawVehicle(pn, kind, color, yaw, wheelPhase = 0) {
     const V = VEHICLES[kind] || VEHICLES.hatch, L = V.L, Wd = V.W, hl = L / 2, hw = Wd / 2;
     const W = orient(yaw);
@@ -70,71 +73,55 @@
     const wheels = [[hl * 0.62, hw - 0.4], [-hl * 0.62, hw - 0.4], [hl * 0.62, -hw + 0.4], [-hl * 0.62, -hw + 0.4]];
     if (kind === "bus" || kind === "truck") { wheels[0][0] = hl * 0.7; wheels[2][0] = hl * 0.7; wheels[1][0] = -hl * 0.55; wheels[3][0] = -hl * 0.55; }
     const far = wheels.filter((w) => (w[1] > 0) !== leftNear), near = wheels.filter((w) => (w[1] > 0) === leftNear);
-    // ground shadow
-    if (!pn.E) {
-      pn.poly([W(-hl - 1, -hw - 1), W(hl + 1, -hw - 1), W(hl + 3, hw + 2), W(-hl + 1, hw + 2)].map((p) => [p[0] + 2, p[1] + 1, 0]), "rgba(20,30,40,0.22)", null);
-    }
+    if (!pn.E) pn.poly([W(-hl - 1, -hw - 1), W(hl + 1, -hw - 1), W(hl + 3, hw + 2), W(-hl + 1, hw + 2)].map((p) => [p[0] + 2, p[1] + 1, 0]), "rgba(40,30,70,0.18)", null);
     far.forEach((w) => drawWheel(pn, W, w[0], w[1], 2.6, wheelPhase));
-    const faces = [];
-    const body = (x0, x1, z0, z1, ins = 0.4, c = color, top) =>
-      prism(pn, W, cham(x0, x1, -hw, hw, 1.4), z0, cham(x0 + ins, x1 - ins, -hw + ins, hw - ins, 1.2), z1, () => c, top || shade(c, 0.12), faces);
-    const glassCab = (bx0, bx1, tx0, tx1, z0, z1, wIn = 0.6, roof = color) =>
-      prism(pn, W, rect(bx0, bx1, -hw + wIn, hw - wIn), z0, rect(tx0, tx1, -hw + wIn + 0.8, hw - wIn - 0.8), z1, () => GLASS, shade(roof, 0.12), faces);
-    const frontFace = (fs) => fs.find((f) => f.i === 1 && (f.q.length));
-    let cabFaces = [];
+    const fr = W(1, 0);
+    const lights = (fs) => fs.forEach((f) => {
+      const d = f.na * fr[0] + f.nb * fr[1];
+      if (Math.abs(d) < 0.8) return;
+      const front = d > 0;
+      [[0.08, 0.26], [0.74, 0.92]].forEach(([u0, u1]) => {
+        if (pn.E) { const p = onFace(f.q, (u0 + u1) / 2, 0.58); pn.glow(p[0], p[1], p[2], front ? 7 : 5, front ? "#FFF3C4" : "#FF4A3D", 0.9); }
+        else decal(pn, f.q, u0, u1, 0.45, 0.7, front ? "#FFF6D6" : "#E0474C");
+      });
+      if (front && !pn.E) decal(pn, f.q, 0.3, 0.7, 0.3, 0.52, shade(color, -0.35));
+    });
+    const P3 = (bottom, z0, top, z1, col, topCol, deco) => () => { const fs = prism(pn, W, bottom, z0, top, z1, typeof col === "function" ? col : () => col, topCol); deco && deco(fs); return fs; };
+    const depth = (x) => { const p = W(x, 0); return p[0] + p[1]; };
+    const parts = []; // {x, draw, kids:[]}
+    const part = (x, draw, kids = []) => { const p = { x, draw, kids }; parts.push(p); return p; };
+    const kid = (x, draw) => ({ x, draw, kids: [] });
+    const cabin = (bx0, bx1, tx0, tx1, z0, z1, wIn = 0.6) => P3(rect(bx0, bx1, -hw + wIn, hw - wIn), z0, rect(tx0, tx1, -hw + wIn + 0.8, hw - wIn - 0.8), z1, GLASS, shade(color, 0.16));
+    const bodyP = (x0, x1, z0, z1, ins = 0.4, deco = lights) => P3(cham(x0, x1, -hw, hw, 1.4), z0, cham(x0 + ins, x1 - ins, -hw + ins, hw - ins, 1.2), z1, color, shade(color, 0.16), deco);
     if (kind === "hatch" || kind === "sedan") {
-      const bf = body(-hl, hl, 2.2, 6.6);
-      cabFaces = kind === "hatch" ? glassCab(-hl + 2, hl * 0.35, -hl + 2.6, 0.2, 6.6, 11) : glassCab(-hl * 0.55, hl * 0.3, -hl * 0.35, -0.2, 6.6, 10.8);
-      lights(bf, 2.2, 6.6);
+      part(0, bodyP(-hl, hl, 2.2, 6.6), [kind === "hatch" ? kid(-hl * 0.3, cabin(-hl + 2, hl * 0.35, -hl + 2.6, 0.2, 6.6, 11)) : kid(0, cabin(-hl * 0.55, hl * 0.3, -hl * 0.35, -0.2, 6.6, 10.8))]);
     } else if (kind === "bakkie") {
-      const bf = body(-hl, hl, 2.2, 6.4);
-      cabFaces = glassCab(-1, hl * 0.45, 0, hl * 0.2, 6.4, 11.4);
-      // load bed walls
-      prism(pn, W, rect(-hl + 0.5, -1.4, hw - 1.2, hw - 0.4), 6.4, rect(-hl + 0.5, -1.4, hw - 1.2, hw - 0.4), 9, () => shade(color, -0.05), shade(color, 0.1));
-      prism(pn, W, rect(-hl + 0.5, -1.4, -hw + 0.4, -hw + 1.2), 6.4, rect(-hl + 0.5, -1.4, -hw + 0.4, -hw + 1.2), 9, () => shade(color, -0.05), shade(color, 0.1));
-      prism(pn, W, rect(-hl + 0.4, -hl + 1.2, -hw + 0.4, hw - 0.4), 6.4, rect(-hl + 0.4, -hl + 1.2, -hw + 0.4, hw - 0.4), 9, () => shade(color, -0.05), shade(color, 0.1));
-      lights(bf, 2.2, 6.4);
+      const wall = (x0, x1, y0, y1) => P3(rect(x0, x1, y0, y1), 6.4, rect(x0, x1, y0, y1), 9, shade(color, -0.05), shade(color, 0.12));
+      part(0, bodyP(-hl, hl, 2.2, 6.4), [
+        kid(hl * 0.25, cabin(-1, hl * 0.45, 0, hl * 0.2, 6.4, 11.4)),
+        kid(-hl * 0.5, wall(-hl + 0.5, -1.4, hw - 1.2, hw - 0.4)),
+        kid(-hl * 0.5, wall(-hl + 0.5, -1.4, -hw + 0.4, -hw + 1.2)),
+        kid(-hl + 0.8, wall(-hl + 0.4, -hl + 1.2, -hw + 0.4, hw - 0.4)),
+      ]);
     } else if (kind === "van") {
-      const bf = prism(pn, W, cham(-hl, hl - 4, -hw, hw, 1.2), 2.2, cham(-hl + 0.3, hl - 4.5, -hw + 0.3, hw - 0.3, 1), 13.5, () => color, shade(color, 0.14), faces);
-      prism(pn, W, cham(hl - 4.6, hl, -hw, hw, 1.4), 2.2, cham(hl - 4.6, hl - 1.2, -hw + 0.4, hw - 0.4, 1), 7.2, () => color, shade(color, 0.1), faces);
-      prism(pn, W, rect(hl - 4.6, hl - 1.2, -hw + 0.5, hw - 0.5), 7.2, rect(hl - 4.6, hl - 4.2, -hw + 0.9, hw - 0.9), 13.2, () => GLASS, shade(color, 0.12));
-      bf.forEach((f) => { if (Math.abs(f.i % 4) === 0 || f.i === 4) decal(pn, f.q, 0.62, 0.92, 0.55, 0.85, GLASS); });
-      lights(faces, 2.2, 7);
+      part((-hl + hl - 4) / 2, P3(cham(-hl, hl - 4, -hw, hw, 1.2), 2.2, cham(-hl + 0.3, hl - 4.5, -hw + 0.3, hw - 0.3, 1), 13.5, color, shade(color, 0.16), (fs) => { lights(fs); fs.forEach((f) => { if (f.i === 0) decal(pn, f.q, 0.62, 0.92, 0.55, 0.85, GLASS); if (f.i === 4) decal(pn, f.q, 0.08, 0.38, 0.55, 0.85, GLASS); }); }));
+      part(hl - 2.3, P3(cham(hl - 4.6, hl, -hw, hw, 1.4), 2.2, cham(hl - 4.6, hl - 1.2, -hw + 0.4, hw - 0.4, 1), 7.2, color, shade(color, 0.12), lights),
+        [kid(hl - 3, P3(rect(hl - 4.6, hl - 1.2, -hw + 0.5, hw - 0.5), 7.2, rect(hl - 4.6, hl - 4.2, -hw + 0.9, hw - 0.9), 13.2, GLASS, shade(color, 0.14)))]);
     } else if (kind === "bus") {
-      const bf = prism(pn, W, cham(-hl, hl, -hw, hw, 1.6), 2.2, cham(-hl + 0.2, hl - 0.2, -hw + 0.2, hw - 0.2, 1.4), 15, () => color, "#F4F1EA", faces);
-      bf.forEach((f) => {
-        const len = Math.hypot(f.q[1][0] - f.q[0][0], f.q[1][1] - f.q[0][1]);
-        if (len > 20) { for (let k = 0; k < 6; k++) decal(pn, f.q, 0.05 + k * 0.155, 0.17 + k * 0.155, 0.5, 0.84, GLASS, "rgba(255,255,255,0.5)"); decal(pn, f.q, 0.02, 0.98, 0.2, 0.3, "#FFF8EC"); }
-        else if (len > 5) decal(pn, f.q, 0.12, 0.88, 0.45, 0.88, GLASS);
-      });
-      lights(faces, 2.2, 8);
-    } else if (kind === "truck") {
-      prism(pn, W, rect(-hl, hl - 7, -hw, hw), 3.2, rect(-hl, hl - 7, -hw, hw), 17, () => "#F6F3EC", "#FBF8F1", faces);
-      faces.forEach((f) => { const len = Math.hypot(f.q[1][0] - f.q[0][0], f.q[1][1] - f.q[0][1]); if (len > 15) decal(pn, f.q, 0.08, 0.92, 0.35, 0.6, color); });
-      const cf = [];
-      prism(pn, W, cham(hl - 7, hl, -hw, hw, 1.2), 2.2, cham(hl - 7, hl - 1.5, -hw + 0.3, hw - 0.3, 1), 12.5, () => color, shade(color, 0.12), cf);
-      cf.forEach((f) => { const fr = W(1, 0); if (f.na * fr[0] + f.nb * fr[1] > 0.6) decal(pn, f.q, 0.12, 0.88, 0.55, 0.9, GLASS); else decal(pn, f.q, 0.1, 0.5, 0.55, 0.9, GLASS); });
-      lights(cf.concat(faces), 2.2, 7);
-    }
-    near.forEach((w) => drawWheel(pn, W, w[0], w[1], 2.6, wheelPhase));
-    // headlights / taillights on whichever end faces the viewer
-    function lights(fs, z0, z1) {
-      const fr = W(1, 0);
-      fs.forEach((f) => {
-        const d = f.na * fr[0] + f.nb * fr[1];
-        if (Math.abs(d) < 0.8) return;
-        const front = d > 0, v0 = 0.45, v1 = 0.7;
-        const col = front ? "#FFF6D6" : "#E0474C";
-        [[0.08, 0.26], [0.74, 0.92]].forEach(([u0, u1]) => {
-          if (pn.E) {
-            const p = onFace(f.q, (u0 + u1) / 2, (v0 + v1) / 2);
-            pn.glow(p[0], p[1], p[2], front ? 7 : 5, front ? "#FFF3C4" : "#FF4A3D", 0.9);
-          } else decal(pn, f.q, u0, u1, v0, v1, col, "rgba(40,30,20,0.4)");
+      part(0, P3(cham(-hl, hl, -hw, hw, 1.6), 2.2, cham(-hl + 0.2, hl - 0.2, -hw + 0.2, hw - 0.2, 1.4), 15, color, "#F4F1EA", (fs) => {
+        fs.forEach((f) => {
+          const len = Math.hypot(f.q[1][0] - f.q[0][0], f.q[1][1] - f.q[0][1]);
+          if (len > 20) { for (let k = 0; k < 6; k++) decal(pn, f.q, 0.05 + k * 0.155, 0.17 + k * 0.155, 0.5, 0.84, GLASS); decal(pn, f.q, 0.02, 0.98, 0.2, 0.3, "#FFF8EC"); }
+          else if (len > 5) decal(pn, f.q, 0.12, 0.88, 0.45, 0.88, GLASS);
         });
-        if (front) { if (!pn.E) decal(pn, f.q, 0.3, 0.7, 0.3, 0.52, shade(color, -0.35)); }
-      });
+        lights(fs);
+      }));
+    } else if (kind === "truck") {
+      part((-hl + hl - 7) / 2, P3(rect(-hl, hl - 7, -hw, hw), 3.2, rect(-hl, hl - 7, -hw, hw), 17, "#F6F3EC", "#FBF8F1", (fs) => { fs.forEach((f) => { const len = Math.hypot(f.q[1][0] - f.q[0][0], f.q[1][1] - f.q[0][1]); if (len > 15) decal(pn, f.q, 0.08, 0.92, 0.35, 0.6, color); }); lights(fs); }));
+      part(hl - 3.5, P3(cham(hl - 7, hl, -hw, hw, 1.2), 2.2, cham(hl - 7, hl - 1.5, -hw + 0.3, hw - 0.3, 1), 12.5, color, shade(color, 0.14), (fs) => { fs.forEach((f) => { if (f.na * fr[0] + f.nb * fr[1] > 0.6) decal(pn, f.q, 0.12, 0.88, 0.55, 0.9, GLASS); else if (Math.abs(f.na * fr[0] + f.nb * fr[1]) < 0.3) decal(pn, f.q, 0.1, 0.5, 0.55, 0.9, GLASS); }); lights(fs); }));
     }
-    return faces;
+    parts.sort((p, q) => depth(p.x) - depth(q.x)).forEach((p) => { p.draw(); p.kids.sort((x, y) => depth(x.x) - depth(y.x)).forEach((k) => k.draw()); });
+    near.forEach((w) => drawWheel(pn, W, w[0], w[1], 2.6, wheelPhase));
   }
   /* headlight beams painted on the road (emissive only) */
   function drawBeams(pn, kind, yaw) {
@@ -178,69 +165,104 @@
     }
   }
 
-  /* ---- people ---- */
-  const SKINS = ["#F1C9A5", "#E6B48E", "#C98E66", "#9E6A48", "#7A4E33", "#5C3A26"];
-  const HAIRS = ["#2B1D14", "#4A2F1D", "#1A1A1A", "#8A5A2B", "#D8B26E", "#6B4A3A", "#B8B2A8"];
-  const TOPS = ["#2A9D8F", "#D9734E", "#3E7CB1", "#E9B949", "#C2577A", "#6DAE5B", "#7E6BC4", "#F08A4B", "#1F8FA3", "#F6EDDF", "#44545A"];
-  const BOTTOMS = ["#3B4A5A", "#2F3E4C", "#5B4A3A", "#8A7A66", "#394B6E", "#2B2B2B"];
+  /* ---- people: simple geometric figures with a bit of personality ---- */
+  const SKINS = ["#F3D2B6", "#E8BE98", "#CF9A74", "#A9745A", "#83573F", "#654030"];
+  const HAIRS = ["#3A2A26", "#5A3A2C", "#2A2530", "#9A6A3A", "#E2B870", "#7A5A4A", "#C8C0C8"];
+  const COATS = ["#E4726A", "#F2A65A", "#5FA8A0", "#6C8FC8", "#9C7CC8", "#F2C45A", "#E88AA8", "#7FB07A", "#F4EDE2", "#4E5A7A", "#D95F5F"];
+  const HATS = ["#E4726A", "#F2C45A", "#6C8FC8", "#4E5A7A", "#F4EDE2", "#7FB07A"];
+  const TRAITS = ["wave", "phone", "sip", "stretch", "look", "hum"];
   function randomLook(r) {
     const pick = (a) => a[(r() * a.length) | 0];
-    return { skin: pick(SKINS), hair: pick(HAIRS), style: pick(["short", "short", "long", "bun", "cap", "curly"]), top: pick(TOPS), bottom: pick(BOTTOMS),
-      dress: r() < 0.18, h: 0.9 + r() * 0.22, bag: r() < 0.2 ? pick(["#8A5A2B", "#C2577A", "#3E7CB1"]) : null, hat: pick(["#D9534F", "#3E7CB1", "#F2C14E"]) };
+    const build = pick(["slim", "slim", "round", "tall", "kid"]);
+    return {
+      skin: pick(SKINS), hair: pick(HAIRS), style: pick(["short", "long", "bun", "curly", "bald"]), top: pick(COATS),
+      build, h: build === "kid" ? 0.74 : build === "tall" ? 1.14 : 0.95 + r() * 0.1,
+      hat: r() < 0.45 ? { kind: pick(["beanie", "cap", "sun", "bowler"]), c: pick(HATS) } : null,
+      acc: r() < 0.5 ? pick(["bag", "phone", "coffee", "umbrella", "balloon"]) : null, accC: pick(HATS),
+      trait: pick(TRAITS), scarf: r() < 0.25 ? pick(HATS) : null,
+    };
   }
   /* person at screen point (x,y) (feet). dir: +1 facing screen-right, -1 left.
-     front: facing the viewer. phase: walk cycle radians. */
-  function drawPerson(ctx, x, y, look, dir, front, phase, moving, scale = 1) {
+     front: facing the viewer. phase: walk cycle radians. act: current idle action. */
+  function drawPerson(ctx, x, y, look, dir, front, phase, moving, scale = 1, act = null, t = 0) {
     const s = look.h * scale;
     const sw = moving ? Math.sin(phase) : 0;
+    const bob = moving ? Math.abs(Math.cos(phase)) * 0.7 : 0;
+    const wid = look.build === "round" ? 3.4 : look.build === "tall" ? 2.5 : 2.8;
+    const bodyH = look.build === "tall" ? 9.5 : 8;
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(dir * s, s);
-    ctx.fillStyle = "rgba(0,0,0,0.2)";
-    ctx.beginPath(); ctx.ellipse(0, 0.3, 3.4, 1.2, 0, 0, TAU); ctx.fill();
-    const hipY = -5.6, shY = -10.4;
-    const leg = (side, c) => {
-      const fx = side * 0.9 + sw * side * 2.2, fy = -Math.abs(sw * side) * 0.5 * (side * sw > 0 ? 1 : 0);
-      ctx.strokeStyle = c; ctx.lineWidth = 1.7; ctx.lineCap = "round";
-      ctx.beginPath(); ctx.moveTo(side * 0.8, hipY); ctx.lineTo(fx, fy - 0.6); ctx.stroke();
-      ctx.fillStyle = "#2A2420"; ctx.beginPath(); ctx.ellipse(fx + 0.5, fy - 0.3, 1.2, 0.6, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = "rgba(40,30,70,0.18)";
+    ctx.beginPath(); ctx.ellipse(0, 0.3, wid + 0.6, 1.1, 0, 0, TAU); ctx.fill();
+    ctx.translate(0, -bob);
+    // legs: two short pegs that step
+    ["#3E3A52", "#4A4662"].forEach((c, k) => { const side = k ? 1 : -1, off = sw * side * 1.4; ctx.fillStyle = c; ctx.fillRect(side * 0.9 - 0.7 + off, -2.6, 1.4, 2.6 + (side * sw > 0 ? -0.4 : 0)); });
+    // coat: a soft trapezoid, lit on the left, shaded on the right
+    const top = -2 - bodyH, hem = -2;
+    const coat = (x0, x1, col) => { ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x0 * 0.62, top); ctx.lineTo(x1 * 0.62, top); ctx.lineTo(x1, hem); ctx.lineTo(x0, hem); ctx.closePath(); ctx.fill(); };
+    coat(-wid, wid, look.top);
+    coat(0.2, wid, shade(look.top, -0.2));
+    ctx.fillStyle = look.top; ctx.beginPath(); ctx.ellipse(0, top + 0.4, wid * 0.62, 1.2, 0, Math.PI, 0); ctx.fill();
+    if (look.scarf) { ctx.fillStyle = look.scarf; ctx.fillRect(-wid * 0.62, top - 0.4, wid * 1.24, 1.6); ctx.fillRect(front ? 0.4 : -1.4, top + 1, 1, 3); }
+    // arms: little nubs that swing, or do the character's thing when idle
+    const act0 = act && act.kind;
+    const armY = top + 2.2;
+    const handAt = (side) => {
+      if (!moving && side === 1 && act0 === "wave") return [wid * 0.9 + 1.2, armY - 5 + Math.sin(t * 12) * 1.2];
+      if (!moving && side === 1 && (act0 === "phone" || act0 === "sip")) return [wid * 0.5 + 0.6, armY - 2.4];
+      if (!moving && act0 === "stretch") return [side * (wid * 0.8 + 1), armY - 6];
+      return [side * (wid * 0.9) - sw * side * 1.1, armY + 4.2];
     };
-    const arm = (side, c) => {
-      const hx = side * 1.9 - sw * side * 1.9, hy = shY + 4.6;
-      ctx.strokeStyle = c; ctx.lineWidth = 1.4; ctx.lineCap = "round";
-      ctx.beginPath(); ctx.moveTo(side * 1.9, shY + 0.4); ctx.lineTo(hx, hy); ctx.stroke();
-      ctx.fillStyle = look.skin; ctx.beginPath(); ctx.arc(hx, hy + 0.3, 0.75, 0, TAU); ctx.fill();
-    };
-    // back limbs
-    leg(-1, shade(look.dress ? look.skin : look.bottom, -0.15));
-    arm(-1, shade(look.top, -0.2));
-    // torso
-    if (look.dress) {
-      leg(1, look.skin);
-      ctx.fillStyle = look.top; ctx.beginPath(); ctx.moveTo(-1.9, shY); ctx.lineTo(1.9, shY); ctx.lineTo(2.9, hipY + 1.8); ctx.lineTo(-2.9, hipY + 1.8); ctx.closePath(); ctx.fill();
-    } else {
-      leg(1, look.bottom);
-      ctx.fillStyle = look.bottom; ctx.fillRect(-2, hipY - 1.2, 4, 1.8);
-      ctx.fillStyle = look.top; ctx.beginPath(); ctx.moveTo(-2.1, shY); ctx.lineTo(2.1, shY); ctx.lineTo(2.2, hipY); ctx.lineTo(-2.2, hipY); ctx.closePath(); ctx.fill();
-    }
-    ctx.fillStyle = "rgba(0,0,0,0.12)"; ctx.fillRect(0.6, shY, 1.5, hipY - shY);
-    if (look.bag) { ctx.fillStyle = look.bag; ctx.fillRect(-3.3, hipY - 2.2, 2, 2.6); }
-    arm(1, look.top);
+    [-1, 1].forEach((side) => {
+      const [hx, hy] = handAt(side);
+      ctx.strokeStyle = side > 0 ? look.top : shade(look.top, -0.2); ctx.lineWidth = 1.4; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(side * wid * 0.62, armY); ctx.lineTo(hx, hy); ctx.stroke();
+      ctx.fillStyle = look.skin; ctx.beginPath(); ctx.arc(hx, hy, 0.75, 0, TAU); ctx.fill();
+      if (side > 0) {
+        if ((act0 === "phone" && !moving) || (look.acc === "phone" && !moving)) { ctx.fillStyle = "#2E2A40"; ctx.fillRect(hx - 0.4, hy - 2, 1.4, 2.2); ctx.fillStyle = "#9FE3FF"; ctx.fillRect(hx - 0.2, hy - 1.8, 1, 1.6); }
+        else if (look.acc === "coffee" || act0 === "sip") { ctx.fillStyle = "#F4EDE2"; ctx.fillRect(hx - 0.8, hy - 2.2, 1.8, 2.2); ctx.fillStyle = "#9A6A3A"; ctx.fillRect(hx - 0.8, hy - 1.4, 1.8, 0.7); }
+        else if (look.acc === "bag") { ctx.fillStyle = look.accC; ctx.fillRect(hx - 1.2, hy, 2.6, 2.6); }
+        else if (look.acc === "umbrella") { ctx.strokeStyle = "#3E3A52"; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx, hy - 9); ctx.stroke(); ctx.fillStyle = look.accC; ctx.beginPath(); ctx.moveTo(hx - 5, hy - 8); ctx.quadraticCurveTo(hx, hy - 14, hx + 5, hy - 8); ctx.closePath(); ctx.fill(); }
+        else if (look.acc === "balloon") { ctx.strokeStyle = "rgba(60,50,80,0.6)"; ctx.lineWidth = 0.4; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.quadraticCurveTo(hx + 2, hy - 7, hx + 1, hy - 13 + Math.sin(t * 2) * 0.6); ctx.stroke(); ctx.fillStyle = look.accC; ctx.beginPath(); ctx.ellipse(hx + 1, hy - 15.5 + Math.sin(t * 2) * 0.6, 2.2, 2.7, 0, 0, TAU); ctx.fill(); }
+      }
+    });
     // head
-    const hy = shY - 2.6;
-    ctx.fillStyle = look.skin; ctx.fillRect(-0.6, shY - 1, 1.2, 1.1);
-    ctx.beginPath(); ctx.arc(0, hy, 2.35, 0, TAU); ctx.fill();
+    const hr = look.build === "kid" ? 2.7 : 2.3, hy = top - hr + 0.2 + (act0 === "look" && !moving ? Math.sin(t * 3) * 0.3 : 0);
+    ctx.fillStyle = look.skin; ctx.beginPath(); ctx.arc(0, hy, hr, 0, TAU); ctx.fill();
+    ctx.fillStyle = shade(look.skin, -0.12); ctx.beginPath(); ctx.arc(0, hy, hr, -Math.PI / 2, Math.PI / 2); ctx.fill();
     ctx.fillStyle = look.hair;
-    if (look.style === "cap") {
-      ctx.fillStyle = look.hat; ctx.beginPath(); ctx.arc(0, hy - 0.4, 2.45, Math.PI, 0); ctx.fill(); ctx.fillRect(front ? 0 : -3.6, hy - 0.6, 3.6, 0.8);
-    } else {
-      ctx.beginPath(); ctx.arc(0, hy - 0.2, 2.5, Math.PI * 0.95, Math.PI * 2.05); ctx.fill();
-      if (!front) { ctx.beginPath(); ctx.arc(0, hy, 2.4, 0, TAU); ctx.fill(); }
-      if (look.style === "long") { ctx.fillRect(-2.5, hy - 0.5, 1.2, 4.2); if (!front) ctx.fillRect(-2.4, hy, 4.8, 3.6); else ctx.fillRect(1.4, hy - 0.5, 1.1, 3.4); }
-      if (look.style === "bun") { ctx.beginPath(); ctx.arc(-0.6, hy - 2.7, 1.3, 0, TAU); ctx.fill(); }
-      if (look.style === "curly") { for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.arc(-2 + k, hy - 2 + (k % 2) * 0.4, 1.1, 0, TAU); ctx.fill(); } }
+    if (look.style !== "bald") {
+      ctx.beginPath(); ctx.arc(0, hy - 0.3, hr + 0.2, Math.PI * 0.95, Math.PI * 2.05); ctx.fill();
+      if (!front) { ctx.beginPath(); ctx.arc(0, hy, hr + 0.1, 0, TAU); ctx.fill(); }
+      if (look.style === "long") { ctx.fillRect(-hr - 0.2, hy - 0.6, 1.3, 4.6); if (!front) ctx.fillRect(-hr, hy, hr * 2, 3.6); }
+      if (look.style === "bun") { ctx.beginPath(); ctx.arc(-0.6, hy - hr - 0.8, 1.3, 0, TAU); ctx.fill(); }
+      if (look.style === "curly") for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.arc(-hr + 0.4 + k * 0.95, hy - hr + 0.5 + (k % 2) * 0.4, 1.1, 0, TAU); ctx.fill(); }
     }
-    if (front) { ctx.fillStyle = "#2A2420"; ctx.fillRect(0.7, hy - 0.2, 0.55, 0.7); ctx.fillRect(1.7, hy - 0.2, 0.5, 0.7); }
+    if (look.hat) {
+      const c = look.hat.c; ctx.fillStyle = c;
+      if (look.hat.kind === "beanie") { ctx.beginPath(); ctx.arc(0, hy - 0.4, hr + 0.3, Math.PI, 0); ctx.fill(); ctx.beginPath(); ctx.arc(0, hy - hr - 0.9, 0.9, 0, TAU); ctx.fill(); }
+      else if (look.hat.kind === "cap") { ctx.beginPath(); ctx.arc(0, hy - 0.4, hr + 0.25, Math.PI, 0); ctx.fill(); ctx.fillRect(front ? 0 : -hr - 1.6, hy - 0.8, hr + 1.6, 0.9); }
+      else if (look.hat.kind === "sun") { ctx.beginPath(); ctx.ellipse(0, hy - 0.9, hr + 2.2, 0.9, 0, 0, TAU); ctx.fill(); ctx.beginPath(); ctx.arc(0, hy - 1, hr * 0.8, Math.PI, 0); ctx.fill(); }
+      else { ctx.fillRect(-hr * 0.8, hy - hr - 1.6, hr * 1.6, 2.4); ctx.fillRect(-hr - 0.8, hy - 0.9, hr * 2 + 1.6, 0.8); }
+    }
+    if (front) {
+      ctx.fillStyle = "#2E2A40";
+      const blink = Math.sin(t * 1.3 + look.h * 40) > 0.97;
+      if (!blink) { ctx.fillRect(0.5, hy - 0.2, 0.55, 0.75); ctx.fillRect(1.5, hy - 0.2, 0.5, 0.75); } else { ctx.fillRect(0.4, hy + 0.3, 0.7, 0.25); ctx.fillRect(1.4, hy + 0.3, 0.7, 0.25); }
+      ctx.fillStyle = "rgba(240,120,120,0.45)"; ctx.beginPath(); ctx.arc(1.9, hy + 1, 0.6, 0, TAU); ctx.fill();
+    }
+    ctx.restore();
+  }
+  /* small thought bubble above someone's head */
+  function drawBubble(ctx, x, y, ch, k = 1) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(k, k);
+    ctx.fillStyle = "rgba(255,250,244,0.95)";
+    ctx.beginPath(); ctx.ellipse(0, -5, 5.2, 4.2, 0, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(-1.6, 0.4, 1, 0, TAU); ctx.fill();
+    ctx.fillStyle = ch === "♥" ? "#E4726A" : "#4E5A7A";
+    ctx.font = "700 6px Fredoka, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(ch, 0, -4.8);
     ctx.restore();
   }
 
@@ -313,19 +335,23 @@
   }
 
   /* ---- static props (drawn into cached sprites) ---- */
+  /* cube-cluster trees, Monument Valley style */
+  const LEAVES = [["#6E9E78", "#88B48A"], ["#5E8E6E", "#7AA67E"], ["#7AA66A", "#94BE80"], ["#4F7D66", "#6A9A7A"]];
   function tree(pn, v = 0, s = 1) {
-    const ctx = pn.ctx, [x, y] = pn.P(0, 0, 0);
-    const greens = [["#4C8A4E", "#6CAB5C", "#9BCB76"], ["#5A9650", "#7BB765", "#AAD47F"], ["#447D4B", "#62A15A", "#8FC271"], ["#3F7A55", "#5C9E6B", "#8CC58F"]][(((v | 0) % 4) + 4) % 4];
-    if (!pn.E) { ctx.fillStyle = "rgba(30,50,20,0.22)"; ctx.beginPath(); ctx.ellipse(x + 7 * s, y + 1, 13 * s, 4.5 * s, 0, 0, TAU); ctx.fill(); }
-    ctx.beginPath(); ctx.moveTo(x - 1.6 * s, y); ctx.lineTo(x - 1.2 * s, y - 12 * s); ctx.lineTo(x + 1.2 * s, y - 12 * s); ctx.lineTo(x + 1.6 * s, y); ctx.closePath(); pn.fillPath("#7A5236");
-    const blobs = [[-5, -15, 7.5, 0], [5, -16, 7.5, 1], [0, -22, 8, 1], [-3, -20, 5, 2], [4, -23, 4.5, 2]];
-    blobs.forEach(([bx, by, r, k]) => { ctx.beginPath(); ctx.arc(x + bx * s, y + by * s, r * s, 0, TAU); pn.fillPath(greens[k]); });
+    const [g1, g2] = LEAVES[(((v | 0) % 4) + 4) % 4];
+    if (!pn.E) pn.poly([[-4 * s, -4 * s, 0], [10 * s, -4 * s, 0], [14 * s, 6 * s, 0], [0, 6 * s, 0]], "rgba(40,30,70,0.16)", null);
+    pn.box(0, 0, 0, 2.6 * s, 2.6 * s, 9 * s, "#8A6A6A");
+    pn.box(0, 0, 9 * s, 13 * s, 13 * s, 9 * s, g1);
+    pn.box(-3 * s, 3 * s, 14 * s, 8 * s, 8 * s, 7 * s, g2);
+    pn.box(3 * s, -2 * s, 17 * s, 7 * s, 7 * s, 6 * s, g1);
   }
   function pine(pn, s = 1) {
-    const ctx = pn.ctx, [x, y] = pn.P(0, 0, 0);
-    if (!pn.E) { ctx.fillStyle = "rgba(30,50,20,0.22)"; ctx.beginPath(); ctx.ellipse(x + 6 * s, y + 1, 10 * s, 3.5 * s, 0, 0, TAU); ctx.fill(); }
-    ctx.beginPath(); ctx.rect(x - 1.2 * s, y - 6 * s, 2.4 * s, 6 * s); pn.fillPath("#6F4A30");
-    [[0, 9, "#3E7A4C"], [7, 7.5, "#4C8A55"], [13, 6, "#5E9E63"]].forEach(([o, w, c]) => { ctx.beginPath(); ctx.moveTo(x - w * s, y - (5 + o) * s); ctx.lineTo(x, y - (20 + o) * s); ctx.lineTo(x + w * s, y - (5 + o) * s); ctx.closePath(); pn.fillPath(c); });
+    const [g1, g2] = LEAVES[3];
+    if (!pn.E) pn.poly([[-4 * s, -4 * s, 0], [9 * s, -4 * s, 0], [12 * s, 5 * s, 0], [0, 5 * s, 0]], "rgba(40,30,70,0.16)", null);
+    pn.box(0, 0, 0, 2.4 * s, 2.4 * s, 6 * s, "#8A6A6A");
+    pn.box(0, 0, 6 * s, 12 * s, 12 * s, 7 * s, g1);
+    pn.box(0, 0, 13 * s, 8.5 * s, 8.5 * s, 7 * s, g2);
+    pn.box(0, 0, 20 * s, 5 * s, 5 * s, 6 * s, g1);
   }
   function palm(pn, s = 1, flip = 1) {
     const ctx = pn.ctx, [x, y] = pn.P(0, 0, 0);
@@ -337,10 +363,10 @@
       ctx.beginPath(); ctx.moveTo(tx, ty); ctx.quadraticCurveTo(tx + dx * 0.5 * s, ty - 7 * s, tx + dx * s, ty + dy * s); ctx.quadraticCurveTo(tx + dx * 0.55 * s, ty - 3 * s, tx, ty); pn.fillPath(k % 2 ? "#5E9E5A" : "#4C8A4E");
     });
   }
-  function bush(pn, c = "#6CAB5C", flower) {
-    const ctx = pn.ctx, [x, y] = pn.P(0, 0, 0);
-    [[-3, -3, 4, 0], [3, -3.5, 4.5, 1], [0, -6, 3.5, 2]].forEach(([bx, by, r, k]) => { ctx.beginPath(); ctx.arc(x + bx, y + by, r, 0, TAU); pn.fillPath(shade(c, [-0.1, 0, 0.15][k])); });
-    if (flower && !pn.E) { ctx.fillStyle = flower; [[-3, -6], [3, -6.5], [0, -8.5], [4, -3], [-4, -2.5]].forEach(([fx, fy]) => { ctx.beginPath(); ctx.arc(x + fx, y + fy, 0.9, 0, TAU); ctx.fill(); }); }
+  function bush(pn, c = "#7AA67E", flower) {
+    pn.box(0, 0, 0, 9, 9, 6, c);
+    pn.box(-2, 2, 6, 5, 5, 3, shade(c, 0.1));
+    if (flower && !pn.E) { const [x, y] = pn.P(1, 1, 6.5); pn.ctx.fillStyle = flower; [[-2, -1], [2, 0], [0, 1.5]].forEach(([dx, dy]) => pn.ctx.fillRect(x + dx - 0.8, y + dy - 0.8, 1.6, 1.6)); }
   }
   function lampPost(pn, dbl = false) {
     pn.box(0, 0, 0, 2.4, 2.4, 1.5, "#566469");

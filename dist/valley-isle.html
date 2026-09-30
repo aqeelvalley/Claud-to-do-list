@@ -6978,11 +6978,34 @@ select.inp {
   };
   const hexOf = (r, g, b) => "#" + [r, g, b].map((v) => clamp(Math.round(v), 0, 255).toString(16).padStart(2, "0")).join("");
   const mix = (c1, c2, t) => { const p = rgb(c1), q = rgb(c2); return hexOf(lerp(p[0], q[0], t), lerp(p[1], q[1], t), lerp(p[2], q[2], t)); };
-  const shade = (c, t) => (t >= 0 ? mix(c, "#FFFFFF", t) : mix(c, "#1E1408", -t));
+  // flat style: shadows lean towards a dusky violet, highlights towards warm white
+  const shade = (c, t) => (t >= 0 ? mix(c, "#FFF8F0", t) : mix(c, "#3A3158", -t));
   const rgba = (c, a) => { const p = rgb(c); return `rgba(${p[0]},${p[1]},${p[2]},${a})`; };
   const hash = (s) => { let t = 2166136261; for (let k = 0; k < s.length; k++) { t ^= s.charCodeAt(k); t = Math.imul(t, 16777619); } return t >>> 0; };
   const rng = (seed) => { let t = seed >>> 0; return () => { t = (t + 0x6d2b79f5) >>> 0; let r = Math.imul(t ^ (t >>> 15), t | 1); r ^= r + Math.imul(r ^ (r >>> 7), r | 61); return ((r ^ (r >>> 14)) >>> 0) / 4294967296; }; };
-  const OUT = "rgba(60,40,22,0.28)";
+  const OUT = null; // flat art: no outlines
+  /* Monument-Valley pass: every solid pen colour is softened - saturation
+     capped, lightness lifted, cool darks nudged towards dusky violet. */
+  const PAST = new Map();
+  const pastel = (c) => {
+    if (typeof c !== "string" || c[0] !== "#") return c;
+    let v = PAST.get(c); if (v) return v;
+    const [r, g, b] = rgb(c).map((x) => x / 255);
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn;
+    let h = 0, s = 0;
+    if (d > 1e-6) {
+      s = d / (1 - Math.abs(2 * l - 1));
+      h = mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      h *= 60;
+    }
+    if (h > 190 && h < 240) h += (240 - h) * 0.35; // steel blues lean periwinkle
+    const L = 0.3 + 0.62 * l, S = s < 0.08 ? s : Math.min(0.72, s * 0.9 + 0.1);
+    const C = (1 - Math.abs(2 * L - 1)) * S, X = C * (1 - Math.abs(((h / 60) % 2) - 1)), m = L - C / 2;
+    const [r1, g1, b1] = h < 60 ? [C, X, 0] : h < 120 ? [X, C, 0] : h < 180 ? [0, C, X] : h < 240 ? [0, X, C] : h < 300 ? [X, 0, C] : [C, 0, X];
+    v = hexOf((r1 + m) * 255, (g1 + m) * 255, (b1 + m) * 255);
+    if (d <= 1e-6 && l < 0.5) v = mix(v, "#5A4E7A", 0.3); // greys/blacks go violet
+    PAST.set(c, v); return v;
+  };
 
   /* A pen draws iso geometry into a 2D context around an origin (ox, oy).
      opts.emit: draw the emissive layer instead. Ordinary geometry then erases
@@ -7001,14 +7024,15 @@ select.inp {
     const poly = (pts, fill, stroke = OUT, lw = 0.7) => {
       path(pts);
       if (E) { if (fill) erase(); return; }
-      if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+      if (fill) { ctx.fillStyle = pastel(fill); ctx.fill(); }
       if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw; ctx.lineJoin = "round"; ctx.stroke(); }
     };
     const line = (p0, p1, color, lw = 1, cap = "round") => {
       if (E) return;
+      if (typeof color === "string" && color.startsWith("rgba")) return; // flat art: no texture lines
       const [x0, y0] = P(p0[0], p0[1], p0[2] || 0), [x1, y1] = P(p1[0], p1[1], p1[2] || 0);
       ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1);
-      ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.lineCap = cap; ctx.stroke();
+      ctx.strokeStyle = pastel(color); ctx.lineWidth = lw; ctx.lineCap = cap; ctx.stroke();
     };
     /* axis-aligned box centred on (x, y) */
     const box = (x, y, z, w, d, h, c, o = {}) => {
@@ -7016,9 +7040,9 @@ select.inp {
       const st = o.stroke === undefined ? OUT : o.stroke;
       if (h > 0) {
         poly([[x0, y1, z], [x1, y1, z], [x1, y1, z1], [x0, y1, z1]], o.left || c, st);
-        poly([[x1, y0, z], [x1, y1, z], [x1, y1, z1], [x1, y0, z1]], o.right || shade(c, -0.2), st);
+        poly([[x1, y0, z], [x1, y1, z], [x1, y1, z1], [x1, y0, z1]], o.right || shade(c, -0.34), st);
       }
-      poly([[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]], o.top || shade(c, 0.12), st);
+      poly([[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]], o.top || shade(c, 0.2), st);
     };
     /* quad on a face of a box: 'L' = +b face, 'R' = +a face; u across, v up (0..1) */
     const faceQ = (bx, face, u0, u1, v0, v1, inset = 0.4) => {
@@ -7035,14 +7059,16 @@ select.inp {
       const [cx, cyb] = P(x, y, z), cyt = cyb - h, rx = r * 1.4142, ry = r * 0.7071;
       ctx.beginPath(); ctx.moveTo(cx - rx, cyt); ctx.lineTo(cx - rx, cyb); ctx.ellipse(cx, cyb, rx, ry, 0, Math.PI, 0, true); ctx.lineTo(cx + rx, cyt); ctx.ellipse(cx, cyt, rx, ry, 0, 0, Math.PI, true); ctx.closePath();
       if (E) { erase(); return { cx, cyt, cyb, rx, ry }; }
-      const g = ctx.createLinearGradient(cx - rx, 0, cx + rx, 0);
-      g.addColorStop(0, shade(c, 0.12)); g.addColorStop(0.35, shade(c, 0.05)); g.addColorStop(1, shade(c, -0.3));
-      ctx.fillStyle = g; ctx.fill(); ctx.strokeStyle = OUT; ctx.lineWidth = 0.7; ctx.stroke();
+      // flat two-tone: lit left half, shaded right half
+      ctx.fillStyle = pastel(c); ctx.fill();
+      const half = (col, zb, zt2) => { ctx.beginPath(); ctx.moveTo(cx, cyb - zt2 + ry); ctx.lineTo(cx, cyb - zb + ry); ctx.ellipse(cx, cyb - zb, rx, ry, 0, Math.PI / 2, 0, true); ctx.lineTo(cx + rx, cyb - zt2); ctx.ellipse(cx, cyb - zt2, rx, ry, 0, 0, Math.PI / 2, false); ctx.closePath(); ctx.fillStyle = pastel(col); ctx.fill(); };
+      half(shade(c, -0.24), 0, h);
       (o.bands || []).forEach(([z0, z1, bc]) => {
         ctx.beginPath(); ctx.moveTo(cx - rx, cyb - z1); ctx.lineTo(cx - rx, cyb - z0); ctx.ellipse(cx, cyb - z0, rx, ry, 0, Math.PI, 0, true); ctx.lineTo(cx + rx, cyb - z1); ctx.ellipse(cx, cyb - z1, rx, ry, 0, 0, Math.PI, false); ctx.closePath();
-        const gb = ctx.createLinearGradient(cx - rx, 0, cx + rx, 0); gb.addColorStop(0, shade(bc, 0.1)); gb.addColorStop(1, shade(bc, -0.3)); ctx.fillStyle = gb; ctx.fill();
+        ctx.fillStyle = pastel(bc); ctx.fill();
+        half(shade(bc, -0.24), z0, z1);
       });
-      if (!o.noTop) { ctx.beginPath(); ctx.ellipse(cx, cyt, rx, ry, 0, 0, TAU); ctx.fillStyle = o.top || shade(c, 0.18); ctx.fill(); ctx.stroke(); }
+      if (!o.noTop) { ctx.beginPath(); ctx.ellipse(cx, cyt, rx, ry, 0, 0, TAU); ctx.fillStyle = pastel(o.top || shade(c, 0.22)); ctx.fill(); }
       return { cx, cyt, cyb, rx, ry };
     };
     /* gable roof over a box footprint; ridge along 'a' or 'b' */
@@ -7080,17 +7106,14 @@ select.inp {
         if (litFn(k)) { path(faceQ(bx, face, u0, u1, v0, v1, 0.7)); ctx.fillStyle = k % 3 ? "#FFD58A" : "#FFE9B8"; ctx.fill(); }
         return;
       }
-      poly(faceQ(bx, face, u0 - 0.015, u1 + 0.015, v0 - 0.03, v1 + 0.03, 0.5), frame, null);
-      poly(faceQ(bx, face, u0, u1, v0, v1, 0.7), face === "L" ? "#6D98A6" : "#557F8D", "rgba(40,30,20,0.35)", 0.5);
-      poly(faceQ(bx, face, u0, lerp(u0, u1, 0.45), lerp(v0, v1, 0.55), v1, 0.8), "rgba(255,255,255,0.22)", null);
-      const um = (u0 + u1) / 2, vm = (v0 + v1) / 2;
-      line(faceP(bx, face, um, v0, 0.9), faceP(bx, face, um, v1, 0.9), frame, 0.9);
-      line(faceP(bx, face, u0, vm, 0.9), faceP(bx, face, u1, vm, 0.9), frame, 0.9);
-      poly(faceQ(bx, face, u0 - 0.03, u1 + 0.03, v0 - 0.06, v0 - 0.02, 1.4), shade(frame, -0.1), null);
+      // flat recessed window: a deep inset with a light reveal on one side and a sill
+      poly(faceQ(bx, face, u0, u1, v0, v1, 0.6), face === "L" ? "#4C5A80" : "#3D4969", null);
+      poly(faceQ(bx, face, u0, lerp(u0, u1, 0.16), v0, v1, 0.7), face === "L" ? "#6A78A0" : "#56628A", null);
+      poly(faceQ(bx, face, u0 - 0.02, u1 + 0.02, v0 - 0.05, v0, 1.2), shade(frame, -0.06), null);
     };
     const door = (bx, face, u, wu, hv, c = "#6E4A33") => {
-      poly(faceQ(bx, face, u - wu / 2 - 0.02, u + wu / 2 + 0.02, 0, hv + 0.04, 0.4), "#F6EDDF", null);
-      poly(faceQ(bx, face, u - wu / 2, u + wu / 2, 0.02, hv, 0.6), c, "rgba(40,30,20,0.4)", 0.6);
+      poly(faceQ(bx, face, u - wu / 2, u + wu / 2, 0, hv, 0.6), c, null);
+      poly(faceQ(bx, face, u - wu / 2, u - wu / 2 + wu * 0.2, 0, hv, 0.7), shade(c, 0.18), null);
       if (!E) {
         const k = faceP(bx, face, u + wu * 0.28, hv * 0.45, 0.9);
         const [kx, ky] = P(k[0], k[1], k[2]); ctx.fillStyle = "#E9B949"; ctx.fillRect(kx - 0.7, ky - 0.7, 1.4, 1.4);
@@ -7136,7 +7159,7 @@ select.inp {
       if (core) { ctx.fillStyle = "#FFFBEA"; ctx.beginPath(); ctx.arc(x, y, core, 0, TAU); ctx.fill(); }
     };
     /* fill the current raw path: colour mode paints, emissive mode erases */
-    const fillPath = (fill) => { if (E) erase(); else { ctx.fillStyle = fill; ctx.fill(); } };
+    const fillPath = (fill) => { if (E) erase(); else { ctx.fillStyle = pastel(fill); ctx.fill(); } };
     return { P, path, poly, line, box, faceQ, faceP, cyl, gable, hip, windowQ, door, awning, sign, glow, fillPath, ctx, E, winCount: () => winK };
   }
 
@@ -7182,7 +7205,7 @@ select.inp {
 
   const rect = (x0, x1, y0, y1) => [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
   const cham = (x0, x1, y0, y1, c) => [[x0 + c, y0], [x1 - c, y0], [x1, y0 + c], [x1, y1 - c], [x1 - c, y1], [x0 + c, y1], [x0, y1 - c], [x0, y0 + c]];
-  const GLASS = "#5E8E9C";
+  const GLASS = "#43527A";
 
   const VEHICLES = {
     hatch: { L: 19, W: 10 }, sedan: { L: 21, W: 10 }, bakkie: { L: 22, W: 10.5 },
@@ -7198,13 +7221,16 @@ select.inp {
     ctx.transform(ux * r, uy * r, 0, -r, 0, 0);
     ctx.beginPath(); ctx.arc(0, 0, 1, 0, TAU);
     if (pn.E) { pn.fillPath(); ctx.restore(); return; }
-    ctx.fillStyle = "#2B2F33"; ctx.fill();
-    ctx.beginPath(); ctx.arc(0, 0, 0.56, 0, TAU); ctx.fillStyle = "#B8C1C6"; ctx.fill();
-    ctx.strokeStyle = "#6E777C"; ctx.lineWidth = 0.14;
+    ctx.fillStyle = "#2E2A40"; ctx.fill();
+    ctx.beginPath(); ctx.arc(0, 0, 0.56, 0, TAU); ctx.fillStyle = "#D8D2E0"; ctx.fill();
+    ctx.strokeStyle = "#8C86A0"; ctx.lineWidth = 0.14;
     for (let k = 0; k < 3; k++) { const t = phase + (k * TAU) / 3; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(Math.cos(t) * 0.5, Math.sin(t) * 0.5); ctx.stroke(); }
     ctx.restore();
   }
-  /* draw a vehicle centred on the pen origin */
+  /* draw a vehicle centred on the pen origin.
+     Parts are drawn back-to-front: side-by-side parts (a van's box and
+     bonnet, a truck's cargo box and cab) sort by depth, and parts that sit
+     on top of another (a cabin, a load bed) are drawn right after their base. */
   function drawVehicle(pn, kind, color, yaw, wheelPhase = 0) {
     const V = VEHICLES[kind] || VEHICLES.hatch, L = V.L, Wd = V.W, hl = L / 2, hw = Wd / 2;
     const W = orient(yaw);
@@ -7212,71 +7238,55 @@ select.inp {
     const wheels = [[hl * 0.62, hw - 0.4], [-hl * 0.62, hw - 0.4], [hl * 0.62, -hw + 0.4], [-hl * 0.62, -hw + 0.4]];
     if (kind === "bus" || kind === "truck") { wheels[0][0] = hl * 0.7; wheels[2][0] = hl * 0.7; wheels[1][0] = -hl * 0.55; wheels[3][0] = -hl * 0.55; }
     const far = wheels.filter((w) => (w[1] > 0) !== leftNear), near = wheels.filter((w) => (w[1] > 0) === leftNear);
-    // ground shadow
-    if (!pn.E) {
-      pn.poly([W(-hl - 1, -hw - 1), W(hl + 1, -hw - 1), W(hl + 3, hw + 2), W(-hl + 1, hw + 2)].map((p) => [p[0] + 2, p[1] + 1, 0]), "rgba(20,30,40,0.22)", null);
-    }
+    if (!pn.E) pn.poly([W(-hl - 1, -hw - 1), W(hl + 1, -hw - 1), W(hl + 3, hw + 2), W(-hl + 1, hw + 2)].map((p) => [p[0] + 2, p[1] + 1, 0]), "rgba(40,30,70,0.18)", null);
     far.forEach((w) => drawWheel(pn, W, w[0], w[1], 2.6, wheelPhase));
-    const faces = [];
-    const body = (x0, x1, z0, z1, ins = 0.4, c = color, top) =>
-      prism(pn, W, cham(x0, x1, -hw, hw, 1.4), z0, cham(x0 + ins, x1 - ins, -hw + ins, hw - ins, 1.2), z1, () => c, top || shade(c, 0.12), faces);
-    const glassCab = (bx0, bx1, tx0, tx1, z0, z1, wIn = 0.6, roof = color) =>
-      prism(pn, W, rect(bx0, bx1, -hw + wIn, hw - wIn), z0, rect(tx0, tx1, -hw + wIn + 0.8, hw - wIn - 0.8), z1, () => GLASS, shade(roof, 0.12), faces);
-    const frontFace = (fs) => fs.find((f) => f.i === 1 && (f.q.length));
-    let cabFaces = [];
+    const fr = W(1, 0);
+    const lights = (fs) => fs.forEach((f) => {
+      const d = f.na * fr[0] + f.nb * fr[1];
+      if (Math.abs(d) < 0.8) return;
+      const front = d > 0;
+      [[0.08, 0.26], [0.74, 0.92]].forEach(([u0, u1]) => {
+        if (pn.E) { const p = onFace(f.q, (u0 + u1) / 2, 0.58); pn.glow(p[0], p[1], p[2], front ? 7 : 5, front ? "#FFF3C4" : "#FF4A3D", 0.9); }
+        else decal(pn, f.q, u0, u1, 0.45, 0.7, front ? "#FFF6D6" : "#E0474C");
+      });
+      if (front && !pn.E) decal(pn, f.q, 0.3, 0.7, 0.3, 0.52, shade(color, -0.35));
+    });
+    const P3 = (bottom, z0, top, z1, col, topCol, deco) => () => { const fs = prism(pn, W, bottom, z0, top, z1, typeof col === "function" ? col : () => col, topCol); deco && deco(fs); return fs; };
+    const depth = (x) => { const p = W(x, 0); return p[0] + p[1]; };
+    const parts = []; // {x, draw, kids:[]}
+    const part = (x, draw, kids = []) => { const p = { x, draw, kids }; parts.push(p); return p; };
+    const kid = (x, draw) => ({ x, draw, kids: [] });
+    const cabin = (bx0, bx1, tx0, tx1, z0, z1, wIn = 0.6) => P3(rect(bx0, bx1, -hw + wIn, hw - wIn), z0, rect(tx0, tx1, -hw + wIn + 0.8, hw - wIn - 0.8), z1, GLASS, shade(color, 0.16));
+    const bodyP = (x0, x1, z0, z1, ins = 0.4, deco = lights) => P3(cham(x0, x1, -hw, hw, 1.4), z0, cham(x0 + ins, x1 - ins, -hw + ins, hw - ins, 1.2), z1, color, shade(color, 0.16), deco);
     if (kind === "hatch" || kind === "sedan") {
-      const bf = body(-hl, hl, 2.2, 6.6);
-      cabFaces = kind === "hatch" ? glassCab(-hl + 2, hl * 0.35, -hl + 2.6, 0.2, 6.6, 11) : glassCab(-hl * 0.55, hl * 0.3, -hl * 0.35, -0.2, 6.6, 10.8);
-      lights(bf, 2.2, 6.6);
+      part(0, bodyP(-hl, hl, 2.2, 6.6), [kind === "hatch" ? kid(-hl * 0.3, cabin(-hl + 2, hl * 0.35, -hl + 2.6, 0.2, 6.6, 11)) : kid(0, cabin(-hl * 0.55, hl * 0.3, -hl * 0.35, -0.2, 6.6, 10.8))]);
     } else if (kind === "bakkie") {
-      const bf = body(-hl, hl, 2.2, 6.4);
-      cabFaces = glassCab(-1, hl * 0.45, 0, hl * 0.2, 6.4, 11.4);
-      // load bed walls
-      prism(pn, W, rect(-hl + 0.5, -1.4, hw - 1.2, hw - 0.4), 6.4, rect(-hl + 0.5, -1.4, hw - 1.2, hw - 0.4), 9, () => shade(color, -0.05), shade(color, 0.1));
-      prism(pn, W, rect(-hl + 0.5, -1.4, -hw + 0.4, -hw + 1.2), 6.4, rect(-hl + 0.5, -1.4, -hw + 0.4, -hw + 1.2), 9, () => shade(color, -0.05), shade(color, 0.1));
-      prism(pn, W, rect(-hl + 0.4, -hl + 1.2, -hw + 0.4, hw - 0.4), 6.4, rect(-hl + 0.4, -hl + 1.2, -hw + 0.4, hw - 0.4), 9, () => shade(color, -0.05), shade(color, 0.1));
-      lights(bf, 2.2, 6.4);
+      const wall = (x0, x1, y0, y1) => P3(rect(x0, x1, y0, y1), 6.4, rect(x0, x1, y0, y1), 9, shade(color, -0.05), shade(color, 0.12));
+      part(0, bodyP(-hl, hl, 2.2, 6.4), [
+        kid(hl * 0.25, cabin(-1, hl * 0.45, 0, hl * 0.2, 6.4, 11.4)),
+        kid(-hl * 0.5, wall(-hl + 0.5, -1.4, hw - 1.2, hw - 0.4)),
+        kid(-hl * 0.5, wall(-hl + 0.5, -1.4, -hw + 0.4, -hw + 1.2)),
+        kid(-hl + 0.8, wall(-hl + 0.4, -hl + 1.2, -hw + 0.4, hw - 0.4)),
+      ]);
     } else if (kind === "van") {
-      const bf = prism(pn, W, cham(-hl, hl - 4, -hw, hw, 1.2), 2.2, cham(-hl + 0.3, hl - 4.5, -hw + 0.3, hw - 0.3, 1), 13.5, () => color, shade(color, 0.14), faces);
-      prism(pn, W, cham(hl - 4.6, hl, -hw, hw, 1.4), 2.2, cham(hl - 4.6, hl - 1.2, -hw + 0.4, hw - 0.4, 1), 7.2, () => color, shade(color, 0.1), faces);
-      prism(pn, W, rect(hl - 4.6, hl - 1.2, -hw + 0.5, hw - 0.5), 7.2, rect(hl - 4.6, hl - 4.2, -hw + 0.9, hw - 0.9), 13.2, () => GLASS, shade(color, 0.12));
-      bf.forEach((f) => { if (Math.abs(f.i % 4) === 0 || f.i === 4) decal(pn, f.q, 0.62, 0.92, 0.55, 0.85, GLASS); });
-      lights(faces, 2.2, 7);
+      part((-hl + hl - 4) / 2, P3(cham(-hl, hl - 4, -hw, hw, 1.2), 2.2, cham(-hl + 0.3, hl - 4.5, -hw + 0.3, hw - 0.3, 1), 13.5, color, shade(color, 0.16), (fs) => { lights(fs); fs.forEach((f) => { if (f.i === 0) decal(pn, f.q, 0.62, 0.92, 0.55, 0.85, GLASS); if (f.i === 4) decal(pn, f.q, 0.08, 0.38, 0.55, 0.85, GLASS); }); }));
+      part(hl - 2.3, P3(cham(hl - 4.6, hl, -hw, hw, 1.4), 2.2, cham(hl - 4.6, hl - 1.2, -hw + 0.4, hw - 0.4, 1), 7.2, color, shade(color, 0.12), lights),
+        [kid(hl - 3, P3(rect(hl - 4.6, hl - 1.2, -hw + 0.5, hw - 0.5), 7.2, rect(hl - 4.6, hl - 4.2, -hw + 0.9, hw - 0.9), 13.2, GLASS, shade(color, 0.14)))]);
     } else if (kind === "bus") {
-      const bf = prism(pn, W, cham(-hl, hl, -hw, hw, 1.6), 2.2, cham(-hl + 0.2, hl - 0.2, -hw + 0.2, hw - 0.2, 1.4), 15, () => color, "#F4F1EA", faces);
-      bf.forEach((f) => {
-        const len = Math.hypot(f.q[1][0] - f.q[0][0], f.q[1][1] - f.q[0][1]);
-        if (len > 20) { for (let k = 0; k < 6; k++) decal(pn, f.q, 0.05 + k * 0.155, 0.17 + k * 0.155, 0.5, 0.84, GLASS, "rgba(255,255,255,0.5)"); decal(pn, f.q, 0.02, 0.98, 0.2, 0.3, "#FFF8EC"); }
-        else if (len > 5) decal(pn, f.q, 0.12, 0.88, 0.45, 0.88, GLASS);
-      });
-      lights(faces, 2.2, 8);
-    } else if (kind === "truck") {
-      prism(pn, W, rect(-hl, hl - 7, -hw, hw), 3.2, rect(-hl, hl - 7, -hw, hw), 17, () => "#F6F3EC", "#FBF8F1", faces);
-      faces.forEach((f) => { const len = Math.hypot(f.q[1][0] - f.q[0][0], f.q[1][1] - f.q[0][1]); if (len > 15) decal(pn, f.q, 0.08, 0.92, 0.35, 0.6, color); });
-      const cf = [];
-      prism(pn, W, cham(hl - 7, hl, -hw, hw, 1.2), 2.2, cham(hl - 7, hl - 1.5, -hw + 0.3, hw - 0.3, 1), 12.5, () => color, shade(color, 0.12), cf);
-      cf.forEach((f) => { const fr = W(1, 0); if (f.na * fr[0] + f.nb * fr[1] > 0.6) decal(pn, f.q, 0.12, 0.88, 0.55, 0.9, GLASS); else decal(pn, f.q, 0.1, 0.5, 0.55, 0.9, GLASS); });
-      lights(cf.concat(faces), 2.2, 7);
-    }
-    near.forEach((w) => drawWheel(pn, W, w[0], w[1], 2.6, wheelPhase));
-    // headlights / taillights on whichever end faces the viewer
-    function lights(fs, z0, z1) {
-      const fr = W(1, 0);
-      fs.forEach((f) => {
-        const d = f.na * fr[0] + f.nb * fr[1];
-        if (Math.abs(d) < 0.8) return;
-        const front = d > 0, v0 = 0.45, v1 = 0.7;
-        const col = front ? "#FFF6D6" : "#E0474C";
-        [[0.08, 0.26], [0.74, 0.92]].forEach(([u0, u1]) => {
-          if (pn.E) {
-            const p = onFace(f.q, (u0 + u1) / 2, (v0 + v1) / 2);
-            pn.glow(p[0], p[1], p[2], front ? 7 : 5, front ? "#FFF3C4" : "#FF4A3D", 0.9);
-          } else decal(pn, f.q, u0, u1, v0, v1, col, "rgba(40,30,20,0.4)");
+      part(0, P3(cham(-hl, hl, -hw, hw, 1.6), 2.2, cham(-hl + 0.2, hl - 0.2, -hw + 0.2, hw - 0.2, 1.4), 15, color, "#F4F1EA", (fs) => {
+        fs.forEach((f) => {
+          const len = Math.hypot(f.q[1][0] - f.q[0][0], f.q[1][1] - f.q[0][1]);
+          if (len > 20) { for (let k = 0; k < 6; k++) decal(pn, f.q, 0.05 + k * 0.155, 0.17 + k * 0.155, 0.5, 0.84, GLASS); decal(pn, f.q, 0.02, 0.98, 0.2, 0.3, "#FFF8EC"); }
+          else if (len > 5) decal(pn, f.q, 0.12, 0.88, 0.45, 0.88, GLASS);
         });
-        if (front) { if (!pn.E) decal(pn, f.q, 0.3, 0.7, 0.3, 0.52, shade(color, -0.35)); }
-      });
+        lights(fs);
+      }));
+    } else if (kind === "truck") {
+      part((-hl + hl - 7) / 2, P3(rect(-hl, hl - 7, -hw, hw), 3.2, rect(-hl, hl - 7, -hw, hw), 17, "#F6F3EC", "#FBF8F1", (fs) => { fs.forEach((f) => { const len = Math.hypot(f.q[1][0] - f.q[0][0], f.q[1][1] - f.q[0][1]); if (len > 15) decal(pn, f.q, 0.08, 0.92, 0.35, 0.6, color); }); lights(fs); }));
+      part(hl - 3.5, P3(cham(hl - 7, hl, -hw, hw, 1.2), 2.2, cham(hl - 7, hl - 1.5, -hw + 0.3, hw - 0.3, 1), 12.5, color, shade(color, 0.14), (fs) => { fs.forEach((f) => { if (f.na * fr[0] + f.nb * fr[1] > 0.6) decal(pn, f.q, 0.12, 0.88, 0.55, 0.9, GLASS); else if (Math.abs(f.na * fr[0] + f.nb * fr[1]) < 0.3) decal(pn, f.q, 0.1, 0.5, 0.55, 0.9, GLASS); }); lights(fs); }));
     }
-    return faces;
+    parts.sort((p, q) => depth(p.x) - depth(q.x)).forEach((p) => { p.draw(); p.kids.sort((x, y) => depth(x.x) - depth(y.x)).forEach((k) => k.draw()); });
+    near.forEach((w) => drawWheel(pn, W, w[0], w[1], 2.6, wheelPhase));
   }
   /* headlight beams painted on the road (emissive only) */
   function drawBeams(pn, kind, yaw) {
@@ -7320,69 +7330,104 @@ select.inp {
     }
   }
 
-  /* ---- people ---- */
-  const SKINS = ["#F1C9A5", "#E6B48E", "#C98E66", "#9E6A48", "#7A4E33", "#5C3A26"];
-  const HAIRS = ["#2B1D14", "#4A2F1D", "#1A1A1A", "#8A5A2B", "#D8B26E", "#6B4A3A", "#B8B2A8"];
-  const TOPS = ["#2A9D8F", "#D9734E", "#3E7CB1", "#E9B949", "#C2577A", "#6DAE5B", "#7E6BC4", "#F08A4B", "#1F8FA3", "#F6EDDF", "#44545A"];
-  const BOTTOMS = ["#3B4A5A", "#2F3E4C", "#5B4A3A", "#8A7A66", "#394B6E", "#2B2B2B"];
+  /* ---- people: simple geometric figures with a bit of personality ---- */
+  const SKINS = ["#F3D2B6", "#E8BE98", "#CF9A74", "#A9745A", "#83573F", "#654030"];
+  const HAIRS = ["#3A2A26", "#5A3A2C", "#2A2530", "#9A6A3A", "#E2B870", "#7A5A4A", "#C8C0C8"];
+  const COATS = ["#E4726A", "#F2A65A", "#5FA8A0", "#6C8FC8", "#9C7CC8", "#F2C45A", "#E88AA8", "#7FB07A", "#F4EDE2", "#4E5A7A", "#D95F5F"];
+  const HATS = ["#E4726A", "#F2C45A", "#6C8FC8", "#4E5A7A", "#F4EDE2", "#7FB07A"];
+  const TRAITS = ["wave", "phone", "sip", "stretch", "look", "hum"];
   function randomLook(r) {
     const pick = (a) => a[(r() * a.length) | 0];
-    return { skin: pick(SKINS), hair: pick(HAIRS), style: pick(["short", "short", "long", "bun", "cap", "curly"]), top: pick(TOPS), bottom: pick(BOTTOMS),
-      dress: r() < 0.18, h: 0.9 + r() * 0.22, bag: r() < 0.2 ? pick(["#8A5A2B", "#C2577A", "#3E7CB1"]) : null, hat: pick(["#D9534F", "#3E7CB1", "#F2C14E"]) };
+    const build = pick(["slim", "slim", "round", "tall", "kid"]);
+    return {
+      skin: pick(SKINS), hair: pick(HAIRS), style: pick(["short", "long", "bun", "curly", "bald"]), top: pick(COATS),
+      build, h: build === "kid" ? 0.74 : build === "tall" ? 1.14 : 0.95 + r() * 0.1,
+      hat: r() < 0.45 ? { kind: pick(["beanie", "cap", "sun", "bowler"]), c: pick(HATS) } : null,
+      acc: r() < 0.5 ? pick(["bag", "phone", "coffee", "umbrella", "balloon"]) : null, accC: pick(HATS),
+      trait: pick(TRAITS), scarf: r() < 0.25 ? pick(HATS) : null,
+    };
   }
   /* person at screen point (x,y) (feet). dir: +1 facing screen-right, -1 left.
-     front: facing the viewer. phase: walk cycle radians. */
-  function drawPerson(ctx, x, y, look, dir, front, phase, moving, scale = 1) {
+     front: facing the viewer. phase: walk cycle radians. act: current idle action. */
+  function drawPerson(ctx, x, y, look, dir, front, phase, moving, scale = 1, act = null, t = 0) {
     const s = look.h * scale;
     const sw = moving ? Math.sin(phase) : 0;
+    const bob = moving ? Math.abs(Math.cos(phase)) * 0.7 : 0;
+    const wid = look.build === "round" ? 3.4 : look.build === "tall" ? 2.5 : 2.8;
+    const bodyH = look.build === "tall" ? 9.5 : 8;
     ctx.save();
     ctx.translate(x, y);
     ctx.scale(dir * s, s);
-    ctx.fillStyle = "rgba(0,0,0,0.2)";
-    ctx.beginPath(); ctx.ellipse(0, 0.3, 3.4, 1.2, 0, 0, TAU); ctx.fill();
-    const hipY = -5.6, shY = -10.4;
-    const leg = (side, c) => {
-      const fx = side * 0.9 + sw * side * 2.2, fy = -Math.abs(sw * side) * 0.5 * (side * sw > 0 ? 1 : 0);
-      ctx.strokeStyle = c; ctx.lineWidth = 1.7; ctx.lineCap = "round";
-      ctx.beginPath(); ctx.moveTo(side * 0.8, hipY); ctx.lineTo(fx, fy - 0.6); ctx.stroke();
-      ctx.fillStyle = "#2A2420"; ctx.beginPath(); ctx.ellipse(fx + 0.5, fy - 0.3, 1.2, 0.6, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = "rgba(40,30,70,0.18)";
+    ctx.beginPath(); ctx.ellipse(0, 0.3, wid + 0.6, 1.1, 0, 0, TAU); ctx.fill();
+    ctx.translate(0, -bob);
+    // legs: two short pegs that step
+    ["#3E3A52", "#4A4662"].forEach((c, k) => { const side = k ? 1 : -1, off = sw * side * 1.4; ctx.fillStyle = c; ctx.fillRect(side * 0.9 - 0.7 + off, -2.6, 1.4, 2.6 + (side * sw > 0 ? -0.4 : 0)); });
+    // coat: a soft trapezoid, lit on the left, shaded on the right
+    const top = -2 - bodyH, hem = -2;
+    const coat = (x0, x1, col) => { ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x0 * 0.62, top); ctx.lineTo(x1 * 0.62, top); ctx.lineTo(x1, hem); ctx.lineTo(x0, hem); ctx.closePath(); ctx.fill(); };
+    coat(-wid, wid, look.top);
+    coat(0.2, wid, shade(look.top, -0.2));
+    ctx.fillStyle = look.top; ctx.beginPath(); ctx.ellipse(0, top + 0.4, wid * 0.62, 1.2, 0, Math.PI, 0); ctx.fill();
+    if (look.scarf) { ctx.fillStyle = look.scarf; ctx.fillRect(-wid * 0.62, top - 0.4, wid * 1.24, 1.6); ctx.fillRect(front ? 0.4 : -1.4, top + 1, 1, 3); }
+    // arms: little nubs that swing, or do the character's thing when idle
+    const act0 = act && act.kind;
+    const armY = top + 2.2;
+    const handAt = (side) => {
+      if (!moving && side === 1 && act0 === "wave") return [wid * 0.9 + 1.2, armY - 5 + Math.sin(t * 12) * 1.2];
+      if (!moving && side === 1 && (act0 === "phone" || act0 === "sip")) return [wid * 0.5 + 0.6, armY - 2.4];
+      if (!moving && act0 === "stretch") return [side * (wid * 0.8 + 1), armY - 6];
+      return [side * (wid * 0.9) - sw * side * 1.1, armY + 4.2];
     };
-    const arm = (side, c) => {
-      const hx = side * 1.9 - sw * side * 1.9, hy = shY + 4.6;
-      ctx.strokeStyle = c; ctx.lineWidth = 1.4; ctx.lineCap = "round";
-      ctx.beginPath(); ctx.moveTo(side * 1.9, shY + 0.4); ctx.lineTo(hx, hy); ctx.stroke();
-      ctx.fillStyle = look.skin; ctx.beginPath(); ctx.arc(hx, hy + 0.3, 0.75, 0, TAU); ctx.fill();
-    };
-    // back limbs
-    leg(-1, shade(look.dress ? look.skin : look.bottom, -0.15));
-    arm(-1, shade(look.top, -0.2));
-    // torso
-    if (look.dress) {
-      leg(1, look.skin);
-      ctx.fillStyle = look.top; ctx.beginPath(); ctx.moveTo(-1.9, shY); ctx.lineTo(1.9, shY); ctx.lineTo(2.9, hipY + 1.8); ctx.lineTo(-2.9, hipY + 1.8); ctx.closePath(); ctx.fill();
-    } else {
-      leg(1, look.bottom);
-      ctx.fillStyle = look.bottom; ctx.fillRect(-2, hipY - 1.2, 4, 1.8);
-      ctx.fillStyle = look.top; ctx.beginPath(); ctx.moveTo(-2.1, shY); ctx.lineTo(2.1, shY); ctx.lineTo(2.2, hipY); ctx.lineTo(-2.2, hipY); ctx.closePath(); ctx.fill();
-    }
-    ctx.fillStyle = "rgba(0,0,0,0.12)"; ctx.fillRect(0.6, shY, 1.5, hipY - shY);
-    if (look.bag) { ctx.fillStyle = look.bag; ctx.fillRect(-3.3, hipY - 2.2, 2, 2.6); }
-    arm(1, look.top);
+    [-1, 1].forEach((side) => {
+      const [hx, hy] = handAt(side);
+      ctx.strokeStyle = side > 0 ? look.top : shade(look.top, -0.2); ctx.lineWidth = 1.4; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(side * wid * 0.62, armY); ctx.lineTo(hx, hy); ctx.stroke();
+      ctx.fillStyle = look.skin; ctx.beginPath(); ctx.arc(hx, hy, 0.75, 0, TAU); ctx.fill();
+      if (side > 0) {
+        if ((act0 === "phone" && !moving) || (look.acc === "phone" && !moving)) { ctx.fillStyle = "#2E2A40"; ctx.fillRect(hx - 0.4, hy - 2, 1.4, 2.2); ctx.fillStyle = "#9FE3FF"; ctx.fillRect(hx - 0.2, hy - 1.8, 1, 1.6); }
+        else if (look.acc === "coffee" || act0 === "sip") { ctx.fillStyle = "#F4EDE2"; ctx.fillRect(hx - 0.8, hy - 2.2, 1.8, 2.2); ctx.fillStyle = "#9A6A3A"; ctx.fillRect(hx - 0.8, hy - 1.4, 1.8, 0.7); }
+        else if (look.acc === "bag") { ctx.fillStyle = look.accC; ctx.fillRect(hx - 1.2, hy, 2.6, 2.6); }
+        else if (look.acc === "umbrella") { ctx.strokeStyle = "#3E3A52"; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx, hy - 9); ctx.stroke(); ctx.fillStyle = look.accC; ctx.beginPath(); ctx.moveTo(hx - 5, hy - 8); ctx.quadraticCurveTo(hx, hy - 14, hx + 5, hy - 8); ctx.closePath(); ctx.fill(); }
+        else if (look.acc === "balloon") { ctx.strokeStyle = "rgba(60,50,80,0.6)"; ctx.lineWidth = 0.4; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.quadraticCurveTo(hx + 2, hy - 7, hx + 1, hy - 13 + Math.sin(t * 2) * 0.6); ctx.stroke(); ctx.fillStyle = look.accC; ctx.beginPath(); ctx.ellipse(hx + 1, hy - 15.5 + Math.sin(t * 2) * 0.6, 2.2, 2.7, 0, 0, TAU); ctx.fill(); }
+      }
+    });
     // head
-    const hy = shY - 2.6;
-    ctx.fillStyle = look.skin; ctx.fillRect(-0.6, shY - 1, 1.2, 1.1);
-    ctx.beginPath(); ctx.arc(0, hy, 2.35, 0, TAU); ctx.fill();
+    const hr = look.build === "kid" ? 2.7 : 2.3, hy = top - hr + 0.2 + (act0 === "look" && !moving ? Math.sin(t * 3) * 0.3 : 0);
+    ctx.fillStyle = look.skin; ctx.beginPath(); ctx.arc(0, hy, hr, 0, TAU); ctx.fill();
+    ctx.fillStyle = shade(look.skin, -0.12); ctx.beginPath(); ctx.arc(0, hy, hr, -Math.PI / 2, Math.PI / 2); ctx.fill();
     ctx.fillStyle = look.hair;
-    if (look.style === "cap") {
-      ctx.fillStyle = look.hat; ctx.beginPath(); ctx.arc(0, hy - 0.4, 2.45, Math.PI, 0); ctx.fill(); ctx.fillRect(front ? 0 : -3.6, hy - 0.6, 3.6, 0.8);
-    } else {
-      ctx.beginPath(); ctx.arc(0, hy - 0.2, 2.5, Math.PI * 0.95, Math.PI * 2.05); ctx.fill();
-      if (!front) { ctx.beginPath(); ctx.arc(0, hy, 2.4, 0, TAU); ctx.fill(); }
-      if (look.style === "long") { ctx.fillRect(-2.5, hy - 0.5, 1.2, 4.2); if (!front) ctx.fillRect(-2.4, hy, 4.8, 3.6); else ctx.fillRect(1.4, hy - 0.5, 1.1, 3.4); }
-      if (look.style === "bun") { ctx.beginPath(); ctx.arc(-0.6, hy - 2.7, 1.3, 0, TAU); ctx.fill(); }
-      if (look.style === "curly") { for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.arc(-2 + k, hy - 2 + (k % 2) * 0.4, 1.1, 0, TAU); ctx.fill(); } }
+    if (look.style !== "bald") {
+      ctx.beginPath(); ctx.arc(0, hy - 0.3, hr + 0.2, Math.PI * 0.95, Math.PI * 2.05); ctx.fill();
+      if (!front) { ctx.beginPath(); ctx.arc(0, hy, hr + 0.1, 0, TAU); ctx.fill(); }
+      if (look.style === "long") { ctx.fillRect(-hr - 0.2, hy - 0.6, 1.3, 4.6); if (!front) ctx.fillRect(-hr, hy, hr * 2, 3.6); }
+      if (look.style === "bun") { ctx.beginPath(); ctx.arc(-0.6, hy - hr - 0.8, 1.3, 0, TAU); ctx.fill(); }
+      if (look.style === "curly") for (let k = 0; k < 5; k++) { ctx.beginPath(); ctx.arc(-hr + 0.4 + k * 0.95, hy - hr + 0.5 + (k % 2) * 0.4, 1.1, 0, TAU); ctx.fill(); }
     }
-    if (front) { ctx.fillStyle = "#2A2420"; ctx.fillRect(0.7, hy - 0.2, 0.55, 0.7); ctx.fillRect(1.7, hy - 0.2, 0.5, 0.7); }
+    if (look.hat) {
+      const c = look.hat.c; ctx.fillStyle = c;
+      if (look.hat.kind === "beanie") { ctx.beginPath(); ctx.arc(0, hy - 0.4, hr + 0.3, Math.PI, 0); ctx.fill(); ctx.beginPath(); ctx.arc(0, hy - hr - 0.9, 0.9, 0, TAU); ctx.fill(); }
+      else if (look.hat.kind === "cap") { ctx.beginPath(); ctx.arc(0, hy - 0.4, hr + 0.25, Math.PI, 0); ctx.fill(); ctx.fillRect(front ? 0 : -hr - 1.6, hy - 0.8, hr + 1.6, 0.9); }
+      else if (look.hat.kind === "sun") { ctx.beginPath(); ctx.ellipse(0, hy - 0.9, hr + 2.2, 0.9, 0, 0, TAU); ctx.fill(); ctx.beginPath(); ctx.arc(0, hy - 1, hr * 0.8, Math.PI, 0); ctx.fill(); }
+      else { ctx.fillRect(-hr * 0.8, hy - hr - 1.6, hr * 1.6, 2.4); ctx.fillRect(-hr - 0.8, hy - 0.9, hr * 2 + 1.6, 0.8); }
+    }
+    if (front) {
+      ctx.fillStyle = "#2E2A40";
+      const blink = Math.sin(t * 1.3 + look.h * 40) > 0.97;
+      if (!blink) { ctx.fillRect(0.5, hy - 0.2, 0.55, 0.75); ctx.fillRect(1.5, hy - 0.2, 0.5, 0.75); } else { ctx.fillRect(0.4, hy + 0.3, 0.7, 0.25); ctx.fillRect(1.4, hy + 0.3, 0.7, 0.25); }
+      ctx.fillStyle = "rgba(240,120,120,0.45)"; ctx.beginPath(); ctx.arc(1.9, hy + 1, 0.6, 0, TAU); ctx.fill();
+    }
+    ctx.restore();
+  }
+  /* small thought bubble above someone's head */
+  function drawBubble(ctx, x, y, ch, k = 1) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(k, k);
+    ctx.fillStyle = "rgba(255,250,244,0.95)";
+    ctx.beginPath(); ctx.ellipse(0, -5, 5.2, 4.2, 0, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(-1.6, 0.4, 1, 0, TAU); ctx.fill();
+    ctx.fillStyle = ch === "♥" ? "#E4726A" : "#4E5A7A";
+    ctx.font = "700 6px Fredoka, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(ch, 0, -4.8);
     ctx.restore();
   }
 
@@ -7455,19 +7500,23 @@ select.inp {
   }
 
   /* ---- static props (drawn into cached sprites) ---- */
+  /* cube-cluster trees, Monument Valley style */
+  const LEAVES = [["#6E9E78", "#88B48A"], ["#5E8E6E", "#7AA67E"], ["#7AA66A", "#94BE80"], ["#4F7D66", "#6A9A7A"]];
   function tree(pn, v = 0, s = 1) {
-    const ctx = pn.ctx, [x, y] = pn.P(0, 0, 0);
-    const greens = [["#4C8A4E", "#6CAB5C", "#9BCB76"], ["#5A9650", "#7BB765", "#AAD47F"], ["#447D4B", "#62A15A", "#8FC271"], ["#3F7A55", "#5C9E6B", "#8CC58F"]][(((v | 0) % 4) + 4) % 4];
-    if (!pn.E) { ctx.fillStyle = "rgba(30,50,20,0.22)"; ctx.beginPath(); ctx.ellipse(x + 7 * s, y + 1, 13 * s, 4.5 * s, 0, 0, TAU); ctx.fill(); }
-    ctx.beginPath(); ctx.moveTo(x - 1.6 * s, y); ctx.lineTo(x - 1.2 * s, y - 12 * s); ctx.lineTo(x + 1.2 * s, y - 12 * s); ctx.lineTo(x + 1.6 * s, y); ctx.closePath(); pn.fillPath("#7A5236");
-    const blobs = [[-5, -15, 7.5, 0], [5, -16, 7.5, 1], [0, -22, 8, 1], [-3, -20, 5, 2], [4, -23, 4.5, 2]];
-    blobs.forEach(([bx, by, r, k]) => { ctx.beginPath(); ctx.arc(x + bx * s, y + by * s, r * s, 0, TAU); pn.fillPath(greens[k]); });
+    const [g1, g2] = LEAVES[(((v | 0) % 4) + 4) % 4];
+    if (!pn.E) pn.poly([[-4 * s, -4 * s, 0], [10 * s, -4 * s, 0], [14 * s, 6 * s, 0], [0, 6 * s, 0]], "rgba(40,30,70,0.16)", null);
+    pn.box(0, 0, 0, 2.6 * s, 2.6 * s, 9 * s, "#8A6A6A");
+    pn.box(0, 0, 9 * s, 13 * s, 13 * s, 9 * s, g1);
+    pn.box(-3 * s, 3 * s, 14 * s, 8 * s, 8 * s, 7 * s, g2);
+    pn.box(3 * s, -2 * s, 17 * s, 7 * s, 7 * s, 6 * s, g1);
   }
   function pine(pn, s = 1) {
-    const ctx = pn.ctx, [x, y] = pn.P(0, 0, 0);
-    if (!pn.E) { ctx.fillStyle = "rgba(30,50,20,0.22)"; ctx.beginPath(); ctx.ellipse(x + 6 * s, y + 1, 10 * s, 3.5 * s, 0, 0, TAU); ctx.fill(); }
-    ctx.beginPath(); ctx.rect(x - 1.2 * s, y - 6 * s, 2.4 * s, 6 * s); pn.fillPath("#6F4A30");
-    [[0, 9, "#3E7A4C"], [7, 7.5, "#4C8A55"], [13, 6, "#5E9E63"]].forEach(([o, w, c]) => { ctx.beginPath(); ctx.moveTo(x - w * s, y - (5 + o) * s); ctx.lineTo(x, y - (20 + o) * s); ctx.lineTo(x + w * s, y - (5 + o) * s); ctx.closePath(); pn.fillPath(c); });
+    const [g1, g2] = LEAVES[3];
+    if (!pn.E) pn.poly([[-4 * s, -4 * s, 0], [9 * s, -4 * s, 0], [12 * s, 5 * s, 0], [0, 5 * s, 0]], "rgba(40,30,70,0.16)", null);
+    pn.box(0, 0, 0, 2.4 * s, 2.4 * s, 6 * s, "#8A6A6A");
+    pn.box(0, 0, 6 * s, 12 * s, 12 * s, 7 * s, g1);
+    pn.box(0, 0, 13 * s, 8.5 * s, 8.5 * s, 7 * s, g2);
+    pn.box(0, 0, 20 * s, 5 * s, 5 * s, 6 * s, g1);
   }
   function palm(pn, s = 1, flip = 1) {
     const ctx = pn.ctx, [x, y] = pn.P(0, 0, 0);
@@ -7479,10 +7528,10 @@ select.inp {
       ctx.beginPath(); ctx.moveTo(tx, ty); ctx.quadraticCurveTo(tx + dx * 0.5 * s, ty - 7 * s, tx + dx * s, ty + dy * s); ctx.quadraticCurveTo(tx + dx * 0.55 * s, ty - 3 * s, tx, ty); pn.fillPath(k % 2 ? "#5E9E5A" : "#4C8A4E");
     });
   }
-  function bush(pn, c = "#6CAB5C", flower) {
-    const ctx = pn.ctx, [x, y] = pn.P(0, 0, 0);
-    [[-3, -3, 4, 0], [3, -3.5, 4.5, 1], [0, -6, 3.5, 2]].forEach(([bx, by, r, k]) => { ctx.beginPath(); ctx.arc(x + bx, y + by, r, 0, TAU); pn.fillPath(shade(c, [-0.1, 0, 0.15][k])); });
-    if (flower && !pn.E) { ctx.fillStyle = flower; [[-3, -6], [3, -6.5], [0, -8.5], [4, -3], [-4, -2.5]].forEach(([fx, fy]) => { ctx.beginPath(); ctx.arc(x + fx, y + fy, 0.9, 0, TAU); ctx.fill(); }); }
+  function bush(pn, c = "#7AA67E", flower) {
+    pn.box(0, 0, 0, 9, 9, 6, c);
+    pn.box(-2, 2, 6, 5, 5, 3, shade(c, 0.1));
+    if (flower && !pn.E) { const [x, y] = pn.P(1, 1, 6.5); pn.ctx.fillStyle = flower; [[-2, -1], [2, 0], [0, 1.5]].forEach(([dx, dy]) => pn.ctx.fillRect(x + dx - 0.8, y + dy - 0.8, 1.6, 1.6)); }
   }
   function lampPost(pn, dbl = false) {
     pn.box(0, 0, 0, 2.4, 2.4, 1.5, "#566469");
@@ -8624,7 +8673,7 @@ select.inp {
   };
 
   /* ===================== engine: ground, sprites, lighting, frame ===================== */
-  const SEA_DROP = 14; // how far the sea sits below street level (seawall height)
+  const SEA_DROP = 26; // how far the sea sits below street level (seawall height)
   const inRect = (r, a, b, m = 0) => a >= r.a0 - m && a <= r.a1 + m && b >= r.b0 - m && b <= r.b1 + m;
 
   /* ---------- ground (static, drawn into cached chunks) ---------- */
@@ -8638,19 +8687,21 @@ select.inp {
       const pts = c.pts, n = pts.length;
       // shallow water halo
       screenPath(c.poly, -SEA_DROP);
-      ctx.save(); ctx.lineJoin = "round"; ctx.strokeStyle = "rgba(143,224,218,0.32)"; ctx.lineWidth = 90; ctx.stroke(); ctx.strokeStyle = "rgba(169,236,226,0.45)"; ctx.lineWidth = 34; ctx.stroke(); ctx.restore();
+      ctx.save(); ctx.lineJoin = "round"; ctx.strokeStyle = "rgba(150,214,210,0.30)"; ctx.lineWidth = 90; ctx.stroke(); ctx.strokeStyle = "rgba(176,226,220,0.45)"; ctx.lineWidth = 34; ctx.stroke(); ctx.restore();
       // wet sand slopes under natural shores
       for (let i = 0; i < n; i++) {
         const p = pts[i], q = pts[(i + 1) % n];
         if (p.wall || q.wall) continue;
-        const po = [p.a + p.na * 18, p.b + p.nb * 18, -SEA_DROP], qo = [q.a + q.na * 18, q.b + q.nb * 18, -SEA_DROP];
-        pn.poly([[p.a, p.b, 0], [q.a, q.b, 0], qo, po], "#D9B98A", null);
+        const po = [p.a + p.na * 16, p.b + p.nb * 16, -9], qo = [q.a + q.na * 16, q.b + q.nb * 16, -9];
+        pn.poly([[p.a, p.b, 0], [q.a, q.b, 0], qo, po], "#E6BE98", null);
+        let na = q.b - p.b, nb = -(q.a - p.a); const L2 = Math.hypot(na, nb) || 1; na /= L2; nb /= L2; if (na * p.na + nb * p.nb < 0) { na = -na; nb = -nb; }
+        if (na + nb > 0.02) pn.poly([po, qo, [qo[0], qo[1], -SEA_DROP], [po[0], po[1], -SEA_DROP]], shade("#E9B48E", 0.06 * nb - 0.2 * na), null);
       }
       ctx.strokeStyle = "rgba(255,255,255,0.8)"; ctx.lineWidth = 1.6; ctx.lineCap = "round";
       for (let i = 0; i < n; i++) {
         const p = pts[i], q = pts[(i + 1) % n];
         if (p.wall || q.wall) continue;
-        const [x0, y0] = P(p.a + p.na * 19, p.b + p.nb * 19, -SEA_DROP), [x1, y1] = P(q.a + q.na * 19, q.b + q.nb * 19, -SEA_DROP);
+        const [x0, y0] = P(p.a + p.na * 18, p.b + p.nb * 18, -SEA_DROP), [x1, y1] = P(q.a + q.na * 18, q.b + q.nb * 18, -SEA_DROP);
         ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
       }
       // seawalls where the shore is built up
@@ -8660,26 +8711,26 @@ select.inp {
         let na = q.b - p.b, nb = -(q.a - p.a); const L = Math.hypot(na, nb) || 1; na /= L; nb /= L;
         if (na * p.na + nb * p.nb < 0) { na = -na; nb = -nb; }
         if (na + nb <= 0.02) continue;
-        pn.poly([[p.a, p.b, 0], [q.a, q.b, 0], [q.a, q.b, -SEA_DROP], [p.a, p.b, -SEA_DROP]], shade("#B9AE9C", 0.05 * nb - 0.14 * na), "rgba(60,40,22,0.25)", 0.6);
+        pn.poly([[p.a, p.b, 0], [q.a, q.b, 0], [q.a, q.b, -SEA_DROP], [p.a, p.b, -SEA_DROP]], shade("#E8A98E", 0.05 * nb - 0.14 * na), "rgba(60,40,22,0.25)", 0.6);
         pn.line([p.a + na * 2, p.b + nb * 2, -SEA_DROP], [q.a + na * 2, q.b + nb * 2, -SEA_DROP], "rgba(255,255,255,0.7)", 1.6);
       }
       // sand, then grass inland of the sand
-      pn.poly(c.poly.map((p) => [p[0], p[1], 0]), "#EDD3A0", null);
-      pn.poly(pts.map((p) => [p.a - p.na * p.sand, p.b - p.nb * p.sand, 0.2]), "#97C97F", null);
+      pn.poly(c.poly.map((p) => [p[0], p[1], 0]), "#F5DCBC", null);
+      pn.poly(pts.map((p) => [p.a - p.na * p.sand, p.b - p.nb * p.sand, 0.2]), "#B3D39E", null);
       // paved edge along seawalls
       for (let i = 0; i < n; i++) {
         const p = pts[i], q = pts[(i + 1) % n];
         if (!(p.wall && q.wall)) continue;
-        pn.poly([[p.a, p.b, 0.3], [q.a, q.b, 0.3], [q.a - q.na * 12, q.b - q.nb * 12, 0.3], [p.a - p.na * 12, p.b - p.nb * 12, 0.3]], "#D6CAB2", null);
+        pn.poly([[p.a, p.b, 0.3], [q.a, q.b, 0.3], [q.a - q.na * 12, q.b - q.nb * 12, 0.3], [p.a - p.na * 12, p.b - p.nb * 12, 0.3]], "#F0DCCB", null);
       }
       // meadow tint patches for variety
       const r = rng(hash("meadow" + c.isle));
-      for (let k = 0; k < 14; k++) { const p = pts[(r() * n) | 0], d = 30 + r() * 40, [x, y] = P(p.a - p.na * d, p.b - p.nb * d, 0.25); ctx.fillStyle = "rgba(170,214,138,0.5)"; ctx.beginPath(); ctx.ellipse(x, y, 30 + r() * 30, 12 + r() * 10, 0, 0, TAU); ctx.fill(); }
+      for (let k = 0; k < 14; k++) { const p = pts[(r() * n) | 0], d = 30 + r() * 40, [x, y] = P(p.a - p.na * d, p.b - p.nb * d, 0.25); ctx.fillStyle = "rgba(190,222,170,0.5)"; ctx.beginPath(); ctx.ellipse(x, y, 30 + r() * 30, 12 + r() * 10, 0, 0, TAU); ctx.fill(); }
     });
     // piers and breakwaters
     T.piers.forEach((p) => {
       const jetty = p.type === "jetty";
-      pn.box((p.a0 + p.a1) / 2, (p.b0 + p.b1) / 2, -SEA_DROP, p.a1 - p.a0, p.b1 - p.b0, SEA_DROP, jetty ? "#BDBAB2" : "#BFB6A6", jetty ? { left: "#A9A59B", right: "#8E8A80", top: "#CBC7BD" } : { left: "#B4A995", right: "#9E937F", top: "#C9C0AF" });
+      pn.box((p.a0 + p.a1) / 2, (p.b0 + p.b1) / 2, -SEA_DROP, p.a1 - p.a0, p.b1 - p.b0, SEA_DROP, jetty ? "#BDBAB2" : "#E7B79C", jetty ? { left: "#A9A59B", right: "#8E8A80", top: "#CBC7BD" } : { left: "#DFA88C", right: "#B98AA0", top: "#F0CDB4" });
       if (jetty) {
         [p.a0 + 3, p.a1 - 3].forEach((a) => { pn.line([a, p.b0 + 8, 0.2], [a, p.b1 - 3, 0.2], "#E9B949", 1.4); for (let b = p.b0 + 24; b < p.b1; b += 34) pn.cyl(a + (a < (p.a0 + p.a1) / 2 ? -1 : 1), b, 0, 1.8, 3.4, "#3B4A50"); });
         for (let b = p.b0 + 14; b < p.b1; b += 14) pn.line([p.a0 + 6, b, 0.2], [p.a1 - 6, b, 0.2], "rgba(90,90,90,0.12)", 0.6);
@@ -8690,15 +8741,15 @@ select.inp {
     T.paths.forEach((pp) => {
       screenPath(pp.pts, 0.4, false);
       ctx.lineJoin = "round"; ctx.lineCap = "round";
-      ctx.strokeStyle = "#CDBB92"; ctx.lineWidth = pp.kind === "link" ? 8 : 11; ctx.stroke();
-      ctx.strokeStyle = "#EADBB8"; ctx.lineWidth = pp.kind === "link" ? 6 : 8.5; ctx.stroke();
+      ctx.strokeStyle = "#E6D0B4"; ctx.lineWidth = pp.kind === "link" ? 8 : 11; ctx.stroke();
+      ctx.strokeStyle = "#F6E6CF"; ctx.lineWidth = pp.kind === "link" ? 6 : 8.5; ctx.stroke();
     });
     /* ---- town: footway base, roads, then rounded blocks ---- */
     Object.values(T.isles).forEach((I) => {
       const r = RC + 15 + VERGE;
-      pn.poly(rrect4(I.box.a0, I.box.a1, I.box.b0, I.box.b1, [r, r, r, r], 0.4), "#DCD0B8", "#C4B597", 1.2);
+      pn.poly(rrect4(I.box.a0, I.box.a1, I.box.b0, I.box.b1, [r, r, r, r], 0.4), "#F2E6D6", "#E3D1BE", 1.2);
     });
-    const road = "#646E74";
+    const road = "#8E8CAA";
     const arcBand = (n, r0, r1, z) => {
       const d = n.edges.map((e) => { const o = e.n0 === n ? e.n1 : e.n0; return [Math.sign(o.a - n.a), Math.sign(o.b - n.b)]; });
       const C = n.bendC;
@@ -8718,7 +8769,7 @@ select.inp {
         const { a0: ba0, a1: ba1 } = e.bridge, b = n0.b, bw = hw + 22;
         for (let a = ba0 + 40; a < ba1 - 20; a += 60) pn.box(a, b, -SEA_DROP - 4, 10, bw * 2 - 10, SEA_DROP, "#A89A84");
         pn.poly([[ba0, b + bw, 0], [ba1, b + bw, 0], [ba1, b + bw, -6], [ba0, b + bw, -6]], "#B7A27E", "rgba(60,40,22,0.35)");
-        pn.poly([[ba0, b - bw, 0.4], [ba1, b - bw, 0.4], [ba1, b + bw, 0.4], [ba0, b + bw, 0.4]], "#DCD0B8", null);
+        pn.poly([[ba0, b - bw, 0.4], [ba1, b - bw, 0.4], [ba1, b + bw, 0.4], [ba0, b + bw, 0.4]], "#F2E6D6", null);
       }
       pn.poly(pts, road, null);
     });
@@ -8735,31 +8786,31 @@ select.inp {
     });
     // blocks with rounded kerbs
     T.blocks.forEach((k) => {
-      pn.poly(rrect4(k.a0, k.a1, k.b0, k.b1, k.radii, 0.55), "#DCD0B8", "#B9AA88", 1.4);
+      pn.poly(rrect4(k.a0, k.a1, k.b0, k.b1, k.radii, 0.55), "#F2E6D6", "#E0CDB8", 1.4);
       const I = { a0: k.a0 + 14, a1: k.a1 - 14, b0: k.b0 + 14, b1: k.b1 - 14 };
-      const lawn = ["refinery", "portyard", "hub"].includes(k.type) ? "#CFCBC2" : ["square", "marina"].includes(k.type) ? "#E7DBC3" : "#9CCB84";
+      const lawn = ["refinery", "portyard", "hub"].includes(k.type) ? "#DDD6CE" : ["square", "marina"].includes(k.type) ? "#F3E7D5" : "#AACF9A";
       pn.poly(rrect4(I.a0, I.a1, I.b0, I.b1, k.radii.map((r) => Math.max(3, r - 14)), 0.6), lawn, "rgba(120,100,60,0.22)", 1);
     });
     T.nodes.forEach((n) => {
       if (!n.rb) return;
       const ring = (r, z) => { const pts = []; for (let k = 0; k < 40; k++) { const t = (k / 40) * TAU; pts.push([n.a + Math.cos(t) * r, n.b + Math.sin(t) * r, z]); } return pts; };
-      pn.poly(ring(20, 0.7), "#8CC578", "#DCD0B8", 3);
+      pn.poly(ring(20, 0.7), "#A2CB90", "#F2E6D6", 3);
       pn.poly(ring(32, 0.65), null, "rgba(255,255,255,0.55)", 1);
     });
     // bends: centre line
     T.nodes.forEach((n) => {
       if (!n.bend) return;
       const c = arcBand(n, RC, RC, 0.7).outer;
-      for (let k = 0; k < c.length - 1; k += 2) pn.line(c[k], c[k + 1], "#F4EEDC", 1.1, "butt");
+      for (let k = 0; k < c.length - 1; k += 2) pn.line(c[k], c[k + 1], "#FBF4EA", 1.1, "butt");
     });
     // lot grounds: gardens, paths, parking, park, square, track
     T.objs.forEach((o) => {
       if (o.kind === "building" && o.drawer === "house" || o.drawer === "cottage" || (o.drawer === "section" && o.sKind !== "shop")) {
         const r = o.lot ? { a0: o.lot.a0 + 2, a1: o.lot.a1 - 2, b0: o.lot.b0 + 2, b1: o.lot.b1 - 2 } : { a0: o.a - o.w / 2, a1: o.a + o.w / 2, b0: o.b - o.d / 2, b1: o.b + o.d / 2 };
-        const shadeL = ["#A5D28C", "#9FCE86", "#AAD693", "#A2D08A"][hash(o.id || "x") % 4];
+        const shadeL = ["#B7D8A4", "#B0D49C", "#BCDCA8", "#B4D6A0"][hash(o.id || "x") % 4];
         pn.poly(rectPts(r, 0.2), shadeL, null);
         // hedges round the plot, a picket fence along the street side
-        const hedge = (p0, p1) => { pn.line(p0, p1, "#4F8A4C", 4.2, "round"); pn.line([p0[0], p0[1], p0[2] + 1.5], [p1[0], p1[1], p1[2] + 1.5], "#6CAB5C", 2.4, "round"); };
+        const hedge = (p0, p1) => { pn.line(p0, p1, "#6E9E78", 4.2, "round"); pn.line([p0[0], p0[1], p0[2] + 1.5], [p1[0], p1[1], p1[2] + 1.5], "#88B48A", 2.4, "round"); };
         const front = o.face;
         const sides = { "-b": [[r.a0, r.b0, 0.4], [r.a1, r.b0, 0.4]], "+a": [[r.a1, r.b0, 0.4], [r.a1, r.b1, 0.4]], "+b": [[r.a1, r.b1, 0.4], [r.a0, r.b1, 0.4]], "-a": [[r.a0, r.b1, 0.4], [r.a0, r.b0, 0.4]] };
         Object.entries(sides).forEach(([f, [p0, p1]]) => {
@@ -8771,7 +8822,7 @@ select.inp {
         const path = f === "+b" ? [[cx - 4, cy, 0.4], [cx + 4, cy, 0.4], [cx + 4, r.b1, 0.4], [cx - 4, r.b1, 0.4]] : f === "+a" ? [[cx, cy - 4, 0.4], [r.a1, cy - 4, 0.4], [r.a1, cy + 4, 0.4], [cx, cy + 4, 0.4]] : null;
         if (path) pn.poly(path, "#E9DBC0", null);
       }
-      if (o.kind === "ground-garden") pn.poly(rectPts(o, 0.2), "#A5D28C", null);
+      if (o.kind === "ground-garden") pn.poly(rectPts(o, 0.2), "#B7D8A4", null);
       if (o.kind === "ground-field") {
         pn.poly(rectPts(o, 0.2), o.c, shade(o.c, -0.2), 1);
         if (o.dir === "a") for (let b = o.b0 + 6; b < o.b1; b += 7) pn.line([o.a0 + 3, b, 0.3], [o.a1 - 3, b, 0.3], shade(o.c, -0.14), 1.4);
@@ -8779,24 +8830,24 @@ select.inp {
         [[o.a0, o.b1, o.a1, o.b1], [o.a1, o.b0, o.a1, o.b1]].forEach(([a0, b0, a1, b1]) => { pn.line([a0, b0, 3], [a1, b1, 3], "#B98759", 0.9); const L = Math.hypot(a1 - a0, b1 - b0); for (let t = 0; t <= L; t += 12) { const u = t / L; pn.line([lerp(a0, a1, u), lerp(b0, b1, u), 0.3], [lerp(a0, a1, u), lerp(b0, b1, u), 4.5], "#8A6240", 1); } });
       }
       if (o.kind === "ground-park") {
-        pn.poly(rectPts(o, 0.2), "#8CC578", null);
+        pn.poly(rectPts(o, 0.2), "#A2CB90", null);
         const ma = (o.a0 + o.a1) / 2, mb = (o.b0 + o.b1) / 2;
-        pn.poly([[o.a0, mb - 5, 0.3], [o.a1, mb - 5, 0.3], [o.a1, mb + 5, 0.3], [o.a0, mb + 5, 0.3]], "#E8D9B8", null);
-        pn.poly([[ma - 5, o.b0, 0.3], [ma + 5, o.b0, 0.3], [ma + 5, o.b1, 0.3], [ma - 5, o.b1, 0.3]], "#E8D9B8", null);
+        pn.poly([[o.a0, mb - 5, 0.3], [o.a1, mb - 5, 0.3], [o.a1, mb + 5, 0.3], [o.a0, mb + 5, 0.3]], "#F4E4CE", null);
+        pn.poly([[ma - 5, o.b0, 0.3], [ma + 5, o.b0, 0.3], [ma + 5, o.b1, 0.3], [ma - 5, o.b1, 0.3]], "#F4E4CE", null);
         const p = o.pond || { a: -9e9, b: 0, ra: 0, rb: 0 }, ell = (ra, rb, z) => { const pts = []; for (let k = 0; k < 36; k++) { const t = (k / 36) * TAU; pts.push([p.a + Math.cos(t) * ra * (1 + 0.06 * Math.sin(3 * t)), p.b + Math.sin(t) * rb, z]); } return pts; };
-        pn.poly(ell(p.ra + 5, p.rb + 5, 0.3), "#D9C9A4", null);
-        pn.poly(ell(p.ra, p.rb, 0.3), "#5CC4CC", "#8FDCE0", 1.2);
+        pn.poly(ell(p.ra + 5, p.rb + 5, 0.3), "#EAD6BC", null);
+        pn.poly(ell(p.ra, p.rb, 0.3), "#7CC7CC", "#8FDCE0", 1.2);
         pn.poly(ell(p.ra * 0.3, p.rb * 0.2, 0.35), "rgba(255,255,255,0.3)", null);
       }
       if (o.kind === "ground-square") {
-        pn.poly(rectPts(o, 0.2), "#E9DDC4", null);
+        pn.poly(rectPts(o, 0.2), "#F6EADB", null);
         const ma = (o.a0 + o.a1) / 2, mb = (o.b0 + o.b1) / 2;
-        [70, 50].forEach((rr, n) => { const pts = []; for (let k = 0; k < 40; k++) { const t = (k / 40) * TAU; pts.push([ma + Math.cos(t) * rr, mb + Math.sin(t) * rr, 0.3]); } pn.poly(pts, n ? "#E2D2B2" : null, "#CDB892", 1.4); });
+        [70, 50].forEach((rr, n) => { const pts = []; for (let k = 0; k < 40; k++) { const t = (k / 40) * TAU; pts.push([ma + Math.cos(t) * rr, mb + Math.sin(t) * rr, 0.3]); } pn.poly(pts, n ? "#EFD9C4" : null, "#E6CCB2", 1.4); });
         for (let a = o.a0 + 16; a < o.a1; a += 16) pn.line([a, o.b0, 0.25], [a, o.b1, 0.25], "rgba(180,150,100,0.12)", 0.6);
         for (let b = o.b0 + 16; b < o.b1; b += 16) pn.line([o.a0, b, 0.25], [o.a1, b, 0.25], "rgba(180,150,100,0.12)", 0.6);
       }
       if (o.kind === "ground-parking" || o.kind === "ground-yard") {
-        pn.poly(rectPts(o, 0.2), o.kind === "ground-yard" ? "#C9C5BB" : "#7E878C", null);
+        pn.poly(rectPts(o, 0.2), o.kind === "ground-yard" ? "#DCD4CC" : "#9C98B4", null);
         if (o.kind === "ground-parking") {
           const I = o;
           for (let row = 0; row < 3; row++) {
@@ -8837,7 +8888,7 @@ select.inp {
         [-1.3, 1.3].forEach((o) => pn.line([s0[0] - e.db * o, s0[1] + e.da * o, 0.6], [s1[0] - e.db * o, s1[1] + e.da * o, 0.6], "#F2C14E", 0.9, "butt"));
       } else {
         const L = Math.hypot(s1[0] - s0[0], s1[1] - s0[1]);
-        for (let t = 0; t < L; t += 16) { const t1 = Math.min(L, t + 8); pn.line([s0[0] + e.da * t, s0[1] + e.db * t, 0.6], [s0[0] + e.da * t1, s0[1] + e.db * t1, 0.6], "#F4EEDC", 1.1, "butt"); }
+        for (let t = 0; t < L; t += 16) { const t1 = Math.min(L, t + 8); pn.line([s0[0] + e.da * t, s0[1] + e.db * t, 0.6], [s0[0] + e.da * t1, s0[1] + e.db * t1, 0.6], "#FBF4EA", 1.1, "butt"); }
       }
       // kerb lines
 
@@ -8847,13 +8898,13 @@ select.inp {
       const e = c.e, ta = e.da, tb = e.db, la = -tb, lb = ta; // across the road
       for (let o = -e.w / 2 + 3; o < e.w / 2 - 2; o += 5) {
         const ca = c.a + la * o, cb = c.b + lb * o;
-        pn.poly([[ca - ta * 5, cb - tb * 5, 0.7], [ca + ta * 5, cb + tb * 5, 0.7], [ca + ta * 5 + la * 2.4, cb + tb * 5 + lb * 2.4, 0.7], [ca - ta * 5 + la * 2.4, cb - tb * 5 + lb * 2.4, 0.7]], "#F4EEDC", null);
+        pn.poly([[ca - ta * 5, cb - tb * 5, 0.7], [ca + ta * 5, cb + tb * 5, 0.7], [ca + ta * 5 + la * 2.4, cb + tb * 5 + lb * 2.4, 0.7], [ca - ta * 5 + la * 2.4, cb - tb * 5 + lb * 2.4, 0.7]], "#FBF4EA", null);
       }
       // stop line for cars arriving at this node (they drive on the left of their heading)
       const toNode = c.node === e.n0 ? -1 : 1; // direction of travel towards the node along e
       const hA = ta * toNode, hB = tb * toNode, lA = hB, lB = -hA;
       const sa = c.a - hA * 9, sb = c.b - hB * 9;
-      pn.line([sa, sb, 0.7], [sa + lA * (e.w / 2 - 1), sb + lB * (e.w / 2 - 1), 0.7], "#F4EEDC", 1.6, "butt");
+      pn.line([sa, sb, 0.7], [sa + lA * (e.w / 2 - 1), sb + lB * (e.w / 2 - 1), 0.7], "#FBF4EA", 1.6, "butt");
     });
     // bridge railings
     const be = T.bridgeE;
@@ -8863,7 +8914,7 @@ select.inp {
         pn.line([a0, b + o, 7], [a1, b + o, 7], "#F6EDDF", 1.6);
         for (let a = a0; a <= a1; a += 10) pn.line([a, b + o, 0.5], [a, b + o, 7], "#8A6F4E", 1);
       });
-      [-be.w / 2, be.w / 2].forEach((o) => pn.line([a0, b + o, 0.6], [a1, b + o, 0.6], "#B9AA88", 1.4));
+      [-be.w / 2, be.w / 2].forEach((o) => pn.line([a0, b + o, 0.6], [a1, b + o, 0.6], "#E0CDB8", 1.4));
     }
   }
 
@@ -9126,13 +9177,19 @@ select.inp {
     function stepWalker(w, dt) {
       if (w.carried) return;
       if (w.hidden) { w.wait -= dt; if (w.wait <= 0 && !w.working) { w.hidden = false; newTrip(w); } return; }
-      if (w.wait > 0) { w.wait -= dt; w.moving = false; if (w.wait <= 0 && !w.path) newTrip(w); return; }
+      if (w.wait > 0) {
+        w.wait -= dt; w.moving = false;
+        if (!w.act) w.act = { kind: w.greet ? "wave" : w.look.trait };
+        if (w.wait <= 0) { w.act = null; w.greet = false; if (!w.path) newTrip(w); }
+        return;
+      }
+      w.act = null;
       if (!w.path) { newTrip(w); return; }
       const step = w.path[w.i];
       if (!step) { w.path = null; w.arrive && w.arrive(); return; }
       const e = step.e;
       if (w.segT === 0 && e.crossing && !w.onCross) {
-        if (!canCross(w, e)) { w.moving = false; return; }
+        if (!canCross(w, e)) { w.moving = false; w.act = { kind: "look" }; if (!w.bubble && R() < 0.01) w.bubble = { ch: "\u2026", until: S.t + 1.6 }; return; }
         w.onCross = e.crossing; e.crossing.peds++;
       }
       const from = w.node, to = step.n;
@@ -9253,8 +9310,23 @@ select.inp {
     };
     S.nearestNode = (a, b) => ringNodes.reduce((best, n) => (Math.hypot(n.a - a, n.b - b) < Math.hypot(best.a - a, best.b - b) ? n : best), ringNodes[0]);
 
+    // passers-by sometimes stop, wave and share a thought
+    let greetT = 0;
+    const MOODS = ["\u2665", "!", "\u266A", "?", "\u2665"];
+    const greet = () => {
+      const vis = S.peds.filter((w) => !w.hidden && !w.carried && !w.onCross && w.moving);
+      for (let i = 0; i < vis.length; i++) for (let j = i + 1; j < vis.length; j++) {
+        const p = vis[i], q = vis[j];
+        if (Math.hypot(p.a - q.a, p.b - q.b) > 12 || R() > 0.25) continue;
+        if ((p.lastGreet || -99) > S.t - 20 || (q.lastGreet || -99) > S.t - 20) continue;
+        const ch = MOODS[(R() * MOODS.length) | 0];
+        [p, q].forEach((w) => { w.lastGreet = S.t; w.greet = true; w.wait = 1.4; w.bubble = { ch, until: S.t + 1.8 }; });
+      }
+      S.peds.forEach((w) => { if (!w.hidden && !w.bubble && !w.moving && R() < 0.02) w.bubble = { ch: w.look.trait === "hum" ? "\u266A" : w.look.trait === "sip" ? "\u2665" : "\u2026", until: S.t + 1.6 }; if (w.bubble && S.t > w.bubble.until) w.bubble = null; });
+    };
     S.step = (dt) => {
       S.t += dt;
+      greetT += dt; if (greetT > 0.6) { greetT = 0; greet(); }
       stepCars(dt);
       S.peds.forEach((w) => stepWalker(w, dt));
       stepAnimals(dt);
@@ -9433,7 +9505,7 @@ select.inp {
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         // sea
         const g = ctx.createLinearGradient(0, 0, 0, cv.height);
-        g.addColorStop(0, "#2FA7B5"); g.addColorStop(1, "#1B8497");
+        g.addColorStop(0, "#6CB8C2"); g.addColorStop(1, "#4A93A8");
         ctx.fillStyle = g; ctx.fillRect(0, 0, cv.width, cv.height);
         ctx.setTransform(dpr * cam.s, 0, 0, dpr * cam.s, dpr * cam.tx, dpr * cam.ty);
         const vx0 = -cam.tx / cam.s, vy0 = -cam.ty / cam.s, vx1 = vx0 + S.w / cam.s, vy1 = vy0 + S.h / cam.s;
@@ -9441,8 +9513,8 @@ select.inp {
         ctx.lineCap = "round";
         glints.forEach((w) => {
           if (w.x < vx0 - 20 || w.x > vx1 + 20 || w.y < vy0 - 20 || w.y > vy1 + 20) return;
-          const a = 0.15 + 0.35 * (0.5 + 0.5 * Math.sin(time * 1.3 + w.p));
-          ctx.strokeStyle = `rgba(230,255,250,${a})`; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(w.x, w.y); ctx.lineTo(w.x + w.w, w.y); ctx.stroke();
+          const a = 0.2 + 0.5 * (0.5 + 0.5 * Math.sin(time * 1.3 + w.p)), r = 1.6 + w.w * 0.12;
+          ctx.fillStyle = `rgba(235,252,250,${a})`; ctx.beginPath(); ctx.moveTo(w.x, w.y - r * 0.5); ctx.lineTo(w.x + r, w.y); ctx.lineTo(w.x, w.y + r * 0.5); ctx.lineTo(w.x - r, w.y); ctx.closePath(); ctx.fill();
         });
         // ground chunks
         const r = Math.min(2, sc);
@@ -9484,7 +9556,8 @@ select.inp {
             const w = d.w, dx = (w.da || 0) - (w.db || 0), dy = (w.da || 0) + (w.db || 0);
             const lift = w.carried ? -14 : 0;
             if (w.carried) { ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.beginPath(); ctx.ellipse(d.sx, d.sy, 7, 3, 0, 0, TAU); ctx.fill(); }
-            drawPerson(ctx, d.sx, d.sy + lift, w.look, dx < 0 ? -1 : 1, dy >= 0, w.phase, w.moving || w.carried, w.crew ? 1.08 : 1);
+            drawPerson(ctx, d.sx, d.sy + lift, w.look, dx < 0 ? -1 : 1, dy >= 0, w.phase, w.moving || w.carried, w.crew ? 1.08 : 1, w.act, time);
+            if (w.bubble && !w.crew) drawBubble(ctx, d.sx + 3, d.sy + lift - 17 * w.look.h, w.bubble.ch, 1);
             if (w.crew) {
               const x = d.sx, y = d.sy + lift - 22 * w.look.h;
               ctx.fillStyle = w.crew.color; ctx.strokeStyle = "#FFF8EC"; ctx.lineWidth = 1.2;

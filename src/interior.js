@@ -16,8 +16,6 @@
     function Desk({ a, b: bb, c = "#B98759", screen = "#7FD1DC", chair = "#44545A" }) {
       return h("g", null,
         box(a, bb, 0, 34, 18, 13, c),
-        box(a - 12, bb - 6, 0, 3, 3, 13, T(c, -0.3)),
-        box(a - 12, bb + 6, 0, 3, 3, 13, T(c, -0.3)),
         box(a - 6, bb, 13, 4, 14, 10, "#3B4A50"),
         h("polygon", { points: me("right", { x: a - 6, y: bb, z: 13, w: 4, d: 14, h: 10 }, 0.1, 0.9, 0.15, 0.9), fill: screen }),
         box(a + 6, bb + 2, 13, 8, 5, 0.8, "#E9E2D2"),
@@ -124,14 +122,14 @@
     function Sofa({ a, b: bb, c }) {
       return h("g", null,
         box(a, bb, 0, 26, 64, 10, c),
-        box(a - 10, bb, 10, 6, 64, 14, T(c, -0.08)),
         box(a, bb - 29, 10, 26, 6, 6, T(c, -0.12)),
+        box(a - 10, bb, 10, 6, 64, 14, T(c, -0.08)),
         box(a, bb + 29, 10, 26, 6, 6, T(c, -0.12)),
         box(a + 2, bb - 12, 10, 12, 12, 4, "#F2C14E"),
       );
     }
     function Coins({ a, b: bb }) {
-      return h("g", null, [[0, 0, 7], [12, 4, 5], [4, 14, 9], [-10, 10, 4]].map(([da, db, n], k) =>
+      return h("g", null, [[-10, 10, 4], [0, 0, 7], [12, 4, 5], [4, 14, 9]].map(([da, db, n], k) =>
         h("g", { key: k }, Array.from({ length: n }).map((_, z) => h(re, { key: z, x: a + da, y: bb + db, z: z * 2.2, r: 5, h: 2.2, c: z % 2 ? "#F2C14E" : "#E9B949" })))));
     }
     function Trophy({ a, b: bb }) {
@@ -151,11 +149,12 @@
     }
     function Bed({ a, b: bb, c }) {
       return h("g", null,
+        // back to front: headboard, frame, mattress, pillow, duvet
+        box(a - 32, bb, 0, 4, 40, 24, "#9C6B45"),
         box(a, bb, 0, 60, 40, 10, "#B98759"),
         box(a, bb, 10, 58, 38, 5, "#FBF8F1"),
-        box(a + 8, bb, 15, 42, 38, 1.5, c),
         box(a - 22, bb, 15, 12, 30, 5, "#FFFFFF"),
-        box(a - 30, bb, 0, 4, 40, 24, "#9C6B45"));
+        box(a + 8, bb, 15, 42, 38, 1.5, c));
     }
 
     function Console({ a, b: bb, c }) {

@@ -168,7 +168,7 @@
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         // sea
         const g = ctx.createLinearGradient(0, 0, 0, cv.height);
-        g.addColorStop(0, "#2FA7B5"); g.addColorStop(1, "#1B8497");
+        g.addColorStop(0, "#6CB8C2"); g.addColorStop(1, "#4A93A8");
         ctx.fillStyle = g; ctx.fillRect(0, 0, cv.width, cv.height);
         ctx.setTransform(dpr * cam.s, 0, 0, dpr * cam.s, dpr * cam.tx, dpr * cam.ty);
         const vx0 = -cam.tx / cam.s, vy0 = -cam.ty / cam.s, vx1 = vx0 + S.w / cam.s, vy1 = vy0 + S.h / cam.s;
@@ -176,8 +176,8 @@
         ctx.lineCap = "round";
         glints.forEach((w) => {
           if (w.x < vx0 - 20 || w.x > vx1 + 20 || w.y < vy0 - 20 || w.y > vy1 + 20) return;
-          const a = 0.15 + 0.35 * (0.5 + 0.5 * Math.sin(time * 1.3 + w.p));
-          ctx.strokeStyle = `rgba(230,255,250,${a})`; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(w.x, w.y); ctx.lineTo(w.x + w.w, w.y); ctx.stroke();
+          const a = 0.2 + 0.5 * (0.5 + 0.5 * Math.sin(time * 1.3 + w.p)), r = 1.6 + w.w * 0.12;
+          ctx.fillStyle = `rgba(235,252,250,${a})`; ctx.beginPath(); ctx.moveTo(w.x, w.y - r * 0.5); ctx.lineTo(w.x + r, w.y); ctx.lineTo(w.x, w.y + r * 0.5); ctx.lineTo(w.x - r, w.y); ctx.closePath(); ctx.fill();
         });
         // ground chunks
         const r = Math.min(2, sc);
@@ -219,7 +219,8 @@
             const w = d.w, dx = (w.da || 0) - (w.db || 0), dy = (w.da || 0) + (w.db || 0);
             const lift = w.carried ? -14 : 0;
             if (w.carried) { ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.beginPath(); ctx.ellipse(d.sx, d.sy, 7, 3, 0, 0, TAU); ctx.fill(); }
-            drawPerson(ctx, d.sx, d.sy + lift, w.look, dx < 0 ? -1 : 1, dy >= 0, w.phase, w.moving || w.carried, w.crew ? 1.08 : 1);
+            drawPerson(ctx, d.sx, d.sy + lift, w.look, dx < 0 ? -1 : 1, dy >= 0, w.phase, w.moving || w.carried, w.crew ? 1.08 : 1, w.act, time);
+            if (w.bubble && !w.crew) drawBubble(ctx, d.sx + 3, d.sy + lift - 17 * w.look.h, w.bubble.ch, 1);
             if (w.crew) {
               const x = d.sx, y = d.sy + lift - 22 * w.look.h;
               ctx.fillStyle = w.crew.color; ctx.strokeStyle = "#FFF8EC"; ctx.lineWidth = 1.2;
