@@ -273,7 +273,12 @@
         const dt = Math.min(0.08, rawDt); last = now;
         // adaptive quality: drop resolution if frames stay slow
         S.ema = S.ema == null ? rawDt : S.ema * 0.95 + rawDt * 0.05;
-        if (S.frame > (S.capAt || 0) + 90 && S.ema > 0.036 && S.dpr > 1 && !document.hidden) { S.dprCap = S.dpr > 1.5 ? 1.5 : 1; S.capAt = S.frame; S.ema = null; resize(); }
+        // adaptive sharpness: step down only when frames stay slow after the opening animation
+        // (painting every sprite the first time is slow and shouldn't blur the island for good),
+        // and step back up once things run smoothly again
+        const settled = !S.intro && !document.hidden && S.frame > (S.capAt || 0) + 120;
+        if (settled && S.ema > 0.04 && S.dpr > 1) { S.dprCap = S.dpr > 1.5 ? 1.5 : 1; S.capAt = S.frame; S.ema = null; resize(); }
+        else if (settled && S.dprCap && S.ema < 0.02 && S.frame > (S.capAt || 0) + 600) { S.dprCap = S.dprCap < 1.5 ? 1.5 : null; S.capAt = S.frame; S.ema = null; resize(); }
         S.frame++;
         if (cb.current.paused && S.frame % 4) return;
         if (!reduce) sim.step(cb.current.paused ? dt * 4 : dt);

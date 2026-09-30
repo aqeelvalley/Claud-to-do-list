@@ -63,6 +63,7 @@ struct LLProvider: TimelineProvider {
 
 // MARK: - Actions you can take right on the widget (iOS 17+)
 
+@available(iOS 17.0, *)
 struct CompleteTodoIntent: AppIntent {
     static var title: LocalizedStringResource = "Tick off a to-do"
     static var isDiscoverable: Bool = false
@@ -84,6 +85,7 @@ struct CompleteTodoIntent: AppIntent {
     }
 }
 
+@available(iOS 17.0, *)
 struct LogKcalIntent: AppIntent {
     static var title: LocalizedStringResource = "Log calories"
     static var isDiscoverable: Bool = false
@@ -163,8 +165,12 @@ struct AddTodoPill: View {
 struct KcalPill: View {
     var kcal: Int
     var body: some View {
-        Button(intent: LogKcalIntent(kcal: kcal)) { PillLabel(icon: "fork.knife", text: "+\(kcal)", color: LL.gold) }
-            .buttonStyle(.plain)
+        if #available(iOS 17.0, *) {
+            Button(intent: LogKcalIntent(kcal: kcal)) { PillLabel(icon: "fork.knife", text: "+\(kcal)", color: LL.gold) }
+                .buttonStyle(.plain)
+        } else {
+            Link(destination: LL.logFood) { PillLabel(icon: "fork.knife", text: "+\(kcal)", color: LL.gold) }
+        }
     }
 }
 
@@ -192,20 +198,26 @@ struct Header: View {
 struct TodoRow: View {
     var t: LLShared.Todo
 
+    var check: some View {
+        ZStack {
+            Circle().strokeBorder(Color(hex: t.color), lineWidth: 2)
+            if t.done {
+                Circle().fill(Color(hex: t.color))
+                Image(systemName: "checkmark").font(.system(size: 9, weight: .heavy)).foregroundStyle(.white)
+            }
+        }
+        .frame(width: 20, height: 20)
+    }
+
     var body: some View {
         HStack(spacing: 8) {
-            Button(intent: CompleteTodoIntent(todoId: t.id)) {
-                ZStack {
-                    Circle().strokeBorder(Color(hex: t.color), lineWidth: 2)
-                    if t.done {
-                        Circle().fill(Color(hex: t.color))
-                        Image(systemName: "checkmark").font(.system(size: 9, weight: .heavy)).foregroundStyle(.white)
-                    }
-                }
-                .frame(width: 20, height: 20)
+            if #available(iOS 17.0, *) {
+                Button(intent: CompleteTodoIntent(todoId: t.id)) { check }
+                    .buttonStyle(.plain)
+                    .disabled(t.done)
+            } else {
+                check
             }
-            .buttonStyle(.plain)
-            .disabled(t.done)
             VStack(alignment: .leading, spacing: 0) {
                 Text(t.title)
                     .font(LL.font(13, .semibold))
@@ -252,9 +264,13 @@ struct SetupView: View {
 }
 
 extension View {
+    @ViewBuilder
     func llBackground() -> some View {
-        containerBackground(for: .widget) {
-            LinearGradient(colors: [LL.cream, LL.peach], startPoint: .top, endPoint: .bottom)
+        let bg = LinearGradient(colors: [LL.cream, LL.peach], startPoint: .top, endPoint: .bottom)
+        if #available(iOS 17.0, *) {
+            containerBackground(for: .widget) { bg }
+        } else {
+            padding().background(bg)
         }
     }
 }
