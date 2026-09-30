@@ -7,7 +7,7 @@
     return ph < 10 ? "g" : ph < 12.5 ? "y" : "r";
   }
   const perpW = (n, e) => (n.rb ? RB_R * 2 : e.axis === "a" ? n.wa : n.wb);
-  const cutAt = (n, e) => (n.rb ? RB_R + 10 : perpW(n, e) / 2 + 17);
+  const cutAt = (n, e) => (n.rb ? RB_R + 22 : n.bend ? RC : perpW(n, e) / 2 + 17);
   const bez = (p0, c, p1, n = 12) => { const out = []; for (let k = 0; k <= n; k++) { const t = k / n, u = 1 - t; out.push([u * u * p0[0] + 2 * u * t * c[0] + t * t * p1[0], u * u * p0[1] + 2 * u * t * c[1] + t * t * p1[1]]); } return out; };
   const withLen = (pts) => { const cum = [0]; for (let k = 1; k < pts.length; k++) cum.push(cum[k - 1] + Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1])); return { pts, cum, len: cum[cum.length - 1] }; };
   const along = (path, u) => {
@@ -63,7 +63,7 @@
       const X = lanePos(tmp, sStart);
       const [h1a, h1b] = head(c), [h2a, h2b] = head(tmp);
       if (n.rb) {
-        const rr = RB_R - 12;
+        const rr = RB_R;
         let t0 = Math.atan2(S0[1] - n.b, S0[0] - n.a) + 0.55, t1 = Math.atan2(X[1] - n.b, X[0] - n.a) - 0.55;
         while (t1 < t0 + 0.3) t1 += TAU;
         const pts = [S0];
@@ -253,8 +253,9 @@
       if (n % 2) return;
       S.animals.push({ kind: "cat", a: k.a1 - 20, b: k.b1 - 20, home: { a: k.a1 - 24, b: k.b1 - 24, ra: 14, rb: 14 }, wait: 4 + R() * 6, col: pick(["#E07B39", "#3B3B3B", "#B9A58C", "#EDE3D1"]), phase: 0 });
     });
-    for (let k = 0; k < 6; k++) S.gulls.push({ cx: 600 + R() * 1300, cy: 700 + R() * 900, r: 120 + R() * 220, t: R() * TAU, sp: 0.1 + R() * 0.12, z: 80 + R() * 60 });
-    [[900, 1950], [1500, 1350], [-200, 700], [1650, -80], [2450, 700]].forEach(([a, b]) => S.dolphins.push({ a, b, t: R() * 12, dir: R() < 0.5 ? 1 : -1 }));
+    const AB = T.abox;
+    for (let k = 0; k < 7; k++) S.gulls.push({ cx: lerp(AB.a0, AB.a1, R()), cy: lerp(AB.b0, AB.b1, R()), r: 120 + R() * 220, t: R() * TAU, sp: 0.1 + R() * 0.12, z: 80 + R() * 60 });
+    for (let k = 0; S.dolphins.length < 5 && k < 400; k++) { const a = lerp(AB.a0 - 250, AB.a1 + 250, R()), b = lerp(AB.b0 - 250, AB.b1 + 250, R()); if (!T.landAt(a, b) && !T.landAt(a + 60, b) && !T.landAt(a - 60, b) && !T.landAt(a, b + 60) && !T.landAt(a, b - 60)) S.dolphins.push({ a, b, t: R() * 12, dir: R() < 0.5 ? 1 : -1 }); }
     function stepAnimals(dt) {
       S.animals.forEach((m) => {
         if (m.wait > 0) { m.wait -= dt; m.moving = false; return; }
@@ -282,10 +283,12 @@
         ...S.traffic,
       ];
     };
+    const ring = (m) => [[AB.a0 - m, AB.b0 - m], [(AB.a0 + AB.a1) / 2, AB.b0 - m * 1.2], [AB.a1 + m, AB.b0 - m], [AB.a1 + m * 1.2, (AB.b0 + AB.b1) / 2], [AB.a1 + m, AB.b1 + m], [(AB.a0 + AB.a1) / 2, AB.b1 + m * 1.2], [AB.a0 - m, AB.b1 + m], [AB.a0 - m * 1.2, (AB.b0 + AB.b1) / 2]];
+    const mw = T.marinaWater, gapA = (ISLES.life.box.a1 + ISLES.work.box.a0) / 2;
     S.traffic = [
-      { kind: "yacht", color: "#2A9D8F", route: [[-250, 1700], [700, 2050], [1500, 1900], [2500, 1400], [2500, 0], [1400, -200], [-200, 200]], u: 0, speed: 18 },
-      { kind: "cargo", color: "#8C3B3B", route: [[2700, -200], [2750, 1500], [1800, 1500], [1400, 2200], [-400, 2000], [-400, -300]], u: 0.5, speed: 14 },
-      { kind: "launch", color: "#F6EDDF", route: [[1300, 1650], [1450, 1400], [1400, 1000], [1320, 900], [1400, 1250]], u: 0.2, speed: 16 },
+      { kind: "yacht", color: "#2A9D8F", route: ring(230), u: 0, speed: 18 },
+      { kind: "cargo", color: "#8C3B3B", route: ring(360).reverse(), u: 0.5, speed: 14 },
+      { kind: "launch", color: "#F6EDDF", route: [[(mw.a0 + mw.a1) / 2 + 60, mw.b1 + 120], [gapA, ISLES.work.box.b1 + 180], [gapA, 1000], [gapA + 20, 880], [gapA - 10, 1200]], u: 0.2, speed: 16 },
     ].map((b) => ({ ...b, path: withLen([...b.route, b.route[0]]), moving: true }));
     S.boats = [...S.traffic];
     function stepBoats(dt) {

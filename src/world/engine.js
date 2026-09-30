@@ -7,85 +7,116 @@
     const pn = pen(ctx, 0, 0);
     const P = pn.P;
     const rectPts = (r, z = 0, m = 0) => [[r.a0 - m, r.b0 - m, z], [r.a1 + m, r.b0 - m, z], [r.a1 + m, r.b1 + m, z], [r.a0 - m, r.b1 + m, z]];
-    const landAt = (a, b) => T.land.some((r) => inRect(r, a, b)) || T.beaches.some((r) => inRect(r, a, b));
-    // shallow water halo
-    ctx.save();
-    ctx.globalAlpha = 0.35;
-    T.land.forEach((r) => pn.poly(rectPts(r, -SEA_DROP, 26), "#8FE0DA", null));
-    T.beaches.forEach((r) => pn.poly(rectPts(r, -SEA_DROP, 34), "#A9ECE2", null));
-    ctx.restore();
-    // beaches: sand shelving into the sea with a soft wet edge
-    T.beaches.forEach((r) => {
-      const wob = (t) => 10 * Math.sin(t * 0.045) + 6 * Math.sin(t * 0.11 + 1);
-      const out = [];
-      const horiz = r.b1 - r.b0 < r.a1 - r.a0;
-      const N = 40;
-      for (let k = 0; k <= N; k++) {
-        const u = k / N;
-        if (horiz) { const a = lerp(r.a0, r.a1, u); const edge = Math.min(1, Math.min(u, 1 - u) * 6); out.push([a, lerp(r.b0 + 30, r.b1 + wob(a), edge), -SEA_DROP * (1 - edge * 0.2)]); }
-        else { const b = lerp(r.b0, r.b1, u); const edge = Math.min(1, Math.min(u, 1 - u) * 6); out.push([lerp(r.a1 - 30, r.a0 + wob(b), edge), b, -SEA_DROP * (1 - edge * 0.2)]); }
+    const screenPath = (pts, z = 0, close = true) => { ctx.beginPath(); pts.forEach((p, k) => { const [x, y] = P(p[0], p[1], (p[2] ?? z)); k ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); if (close) ctx.closePath(); };
+    /* ---- shores ---- */
+    T.coasts.forEach((c) => {
+      const pts = c.pts, n = pts.length;
+      // shallow water halo
+      screenPath(c.poly, -SEA_DROP);
+      ctx.save(); ctx.lineJoin = "round"; ctx.strokeStyle = "rgba(143,224,218,0.32)"; ctx.lineWidth = 90; ctx.stroke(); ctx.strokeStyle = "rgba(169,236,226,0.45)"; ctx.lineWidth = 34; ctx.stroke(); ctx.restore();
+      // wet sand slopes under natural shores
+      for (let i = 0; i < n; i++) {
+        const p = pts[i], q = pts[(i + 1) % n];
+        if (p.wall || q.wall) continue;
+        const po = [p.a + p.na * 18, p.b + p.nb * 18, -SEA_DROP], qo = [q.a + q.na * 18, q.b + q.nb * 18, -SEA_DROP];
+        pn.poly([[p.a, p.b, 0], [q.a, q.b, 0], qo, po], "#D9B98A", null);
       }
-      const inner = horiz ? [[r.a1, r.b0, 0], [r.a0, r.b0, 0]] : [[r.a1, r.b1, 0], [r.a1, r.b0, 0]];
-      pn.poly(horiz ? [...inner, ...out] : [...inner.reverse(), ...out.reverse()], "#EBCB94", null);
-      pn.poly(horiz ? [...inner, ...out.map((p) => [p[0], p[1] - 16, p[2] * 0.4])] : [...inner, ...out.map((p) => [p[0] + 16, p[1], p[2] * 0.4])], "#F3D8A6", null);
-      ctx.strokeStyle = "rgba(255,255,255,0.75)"; ctx.lineWidth = 1.6; ctx.beginPath();
-      out.forEach((p, k) => { const [x, y] = P(p[0], p[1] + (horiz ? 3 : 0), p[2] - 1); k ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
+      ctx.strokeStyle = "rgba(255,255,255,0.8)"; ctx.lineWidth = 1.6; ctx.lineCap = "round";
+      for (let i = 0; i < n; i++) {
+        const p = pts[i], q = pts[(i + 1) % n];
+        if (p.wall || q.wall) continue;
+        const [x0, y0] = P(p.a + p.na * 19, p.b + p.nb * 19, -SEA_DROP), [x1, y1] = P(q.a + q.na * 19, q.b + q.nb * 19, -SEA_DROP);
+        ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+      }
+      // seawalls where the shore is built up
+      for (let i = 0; i < n; i++) {
+        const p = pts[i], q = pts[(i + 1) % n];
+        if (!(p.wall && q.wall)) continue;
+        let na = q.b - p.b, nb = -(q.a - p.a); const L = Math.hypot(na, nb) || 1; na /= L; nb /= L;
+        if (na * p.na + nb * p.nb < 0) { na = -na; nb = -nb; }
+        if (na + nb <= 0.02) continue;
+        pn.poly([[p.a, p.b, 0], [q.a, q.b, 0], [q.a, q.b, -SEA_DROP], [p.a, p.b, -SEA_DROP]], shade("#B9AE9C", 0.05 * nb - 0.14 * na), "rgba(60,40,22,0.25)", 0.6);
+        pn.line([p.a + na * 2, p.b + nb * 2, -SEA_DROP], [q.a + na * 2, q.b + nb * 2, -SEA_DROP], "rgba(255,255,255,0.7)", 1.6);
+      }
+      // sand, then grass inland of the sand
+      pn.poly(c.poly.map((p) => [p[0], p[1], 0]), "#EDD3A0", null);
+      pn.poly(pts.map((p) => [p.a - p.na * p.sand, p.b - p.nb * p.sand, 0.2]), "#97C97F", null);
+      // paved edge along seawalls
+      for (let i = 0; i < n; i++) {
+        const p = pts[i], q = pts[(i + 1) % n];
+        if (!(p.wall && q.wall)) continue;
+        pn.poly([[p.a, p.b, 0.3], [q.a, q.b, 0.3], [q.a - q.na * 12, q.b - q.nb * 12, 0.3], [p.a - p.na * 12, p.b - p.nb * 12, 0.3]], "#D6CAB2", null);
+      }
+      // meadow tint patches for variety
+      const r = rng(hash("meadow" + c.isle));
+      for (let k = 0; k < 14; k++) { const p = pts[(r() * n) | 0], d = 30 + r() * 40, [x, y] = P(p.a - p.na * d, p.b - p.nb * d, 0.25); ctx.fillStyle = "rgba(170,214,138,0.5)"; ctx.beginPath(); ctx.ellipse(x, y, 30 + r() * 30, 12 + r() * 10, 0, 0, TAU); ctx.fill(); }
     });
-    // seawalls on the visible (+a / +b) sides of every land rect
-    const beachAt = (a, b) => T.beaches.some((r) => inRect(r, a, b, 4));
-    T.land.forEach((r) => {
-      [["b", r.b1], ["a", r.a1]].forEach(([side, v]) => {
-        const lo = side === "b" ? r.a0 : r.b0, hi = side === "b" ? r.a1 : r.b1;
-        let run = null;
-        const flush = (end) => {
-          if (!run) return;
-          const [s, e] = [run, end];
-          const pts = side === "b" ? [[s, v, 0], [e, v, 0], [e, v, -SEA_DROP], [s, v, -SEA_DROP]] : [[v, s, 0], [v, e, 0], [v, e, -SEA_DROP], [v, s, -SEA_DROP]];
-          pn.poly(pts, side === "b" ? "#B9AE9C" : "#9E937F", "rgba(60,40,22,0.35)", 0.8);
-          for (let x = s + 12; x < e; x += 12) {
-            const p0 = side === "b" ? [x, v + 0.3, 0] : [v + 0.3, x, 0], p1 = side === "b" ? [x, v + 0.3, -SEA_DROP] : [v + 0.3, x, -SEA_DROP];
-            pn.line(p0, p1, "rgba(60,40,22,0.18)", 0.7);
-          }
-          pn.line(side === "b" ? [s, v + 0.3, -7] : [v + 0.3, s, -7], side === "b" ? [e, v + 0.3, -7] : [v + 0.3, e, -7], "rgba(60,40,22,0.15)", 0.7);
-          pn.line(side === "b" ? [s, v + 2, -SEA_DROP] : [v + 2, s, -SEA_DROP], side === "b" ? [e, v + 2, -SEA_DROP] : [v + 2, e, -SEA_DROP], "rgba(255,255,255,0.7)", 1.6);
-          run = null;
-        };
-        for (let t = lo; t <= hi; t += 4) {
-          const oa = side === "b" ? t : v + 2, ob = side === "b" ? v + 2 : t;
-          const exposed = !T.land.some((q) => q !== r && inRect(q, oa, ob)) && !beachAt(oa, ob) && !(T.marinaWater && false);
-          if (exposed && run === null) run = t;
-          if (!exposed && run !== null) flush(t);
-        }
-        flush(hi);
-      });
+    // piers and breakwaters
+    T.piers.forEach((p) => pn.box((p.a0 + p.a1) / 2, (p.b0 + p.b1) / 2, -SEA_DROP, p.a1 - p.a0, p.b1 - p.b0, SEA_DROP, "#BFB6A6", { left: "#B4A995", right: "#9E937F", top: "#C9C0AF" }));
+    // coastal footpaths
+    T.paths.forEach((pp) => {
+      screenPath(pp.pts, 0.4, false);
+      ctx.lineJoin = "round"; ctx.lineCap = "round";
+      ctx.strokeStyle = "#CDBB92"; ctx.lineWidth = pp.kind === "link" ? 8 : 11; ctx.stroke();
+      ctx.strokeStyle = "#EADBB8"; ctx.lineWidth = pp.kind === "link" ? 6 : 8.5; ctx.stroke();
     });
-    // land tops
-    T.land.forEach((r) => pn.poly(rectPts(r), r.pier ? "#BFB6A6" : "#97C97F", null));
-    // blocks and strips
-    T.blocks.forEach((k) => {
-      if (k.kind === "strip") {
-        const c = k.type === "quay" ? "#CBC7BD" : k.type === "pier" || k.type === "lighthousePad" ? "#C4BBAA" : "#E4D8C0";
-        pn.poly(rectPts(k), c, null);
-        if (k.type === "prom") {
-          // paving pattern + sea railing
-          for (let t = 0; t < 1; t += 0.04) {
-            const alongA = k.a1 - k.a0 > k.b1 - k.b0;
-            const a = alongA ? lerp(k.a0, k.a1, t) : k.a0, b = alongA ? k.b0 : lerp(k.b0, k.b1, t);
-            pn.line(alongA ? [a, k.b0, 0] : [k.a0, b, 0], alongA ? [a, k.b1, 0] : [k.a1, b, 0], "rgba(150,120,80,0.12)", 0.7);
-          }
-        }
-        if (k.type === "quay") pn.line([k.a0, k.b1 - 3, 0.2], [k.a1, k.b1 - 3, 0.2], "#E9B949", 2);
-        if (k.type === "pier" || k.type === "lighthousePad") pn.poly(rectPts(k, 0.1, -3), null, "rgba(255,255,255,0.35)", 1);
+    /* ---- town: footway base, roads, then rounded blocks ---- */
+    Object.values(T.isles).forEach((I) => {
+      const r = RC + 15 + VERGE;
+      pn.poly(rrect4(I.box.a0, I.box.a1, I.box.b0, I.box.b1, [r, r, r, r], 0.4), "#DCD0B8", "#C4B597", 1.2);
+    });
+    const road = "#646E74";
+    const arcBand = (n, r0, r1, z) => {
+      const d = n.edges.map((e) => { const o = e.n0 === n ? e.n1 : e.n0; return [Math.sign(o.a - n.a), Math.sign(o.b - n.b)]; });
+      const C = n.bendC;
+      const p1 = [n.a + d[0][0] * RC, n.b + d[0][1] * RC], p2 = [n.a + d[1][0] * RC, n.b + d[1][1] * RC];
+      let t0 = Math.atan2(p1[1] - C[1], p1[0] - C[0]), t1 = Math.atan2(p2[1] - C[1], p2[0] - C[0]);
+      while (t1 - t0 > Math.PI) t1 -= TAU; while (t0 - t1 > Math.PI) t1 += TAU;
+      const outer = [], inner = [];
+      for (let k = 0; k <= 14; k++) { const t = lerp(t0, t1, k / 14); outer.push([C[0] + Math.cos(t) * r1, C[1] + Math.sin(t) * r1, z]); inner.push([C[0] + Math.cos(t) * r0, C[1] + Math.sin(t) * r0, z]); }
+      return { outer, inner, poly: outer.concat(inner.reverse()) };
+    };
+    T.edges.forEach((e) => {
+      const hw = e.w / 2, n0 = e.n0, n1 = e.n1;
+      const c0 = n0.bend ? RC : 0, c1 = n1.bend ? RC : 0;
+      const a0 = n0.a + e.da * c0, b0 = n0.b + e.db * c0, a1 = n1.a - e.da * c1, b1 = n1.b - e.db * c1;
+      const pts = e.axis === "a" ? [[a0, b0 - hw, 0.5], [a1, b1 - hw, 0.5], [a1, b1 + hw, 0.5], [a0, b0 + hw, 0.5]] : [[a0 - hw, b0, 0.5], [a1 - hw, b1, 0.5], [a1 + hw, b1, 0.5], [a0 + hw, b0, 0.5]];
+      if (e.bridge) {
+        const { a0: ba0, a1: ba1 } = e.bridge, b = n0.b, bw = hw + 22;
+        for (let a = ba0 + 40; a < ba1 - 20; a += 60) pn.box(a, b, -SEA_DROP - 4, 10, bw * 2 - 10, SEA_DROP, "#A89A84");
+        pn.poly([[ba0, b + bw, 0], [ba1, b + bw, 0], [ba1, b + bw, -6], [ba0, b + bw, -6]], "#B7A27E", "rgba(60,40,22,0.35)");
+        pn.poly([[ba0, b - bw, 0.4], [ba1, b - bw, 0.4], [ba1, b + bw, 0.4], [ba0, b + bw, 0.4]], "#DCD0B8", null);
+      }
+      pn.poly(pts, road, null);
+    });
+    T.nodes.forEach((n) => {
+      if (n.rb) {
+        const ring = (r, z) => { const pts = []; for (let k = 0; k < 40; k++) { const t = (k / 40) * TAU; pts.push([n.a + Math.cos(t) * r, n.b + Math.sin(t) * r, z]); } return pts; };
+        pn.poly(ring(RB_R + 12, 0.5), road, null);
         return;
       }
-      pn.poly(rectPts(k), "#DCD0B8", null);
-      pn.poly(rectPts(k), null, "#B9AA88", 1.4);
-      // sidewalk slabs
-      for (let a = k.a0 + 12; a < k.a1; a += 12) { pn.line([a, k.b1 - 14, 0], [a, k.b1, 0], "rgba(140,120,90,0.18)", 0.6); pn.line([a, k.b0, 0], [a, k.b0 + 14, 0], "rgba(140,120,90,0.18)", 0.6); }
-      for (let b = k.b0 + 12; b < k.b1; b += 12) { pn.line([k.a1 - 14, b, 0], [k.a1, b, 0], "rgba(140,120,90,0.18)", 0.6); pn.line([k.a0, b, 0], [k.a0 + 14, b, 0], "rgba(140,120,90,0.18)", 0.6); }
+      if (n.bend) { const w = n.edges[0].w; pn.poly(arcBand(n, RC - w / 2, RC + w / 2, 0.5).poly, road, null); return; }
+      const wa = n.wa || n.w, wb = n.wb || n.w;
+      pn.poly([[n.a - wa / 2 - CURB, n.b - wb / 2 - CURB, 0.5], [n.a + wa / 2 + CURB, n.b - wb / 2 - CURB, 0.5], [n.a + wa / 2 + CURB, n.b + wb / 2 + CURB, 0.5], [n.a - wa / 2 - CURB, n.b + wb / 2 + CURB, 0.5]], road, null);
+    });
+    // blocks with rounded kerbs
+    T.blocks.forEach((k) => {
+      pn.poly(rrect4(k.a0, k.a1, k.b0, k.b1, k.radii, 0.55), "#DCD0B8", "#B9AA88", 1.4);
       const I = { a0: k.a0 + 14, a1: k.a1 - 14, b0: k.b0 + 14, b1: k.b1 - 14 };
-      const lawn = ["houses", "houses2", "beachHouses", "home", "studio", "freelance", "maker", "mill"].includes(k.type) ? "#9CCB84" : k.type === "park" ? "#8CC578" : ["refinery", "portyard", "hub"].includes(k.type) ? "#CFCBC2" : "#E7DBC3";
-      pn.poly(rectPts(I), lawn, "rgba(120,100,60,0.25)", 1);
+      const lawn = ["refinery", "portyard", "hub"].includes(k.type) ? "#CFCBC2" : ["square", "marina"].includes(k.type) ? "#E7DBC3" : "#9CCB84";
+      pn.poly(rrect4(I.a0, I.a1, I.b0, I.b1, k.radii.map((r) => Math.max(3, r - 14)), 0.6), lawn, "rgba(120,100,60,0.22)", 1);
+    });
+    T.nodes.forEach((n) => {
+      if (!n.rb) return;
+      const ring = (r, z) => { const pts = []; for (let k = 0; k < 40; k++) { const t = (k / 40) * TAU; pts.push([n.a + Math.cos(t) * r, n.b + Math.sin(t) * r, z]); } return pts; };
+      pn.poly(ring(20, 0.7), "#8CC578", "#DCD0B8", 3);
+      pn.poly(ring(32, 0.65), null, "rgba(255,255,255,0.55)", 1);
+    });
+    // bends: centre line
+    T.nodes.forEach((n) => {
+      if (!n.bend) return;
+      const c = arcBand(n, RC, RC, 0.7).outer;
+      for (let k = 0; k < c.length - 1; k += 2) pn.line(c[k], c[k + 1], "#F4EEDC", 1.1, "butt");
     });
     // lot grounds: gardens, paths, parking, park, square, track
     T.objs.forEach((o) => {
@@ -105,7 +136,7 @@
         const ma = (o.a0 + o.a1) / 2, mb = (o.b0 + o.b1) / 2;
         pn.poly([[o.a0, mb - 5, 0.3], [o.a1, mb - 5, 0.3], [o.a1, mb + 5, 0.3], [o.a0, mb + 5, 0.3]], "#E8D9B8", null);
         pn.poly([[ma - 5, o.b0, 0.3], [ma + 5, o.b0, 0.3], [ma + 5, o.b1, 0.3], [ma - 5, o.b1, 0.3]], "#E8D9B8", null);
-        const p = o.pond, ell = (ra, rb, z) => { const pts = []; for (let k = 0; k < 36; k++) { const t = (k / 36) * TAU; pts.push([p.a + Math.cos(t) * ra * (1 + 0.06 * Math.sin(3 * t)), p.b + Math.sin(t) * rb, z]); } return pts; };
+        const p = o.pond || { a: -9e9, b: 0, ra: 0, rb: 0 }, ell = (ra, rb, z) => { const pts = []; for (let k = 0; k < 36; k++) { const t = (k / 36) * TAU; pts.push([p.a + Math.cos(t) * ra * (1 + 0.06 * Math.sin(3 * t)), p.b + Math.sin(t) * rb, z]); } return pts; };
         pn.poly(ell(p.ra + 5, p.rb + 5, 0.3), "#D9C9A4", null);
         pn.poly(ell(p.ra, p.rb, 0.3), "#5CC4CC", "#8FDCE0", 1.2);
         pn.poly(ell(p.ra * 0.3, p.rb * 0.2, 0.35), "rgba(255,255,255,0.3)", null);
@@ -150,34 +181,10 @@
       const pts = [[o.a - hw, o.b - hd], [o.a + hw + len, o.b - hd - len * 0.2], [o.a + hw + len, o.b + hd - len * 0.2], [o.a + hw, o.b + hd], [o.a - hw, o.b + hd]];
       pn.path(pts.map((p) => [p[0], p[1], 0.5])); ctx.fill();
     });
-    // roads
-    const road = "#646E74";
-    T.edges.forEach((e) => {
-      const hw = e.w / 2, n0 = e.n0, n1 = e.n1;
-      const pts = e.axis === "a" ? [[n0.a, n0.b - hw, 0.5], [n1.a, n1.b - hw, 0.5], [n1.a, n1.b + hw, 0.5], [n0.a, n0.b + hw, 0.5]] : [[n0.a - hw, n0.b, 0.5], [n1.a - hw, n1.b, 0.5], [n1.a + hw, n1.b, 0.5], [n0.a + hw, n0.b, 0.5]];
-      if (e.bridge) {
-        const { a0, a1 } = e.bridge, b = n0.b, bw = hw + 22;
-        // piers under the deck
-        for (let a = a0 + 40; a < a1; a += 60) { pn.box(a, b, -SEA_DROP - 4, 10, bw * 2 - 10, SEA_DROP, "#A89A84"); }
-        pn.poly([[a0, b + bw, 0], [a1, b + bw, 0], [a1, b + bw, -6], [a0, b + bw, -6]], "#B7A27E", "rgba(60,40,22,0.35)");
-        pn.poly([[a0, b - bw, 0.4], [a1, b - bw, 0.4], [a1, b + bw, 0.4], [a0, b + bw, 0.4]], "#DCD0B8", null);
-      }
-      pn.poly(pts, road, null);
-    });
-    T.nodes.forEach((n) => {
-      if (n.rb) {
-        const ring = (r, z) => { const pts = []; for (let k = 0; k < 40; k++) { const t = (k / 40) * TAU; pts.push([n.a + Math.cos(t) * r, n.b + Math.sin(t) * r, z]); } return pts; };
-        pn.poly(ring(RB_R + 2, 0.5), road, null);
-        pn.poly(ring(20, 0.6), "#8CC578", "#DCD0B8", 3);
-        pn.poly(ring(32, 0.55), null, "rgba(255,255,255,0.55)", 1);
-        return;
-      }
-      const wa = n.wa || n.w, wb = n.wb || n.w;
-      pn.poly([[n.a - wa / 2, n.b - wb / 2, 0.5], [n.a + wa / 2, n.b - wb / 2, 0.5], [n.a + wa / 2, n.b + wb / 2, 0.5], [n.a - wa / 2, n.b + wb / 2, 0.5]], road, null);
-    });
     // lane markings
     T.edges.forEach((e) => {
-      const n0 = e.n0, n1 = e.n1, cut0 = (n0.rb ? RB_R + 4 : (e.axis === "a" ? n0.wa : n0.wb) / 2 + 18), cut1 = (n1.rb ? RB_R + 4 : (e.axis === "a" ? n1.wa : n1.wb) / 2 + 18);
+      const cutN = (n) => (n.rb ? RB_R + 16 : n.bend ? RC : (e.axis === "a" ? n.wa : n.wb) / 2 + 18);
+      const n0 = e.n0, n1 = e.n1, cut0 = cutN(n0), cut1 = cutN(n1);
       const s0 = [n0.a + e.da * cut0, n0.b + e.db * cut0], s1 = [n1.a - e.da * cut1, n1.b - e.db * cut1];
       if (e.main) {
         [-1.3, 1.3].forEach((o) => pn.line([s0[0] - e.db * o, s0[1] + e.da * o, 0.6], [s1[0] - e.db * o, s1[1] + e.da * o, 0.6], "#F2C14E", 0.9, "butt"));
@@ -186,7 +193,7 @@
         for (let t = 0; t < L; t += 16) { const t1 = Math.min(L, t + 8); pn.line([s0[0] + e.da * t, s0[1] + e.db * t, 0.6], [s0[0] + e.da * t1, s0[1] + e.db * t1, 0.6], "#F4EEDC", 1.1, "butt"); }
       }
       // kerb lines
-      [-1, 1].forEach((sd) => pn.line([n0.a - e.db * sd * (e.w / 2 - 1), n0.b + e.da * sd * (e.w / 2 - 1), 0.6], [n1.a - e.db * sd * (e.w / 2 - 1), n1.b + e.da * sd * (e.w / 2 - 1), 0.6], "rgba(255,255,255,0.18)", 0.8));
+
     });
     // zebra crossings and stop lines
     T.crossings.forEach((c) => {

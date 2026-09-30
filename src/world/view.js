@@ -26,6 +26,7 @@
       else if (o.p === "planterTree") { pn.box(0, 0, 0, 14, 14, 5, "#C4B597"); const q = pen(pn.ctx, pn.P(0, 0, 5)[0], pn.P(0, 0, 5)[1], { emit: pn.E }); tree(q, 1, 0.8); }
       else if (o.p === "stall") { pn.box(0, 0, 0, 22, 12, 10, "#B98759"); [[-10, -5], [10, -5], [-10, 5], [10, 5]].forEach(([x, y]) => pn.line([x, y, 10], [x, y, 22], "#6F5A45", 1)); pn.box(0, 0, 22, 26, 16, 2, o.c); pn.box(-4, 2, 10, 6, 5, 3, "#E0474C"); pn.box(4, 2, 10, 6, 5, 3, "#F2C14E"); pn.glow(0, 0, 20, 10, "#FFE3A0", 1); }
       else if (o.p === "umbrella") umbrellaTable(pn, o.c);
+      else if (o.p === "rock") Bt2(pn, o.s || 1);
     }
   }
 
@@ -42,8 +43,7 @@
       const emitCv = document.createElement("canvas"), ectx = emitCv.getContext("2d");
       const drawables = staticDrawables(T);
       // world bounds in screen units
-      let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
-      [...T.land, ...T.beaches].forEach((r) => [[r.a0, r.b0], [r.a1, r.b0], [r.a1, r.b1], [r.a0, r.b1]].forEach(([a, b]) => { x0 = Math.min(x0, a - b); x1 = Math.max(x1, a - b); y0 = Math.min(y0, (a + b) / 2); y1 = Math.max(y1, (a + b) / 2); }));
+      const { x0, x1, y0, y1 } = T.bbox;
       const bounds = { x0: x0 - 120, x1: x1 + 120, y0: y0 - 220, y1: y1 + 120 };
       const sim = createSim(T, { cars: window.innerWidth < 700 ? 22 : 32, peds: window.innerWidth < 700 ? 40 : 60 });
       const sprites = new Sprites();
@@ -140,7 +140,7 @@
       { const g = poolSprite.getContext("2d"), gg = g.createRadialGradient(46, 23, 0, 46, 23, 46); gg.addColorStop(0, "rgba(255,196,110,0.34)"); gg.addColorStop(0.55, "rgba(255,180,90,0.12)"); gg.addColorStop(1, "rgba(255,180,90,0)"); g.setTransform(1, 0, 0, 0.5, 0, 0); g.fillStyle = gg; g.beginPath(); g.arc(46, 46, 46, 0, TAU); g.fill(); }
       /* ---- water ---- */
       const glints = [];
-      { const r = rng(7); for (let k = 0; k < 260; k++) { const a = -500 + r() * 3400, b = -400 + r() * 2600; if (!T.land.some((q) => inRect(q, a, b, 40)) && !T.beaches.some((q) => inRect(q, a, b, 40))) glints.push({ x: a - b, y: (a + b) / 2 + SEA_DROP, w: 5 + r() * 10, p: r() * TAU }); } }
+      { const r = rng(7); for (let k = 0; k < 260; k++) { const a = T.abox.a0 - 400 + r() * (T.abox.a1 - T.abox.a0 + 800), b = T.abox.b0 - 400 + r() * (T.abox.b1 - T.abox.b0 + 800); if (!T.landAt(a, b) && !T.landAt(a + 40, b) && !T.landAt(a, b + 40) && !T.landAt(a - 40, b - 40)) glints.push({ x: a - b, y: (a + b) / 2 + SEA_DROP, w: 5 + r() * 10, p: r() * TAU }); } }
 
       /* ---- frame ---- */
       let raf = 0, last = performance.now();

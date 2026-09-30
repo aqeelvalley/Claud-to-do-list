@@ -383,3 +383,9 @@
     for (let k = 1; k < 8; k++) pn.line(pn.faceP(bx, "L", k / 8, 0.05), pn.faceP(bx, "L", k / 8, 0.95), shade(c, -0.18), 0.6);
     for (let k = 1; k < 4; k++) pn.line(pn.faceP(bx, "R", k / 4, 0.05), pn.faceP(bx, "R", k / 4, 0.95), shade(c, -0.25), 0.6);
   }
+
+  function Bt2(pn, s = 1) {
+    const ctx = pn.ctx, [x, y] = pn.P(0, 0, -4);
+    ctx.beginPath(); ctx.moveTo(x - 10 * s, y + 2); ctx.lineTo(x - 8 * s, y - 6 * s); ctx.lineTo(x - 2 * s, y - 10 * s); ctx.lineTo(x + 7 * s, y - 8 * s); ctx.lineTo(x + 11 * s, y - 1 * s); ctx.lineTo(x + 8 * s, y + 3); ctx.closePath(); pn.fillPath("#B7AC9A");
+    ctx.beginPath(); ctx.moveTo(x - 8 * s, y - 6 * s); ctx.lineTo(x - 2 * s, y - 10 * s); ctx.lineTo(x + 7 * s, y - 8 * s); ctx.lineTo(x + 1 * s, y - 4 * s); ctx.closePath(); pn.fillPath("#D4CBBA");
+  }
