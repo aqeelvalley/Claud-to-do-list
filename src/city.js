@@ -1,318 +1,346 @@
   /* ===================== Valley Isle · city layout =====================
-   * Islands on an isometric macro-grid, each with a 3x3 street grid,
-   * joined by bridges. Everything here is in iso units (a, b); ye()
-   * projects to screen. Buildings sit in the four blocks of an island.
+   * Hand-placed islands of different sizes with wobbly coastlines. Each has
+   * a winding loop road, a lane or cul-de-sac through the middle, and a few
+   * building sites. Curved bridges join neighbours. Geometry is in iso
+   * units (a, b); ye() projects to screen.
    */
   var City = (() => {
     const h = React.createElement;
-    const P = 660, // macro pitch between island centres
-      RING = 150, // outer ring road offset from island centre
-      RW = 26, // road width
-      SW = 40, // road + pavements
-      BLK = 75; // block centre offset
-    const QUAD = { N: [-1, -1], E: [1, -1], S: [1, 1], W: [-1, 1] };
-    const ORDER = ["N", "E", "S", "W"];
-
-    const CORE = [
-      { id: "home", name: "Home Isle", i: 0, j: 0, color: "#6DAE5B",
-        blocks: { N: "plaza", E: "park", S: "cs:Town hall", W: "personal" } },
-      { id: "eng", name: "Engineering Isle", i: -1, j: 0, color: "#3E7CB1",
-        blocks: { N: "epcm", E: "freelance", S: "fill:office", W: "cs:Research lab" } },
-      { id: "maker", name: "Maker Isle", i: 0, j: -1, color: "#2A9D8F",
-        blocks: { N: "bynode", E: "wood", S: "fill:shop", W: "cs:Robotics bay" } },
-      { id: "harbour", name: "Harbour Isle", i: 1, j: 0, color: "#1F7A8C",
-        blocks: { N: "coffee", E: "hub", S: "cs:Warehouse", W: "fill:house" } },
-      { id: "media", name: "Media Isle", i: 0, j: 1, color: "#E0474C",
-        blocks: { N: "youtube", E: "fill:tower", S: "park", W: "cs:Sound stage" } },
-      { id: "well", name: "Wellness Isle", i: 1, j: 1, color: "#F08A4B",
-        blocks: { N: "fitness", E: "park", S: "field", W: "fill:house" } },
-    ];
-    const LIGHT = { id: "light", name: "Lighthouse Point", i: 1, j: -1, small: true, color: "#E9B949" };
-    const FRONTIER_CELLS = [
-      [-1, -1], [-1, 1], [2, 1], [1, 2], [-2, 0], [0, -2], [-1, 2], [-2, -1],
-    ];
-    const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
-
-    const frontierCell = (k) => {
-      if (k < FRONTIER_CELLS.length) return FRONTIER_CELLS[k];
-      const r = 3 + Math.floor((k - FRONTIER_CELLS.length) / 8),
-        t = (k - FRONTIER_CELLS.length) % 8,
-        ring = [[r, 0], [0, r], [-r, 0], [0, -r], [r, -1], [-1, r], [-r, 1], [1, -r]];
-      return ring[t];
-    };
-    const centre = (isle) => ({ a: isle.i * P, b: isle.j * P });
+    const TAU = Math.PI * 2;
+    const L_ = (v) => Math.round(v * 10) / 10;
     const scr = (a, b, z = 0) => ye(a, b, z);
+    const toIso = (X, Y) => [Y + X / 2, Y - X / 2];
+
+    /* x,y are screen positions; size scales the island */
+    const CORE = [
+      { id: "home", name: "Home Isle", x: 0, y: 0, size: 1.12, color: "#6DAE5B",
+        sites: ["plaza", "personal", "park", "cs:Town hall"] },
+      { id: "eng", name: "Engineering Isle", x: -840, y: -250, size: 1.0, color: "#3E7CB1",
+        sites: ["epcm", "freelance", "cs:Research lab"] },
+      { id: "maker", name: "Maker Isle", x: 690, y: -410, size: 0.9, color: "#2A9D8F",
+        sites: ["bynode", "wood", "cs:Robotics bay"] },
+      { id: "harbour", name: "Harbour Isle", x: 860, y: 290, size: 1.05, color: "#1F7A8C",
+        sites: ["coffee", "hub", "fill:house"], port: true },
+      { id: "media", name: "Media Isle", x: -770, y: 430, size: 0.88, color: "#E0474C",
+        sites: ["youtube", "park", "cs:Sound stage"] },
+      { id: "well", name: "Wellness Isle", x: 60, y: 710, size: 0.98, color: "#F08A4B",
+        sites: ["fitness", "field", "park"] },
+    ];
+    const LIGHT = { id: "light", name: "Lighthouse Point", x: 1470, y: -110, small: true, color: "#E9B949" };
+    const LINKS = [["home", "eng"], ["home", "maker"], ["home", "harbour"], ["home", "media"], ["home", "well"],
+      ["harbour", "well"], ["media", "well"], ["harbour", "light"], ["maker", "light"]];
+    const FRONTIER = [[-90, -700], [-1620, 60], [-1330, -800], [-900, 1080], [1260, -980], [-1780, 760], [1420, 1060], [2100, 350]];
+    const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
+    const frontierPos = (k) => {
+      if (k < FRONTIER.length) return FRONTIER[k];
+      const t = k - FRONTIER.length, r = 1900 + Math.floor(t / 8) * 700, th = (t % 8) / 8 * TAU + 0.3;
+      return [Math.cos(th) * r * 1.3, Math.sin(th) * r * 0.7];
+    };
+
+    /* sample a quadratic curve between two iso points with a sideways bulge */
+    const curve = (p0, p1, bulge, n = 14) => {
+      const ma = (p0[0] + p1[0]) / 2, mb = (p0[1] + p1[1]) / 2;
+      const L = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]) || 1;
+      const ca = ma - ((p1[1] - p0[1]) / L) * bulge, cb = mb + ((p1[0] - p0[0]) / L) * bulge;
+      const out = [];
+      for (let k = 0; k <= n; k++) {
+        const t = k / n, u = 1 - t;
+        out.push([u * u * p0[0] + 2 * u * t * ca + t * t * p1[0], u * u * p0[1] + 2 * u * t * cb + t * t * p1[1]]);
+      }
+      out[0] = p0; out[n] = p1;
+      return out;
+    };
 
     /* ---------- layout ---------- */
     function layout(nSections) {
       const nFrontier = Math.floor(nSections / 4) + 1;
-      const isles = CORE.map((c) => ({ ...c, blocks: { ...c.blocks } }));
+      const isles = CORE.map((c) => ({ ...c, sites: [...c.sites] }));
       for (let k = 0; k < nFrontier; k++) {
-        const [i, j] = frontierCell(k);
-        const blocks = {};
-        ORDER.forEach((q, n) => {
+        const [x, y] = frontierPos(k);
+        const sites = [0, 1, 2, 3].map((n) => {
           const slot = k * 4 + n;
-          blocks[q] = slot < nSections ? "slot:" + slot : "free:" + slot;
+          return slot < nSections ? "slot:" + slot : "free:" + slot;
         });
-        isles.push({ id: "fr" + k, name: "Frontier Isle " + (ROMAN[k] || k + 1), i, j,
-          color: "#9A8F7A", frontier: true, blocks });
+        isles.push({ id: "fr" + k, name: "Frontier Isle " + (ROMAN[k] || k + 1), x, y, size: 1.04, color: "#9A8F7A", frontier: true, sites });
       }
       const all = [...isles, LIGHT];
-      const at = {};
-      all.forEach((s) => (at[s.i + "," + s.j] = s));
+      const byId = Object.fromEntries(all.map((s) => [s.id, s]));
 
-      const plots = {}; // landmark id -> {x,y,r, isle}
-      const blocks = []; // every block with its content
-      const nodes = new Map(); // "a,b" -> {a,b,adj:Set}
-      const roads = []; // [{a0,b0,a1,b1}]
-      const bridges = [];
-      const blobs = [];
-      const lamps = [];
-      const signs = [];
-      const ponds = [];
-      const pastures = [];
-      const addNode = (a, b) => {
-        const k = a + "," + b;
-        if (!nodes.has(k)) nodes.set(k, { a, b, k, adj: new Set() });
+      const plots = {}, blocks = [], nodes = new Map(), paths = [], bridges = [], blobs = [],
+        lamps = [], signs = [], ponds = [], pastures = [], roundabouts = [];
+      const key = (p) => Math.round(p[0]) + "," + Math.round(p[1]);
+      const addNode = (p) => {
+        const k = key(p);
+        if (!nodes.has(k)) nodes.set(k, { a: p[0], b: p[1], k, adj: new Set() });
         return nodes.get(k);
       };
-      const link = (a0, b0, a1, b1, road = true) => {
-        const n0 = addNode(a0, b0), n1 = addNode(a1, b1);
-        n0.adj.add(n1.k); n1.adj.add(n0.k);
-        if (road) roads.push({ a0, b0, a1, b1 });
+      // a road is a polyline; every vertex is a graph node so traffic follows curves
+      const road = (pts, kind = "road") => {
+        for (let n = 0; n < pts.length - 1; n++) {
+          const n0 = addNode(pts[n]), n1 = addNode(pts[n + 1]);
+          if (n0 === n1) continue;
+          n0.adj.add(n1.k); n1.adj.add(n0.k);
+        }
+        paths.push({ pts, kind });
       };
 
       all.forEach((s) => {
-        const c = centre(s);
-        const [sx, sy] = scr(c.a, c.b);
-        s.cx = sx; s.cy = sy; s.ca = c.a; s.cb = c.b;
+        const rnd = Zs(ms("isle-" + s.id));
+        const [ca, cb] = toIso(s.x, s.y);
+        s.ca = ca; s.cb = cb;
         if (s.small) {
-          // Lighthouse islet: round rock with a single lane in
-          [-45, 45].forEach((da) => [-45, 45].forEach((db) => {
-            const [x, y] = scr(c.a + da, c.b + db);
-            blobs.push({ id: "b" + s.id + da + db, x, y, r: 150 });
-          }));
-          const [lx, ly] = scr(c.a - 10, c.b - 20);
+          s.landR = 125;
+          [[0, 0, 190], [-40, 30, 150], [50, -20, 140], [10, 55, 120]].forEach(([da, db, r], n) => {
+            const [x, y] = scr(ca + da, cb + db);
+            blobs.push({ id: "b" + s.id + n, x, y, r });
+          });
+          const [lx, ly] = scr(ca - 5, cb - 25);
           plots.goals = { x: lx, y: ly, r: 160 };
-          signs.push({ x: sx, y: sy + 130, name: s.name, color: s.color });
+          s.loop = [[ca + 10, cb + 55]];
+          s.nodes = [[ca + 10, cb + 55]];
+          road(curve([ca + 10, cb + 55], [ca + 5, cb + 22], 6, 3), "lane");
+          signs.push({ x: s.x, y: s.y + 118, name: s.name, color: s.color });
           return;
         }
-        // Terrain: a dense grid of blobs gives a rounded-square island
-        [-160, -80, 0, 80, 160].forEach((da) => [-160, -80, 0, 80, 160].forEach((db) => {
-          const [x, y] = scr(c.a + da, c.b + db);
-          blobs.push({ id: "b" + s.id + "_" + da + "_" + db, x, y, r: 200 });
-        }));
-        // Street grid
-        const L = [-RING, 0, RING];
-        L.forEach((la) => {
-          for (let q = 0; q < 2; q++) {
-            link(c.a + la, c.b + L[q], c.a + la, c.b + L[q + 1]);
-            link(c.a + L[q], c.b + la, c.a + L[q + 1], c.b + la);
-          }
-        });
-        L.forEach((la) => L.forEach((lb) => {
-          if ((la === 0 && lb === 0) || (Math.abs(la) === RING && Math.abs(lb) === RING)) return;
-          lamps.push({ a: c.a + la + 19, b: c.b + lb + 19 });
-        }));
-        signs.push({ x: sx, y: sy + 222, name: s.name, color: s.color });
-        // Blocks
-        ORDER.forEach((q) => {
-          const [ua, ub] = QUAD[q];
-          const ba = c.a + ua * BLK, bb = c.b + ub * BLK;
-          const [x, y] = scr(ba, bb);
-          const content = s.blocks[q];
-          const blk = { id: s.id + ":" + q, isle: s, q, a: ba, b: bb, x, y, content };
-          blocks.push(blk);
-          if (content === "park") {
-            ponds.push({ a: ba + 18, b: bb - 12, ra: 22, rb: 15 });
-          }
-          if (content === "field") pastures.push({ a: ba, b: bb, r: 40 });
-          if (!content.includes(":") && content !== "park" && content !== "field")
-            plots[content] = { x, y, r: 200 };
+        const n = s.sites.length;
+        const spin = rnd() * TAU;
+        const sr = (n >= 4 ? 118 : 104) * s.size;
+        const loopR = sr + 108 * s.size;
+        s.landR = loopR + 62;
+        // coastline: blobs round a wobbly ring plus a couple of headlands
+        const wob = (th) => 1 + 0.07 * Math.sin(2 * th + spin * 3) + 0.05 * Math.sin(3 * th + spin);
+        for (let k = 0; k < 12; k++) {
+          const th = (k / 12) * TAU + rnd() * 0.35;
+          const rr = loopR * (0.66 + rnd() * 0.22) * wob(th);
+          const [x, y] = scr(ca + Math.cos(th) * rr, cb + Math.sin(th) * rr);
+          blobs.push({ id: "b" + s.id + "o" + k, x, y, r: (165 + rnd() * 105) * s.size });
+        }
+        for (let k = 0; k < 5; k++) {
+          const th = (k / 5) * TAU + spin;
+          const [x, y] = scr(ca + Math.cos(th) * loopR * 0.35, cb + Math.sin(th) * loopR * 0.35);
+          blobs.push({ id: "b" + s.id + "i" + k, x, y, r: 230 * s.size });
+        }
+        for (let k = 0; k < 3 + ((rnd() * 3) | 0); k++) {
+          const th = rnd() * TAU;
+          const rr = loopR * (1.0 + rnd() * 0.3);
+          const [x, y] = scr(ca + Math.cos(th) * rr, cb + Math.sin(th) * rr);
+          blobs.push({ id: "b" + s.id + "h" + k, x, y, r: 120 + rnd() * 60 });
+        }
+        // winding loop road
+        const M = 48;
+        const lo = [(rnd() - 0.5) * 22, (rnd() - 0.5) * 22], stretch = (rnd() - 0.5) * 0.14;
+        const loop = [];
+        for (let k = 0; k < M; k++) {
+          const th = (k / M) * TAU + spin;
+          const rr = loopR * (0.97 + 0.1 * Math.sin(2 * th + spin * 5) + 0.06 * Math.sin(3 * th + spin * 2 + 1.3) + 0.03 * Math.sin(5 * th + spin));
+          loop.push([ca + lo[0] + Math.cos(th) * rr * (1 + stretch), cb + lo[1] + Math.sin(th) * rr * (1 - stretch)]);
+        }
+        s.loop = loop;
+        s.nodes = [];
+        for (let k = 0; k < M; k += 6) s.nodes.push(loop[k]);
+        road([...loop, loop[0]]);
+        // sites between the lanes
+        const siteTh = [];
+        for (let k = 0; k < n; k++) {
+          const th = spin + (k + 0.5) * (TAU / n) + (rnd() - 0.5) * 0.28;
+          siteTh.push(th);
+          const rr = sr * (0.96 + rnd() * 0.08);
+          const a = ca + Math.cos(th) * rr, b = cb + Math.sin(th) * rr;
+          const [x, y] = scr(a, b);
+          const content = s.sites[k];
+          blocks.push({ id: s.id + ":" + k, isle: s, a, b, x, y, content, wob: rnd() * TAU });
+          if (content === "park") ponds.push({ a: a + 18, b: b - 12 });
+          if (content === "field") pastures.push({ a, b });
+          if (!content.includes(":") && content !== "park" && content !== "field") plots[content] = { x, y, r: 200 };
           if (content.startsWith("slot:")) plots[content] = { x, y, r: 200 };
+        }
+        // inner lanes run between sites (angles spin + k*TAU/n)
+        const nodeAt = (th) => {
+          let best = 0, bd = 1e9;
+          loop.forEach((p, i) => {
+            if (i % 6) return;
+            const d = Math.abs(Math.atan2(Math.sin(Math.atan2(p[1] - cb, p[0] - ca) - th), Math.cos(Math.atan2(p[1] - cb, p[0] - ca) - th)));
+            if (d < bd) { bd = d; best = i; }
+          });
+          return loop[best];
+        };
+        const centre = [ca + (rnd() - 0.5) * 16, cb + (rnd() - 0.5) * 16];
+        if (n >= 4) {
+          road(curve(nodeAt(spin), nodeAt(spin + Math.PI), (rnd() - 0.5) * 30), "lane");
+        } else {
+          road(curve(nodeAt(spin), centre, (rnd() - 0.5) * 24, 8), "lane");
+          roundabouts.push(centre);
+        }
+        s.nodes.forEach((p, k) => {
+          if (k % 2) return;
+          const th = Math.atan2(p[1] - cb, p[0] - ca);
+          lamps.push({ a: p[0] + Math.cos(th) * 24, b: p[1] + Math.sin(th) * 24 });
         });
+        signs.push({ x: s.x, y: s.y + s.landR * 0.72 + 30, name: s.name, color: s.color });
+        s.siteTh = siteTh;
       });
 
-      // Harbour quay: the port sits on the east shore, pier out to sea
-      const hb = isles.find((s) => s.id === "harbour");
+      // Harbour: the port sits on the east shore with a pier out to sea
       {
-        const qa = hb.ca + 236, qb = hb.cb + 70;
+        const hb = isles.find((s) => s.id === "harbour");
+        const th = 0.28; // mostly +a (screen down-right)
+        const qa = hb.ca + Math.cos(th) * (hb.landR + 8), qb = hb.cb + Math.sin(th) * (hb.landR + 8);
         const [x, y] = scr(qa, qb);
         plots.port = { x, y, r: 130 };
-        [[200, 40], [200, 110], [250, 60]].forEach(([da, db], n) => {
-          const [bx, by] = scr(hb.ca + da, hb.cb + db);
-          blobs.push({ id: "quay" + n, x: bx, y: by, r: 150 });
+        [[-40, 0, 150], [-20, 50, 130], [-60, -40, 130]].forEach(([da, db, r], n) => {
+          const [bx, by] = scr(qa + da, qb + db);
+          blobs.push({ id: "quay" + n, x: bx, y: by, r });
         });
-        link(hb.ca + RING, hb.cb + 70 - 70, hb.ca + RING, hb.cb + 75, false);
+        const lp = hb.loop.reduce((best, p) => (Math.hypot(p[0] - qa, p[1] - qb) < Math.hypot(best[0] - qa, best[1] - qb) ? p : best));
+        road(curve(lp, [qa - 70, qb - 6], 10, 5), "lane");
       }
 
-      // Bridges between neighbouring islands
-      const done = new Set();
-      const bridge = (s, t) => {
-        const key = [s.id, t.id].sort().join("|");
-        if (done.has(key)) return;
-        done.add(key);
-        const alongA = s.i !== t.i;
-        const [lo, hi] = (alongA ? s.i < t.i : s.j < t.j) ? [s, t] : [t, s];
-        let a0, b0, a1, b1;
-        const hiEnd = hi.small ? 60 : RING;
-        if (alongA) {
-          a0 = lo.ca + RING; a1 = hi.ca - hiEnd; b0 = b1 = lo.cb;
-        } else {
-          b0 = lo.cb + RING; b1 = hi.cb - hiEnd; a0 = a1 = lo.ca;
-        }
-        if (lo.small) {
-          if (alongA) a0 = lo.ca + 60; else b0 = lo.cb + 60;
-        }
-        link(a0, b0, a1, b1);
-        // water span (approx.) for the deck
-        const w0 = lo.small ? 120 : 238, w1 = hi.small ? 120 : 238;
-        bridges.push(alongA
-          ? { a0: lo.ca + w0, a1: hi.ca - w1, b0: lo.cb, b1: lo.cb, axis: "a" }
-          : { b0: lo.cb + w0, b1: hi.cb - w1, a0: lo.ca, a1: lo.ca, axis: "b" });
+      // Bridges: from the loop node facing the neighbour, a gentle arc across
+      const facing = (s, t) => {
+        const pool = s.small ? s.nodes : s.nodes;
+        return pool.reduce((best, p) => (Math.hypot(p[0] - t.ca, p[1] - t.cb) < Math.hypot(best[0] - t.ca, best[1] - t.cb) ? p : best));
       };
-      const nb = (s) => [[1, 0], [-1, 0], [0, 1], [0, -1]]
-        .map(([di, dj]) => at[s.i + di + "," + (s.j + dj)]).filter(Boolean);
-      CORE.forEach((c) => {
-        const s = isles.find((x) => x.id === c.id);
-        nb(s).forEach((t) => !t.frontier && !t.small && bridge(s, t));
+      const bridge = (s, t, n) => {
+        const p0 = facing(s, t), p1 = facing(t, s);
+        const L = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]);
+        const pts = curve(p0, p1, (n % 2 ? 1 : -1) * L * 0.08, Math.max(12, Math.round(L / 22)));
+        road(pts, "bridge");
+        // water span = points outside both coastlines
+        const wet = pts.filter((p) => Math.hypot(p[0] - s.ca, p[1] - s.cb) > s.landR - 30 && Math.hypot(p[0] - t.ca, p[1] - t.cb) > t.landR - 30);
+        if (wet.length > 1) bridges.push({ pts: wet });
+      };
+      LINKS.forEach(([x, y], n) => bridge(byId[x], byId[y], n));
+      isles.filter((s) => s.frontier).forEach((s, n) => {
+        const t = [...all].filter((x) => x !== s && !x.small && (!x.frontier || x.id < s.id))
+          .sort((p, q) => Math.hypot(p.ca - s.ca, p.cb - s.cb) - Math.hypot(q.ca - s.ca, q.cb - s.cb))[0];
+        t && bridge(s, t, n + 1);
       });
-      bridge(isles.find((x) => x.id === "harbour"), LIGHT);
-      isles.filter((s) => s.frontier).forEach((s) => {
-        const t = nb(s).find((x) => !x.small && !x.frontier) || nb(s).find((x) => !x.small);
-        t && bridge(s, t);
-      });
-      // Lighthouse lane
-      link(LIGHT.i * P, LIGHT.j * P + 60, LIGHT.i * P, LIGHT.j * P + 20);
 
-      return { isles, blocks, plots, nodes, roads, bridges, blobs, lamps, signs, ponds, pastures };
+      return { isles, blocks, plots, nodes, paths, bridges, blobs, lamps, signs, ponds, pastures, roundabouts };
     }
 
-    /* point-in-city tests used when scattering trees & flowers */
+    /* scatter test: is a screen point clear of roads and building sites? */
     function free(city, X, Y, pad = 10) {
-      const a = Y + X / 2, b = Y - X / 2;
-      for (const r of city.roads) {
-        const la = Math.min(r.a0, r.a1) - SW / 2 - pad, ha = Math.max(r.a0, r.a1) + SW / 2 + pad,
-          lb = Math.min(r.b0, r.b1) - SW / 2 - pad, hb = Math.max(r.b0, r.b1) + SW / 2 + pad;
-        if (a > la && a < ha && b > lb && b < hb) return false;
+      const [a, b] = toIso(X, Y);
+      for (const r of city.paths) {
+        const lim = (r.kind === "lane" ? 15 : 20) + pad;
+        const p = r.pts;
+        for (let n = 0; n < p.length - 1; n++) {
+          const [a0, b0] = p[n], [a1, b1] = p[n + 1];
+          const da = a1 - a0, db = b1 - b0, L2 = da * da + db * db || 1;
+          const t = Math.max(0, Math.min(1, ((a - a0) * da + (b - b0) * db) / L2));
+          if (Math.hypot(a - a0 - da * t, b - b0 - db * t) < lim) return false;
+        }
       }
+      for (const c of city.roundabouts) if (Math.hypot(a - c[0], b - c[1]) < 30 + pad) return false;
       for (const k of city.blocks) {
-        if (Math.abs(a - k.a) < 62 + pad && Math.abs(b - k.b) < 62 + pad) {
-          if (k.content !== "park" && k.content !== "field") return false;
-          if (k.content === "field") return false;
-          // inside a park: keep off the paths and pond
-          const da = a - k.a, db = b - k.b;
+        const da = a - k.a, db = b - k.b;
+        if (Math.hypot(da, db) < 70 + pad) {
+          if (k.content !== "park") return false;
           if (Math.abs(da) < 9 || Math.abs(db) < 9) return false;
           if (((da - 18) / 30) ** 2 + ((db + 12) / 22) ** 2 < 1) return false;
         }
       }
       const pp = city.plots.port;
       if (pp) {
-        const pa = pp.y + pp.x / 2, pb = pp.y - pp.x / 2;
-        if (a > pa - 80 && a < pa + 200 && b > pb - 50 && b < pb + 50) return false;
+        const [pa, pb] = toIso(pp.x, pp.y);
+        if (a > pa - 80 && a < pa + 200 && b > pb - 60 && b < pb + 60) return false;
       }
       const g = city.plots.goals;
       if (g && Math.hypot(X - g.x, (Y - g.y) * 2) < 110) return false;
       return true;
     }
 
-    /* ---------- drawing helpers ---------- */
-    const quad = (a0, b0, a1, b1, w, z = 0, ext = 0) => {
-      const L = Math.hypot(a1 - a0, b1 - b0) || 1,
-        da = (a1 - a0) / L, db = (b1 - b0) / L,
-        pa = -db * w / 2, pb = da * w / 2,
-        s0a = a0 - da * ext, s0b = b0 - db * ext, s1a = a1 + da * ext, s1b = b1 + db * ext;
-      return J([[s0a + pa, s0b + pb, z], [s1a + pa, s1b + pb, z], [s1a - pa, s1b - pb, z], [s0a - pa, s0b - pb, z]]);
+    /* ---------- ground drawing ---------- */
+    const pathD = (pts, z = 0) => pts.map((p, n) => {
+      const [x, y] = scr(p[0], p[1], z);
+      return (n ? "L" : "M") + L_(x) + "," + L_(y);
+    }).join("");
+    // offset a screen polyline sideways (for bridge railings)
+    const offsetD = (pts, off, z) => {
+      const s = pts.map((p) => scr(p[0], p[1], z));
+      return s.map((p, n) => {
+        const q0 = s[Math.max(0, n - 1)], q1 = s[Math.min(s.length - 1, n + 1)];
+        const dx = q1[0] - q0[0], dy = q1[1] - q0[1], L = Math.hypot(dx, dy) || 1;
+        return (n ? "L" : "M") + L_(p[0] - (dy / L) * off) + "," + L_(p[1] + (dx / L) * off);
+      }).join("");
     };
-    const sq = (a, b, half, z = 0) => J([[a - half, b - half, z], [a + half, b - half, z], [a + half, b + half, z], [a - half, b + half, z]]);
+    const quad = (a0, b0, a1, b1, w, z = 0) => {
+      const L = Math.hypot(a1 - a0, b1 - b0) || 1, da = (a1 - a0) / L, db = (b1 - b0) / L, pa = -db * w / 2, pb = da * w / 2;
+      return J([[a0 + pa, b0 + pb, z], [a1 + pa, b1 + pb, z], [a1 - pa, b1 - pb, z], [a0 - pa, b0 - pb, z]]);
+    };
 
     function Ground({ city }) {
-      const r = city.roads;
-      const walk = [], tar = [], dash = [], zebra = [];
-      r.forEach((s, n) => {
-        walk.push(h("polygon", { key: n, points: quad(s.a0, s.b0, s.a1, s.b1, SW, 0, SW / 2), fill: "#DCD0B8" }));
-        tar.push(h("polygon", { key: n, points: quad(s.a0, s.b0, s.a1, s.b1, RW, 0.2, RW / 2), fill: "#5F6B72" }));
-        const L = Math.hypot(s.a1 - s.a0, s.b1 - s.b0), da = (s.a1 - s.a0) / L, db = (s.b1 - s.b0) / L;
-        if (L > 60) {
-          const p0 = scr(s.a0 + da * 24, s.b0 + db * 24, 0.3), p1 = scr(s.a1 - da * 24, s.b1 - db * 24, 0.3);
-          dash.push(h("line", { key: n, x1: L_(p0[0]), y1: L_(p0[1]), x2: L_(p1[0]), y2: L_(p1[1]) }));
-          [[s.a0 + da * 19, s.b0 + db * 19], [s.a1 - da * 19, s.b1 - db * 19]].forEach(([za, zb], m2) => {
-            [-9, -4.5, 0, 4.5, 9].forEach((o) => {
-              const ca = za - db * o, cb = zb + da * o;
-              zebra.push(h("polygon", { key: n + "z" + m2 + o, points: quad(ca - da * 3.5, cb - db * 3.5, ca + da * 3.5, cb + db * 3.5, 2.6, 0.3), fill: "#EFE8D8" }));
-            });
-          });
-        }
-      });
-      return h("g", { className: "roads", pointerEvents: "none" },
-        h("g", { stroke: "#C4B597", strokeWidth: 1.2, strokeLinejoin: "round" }, walk),
-        h("g", null, tar),
-        h("g", { stroke: "#F3E3B3", strokeWidth: 1.3, strokeDasharray: "7 7", strokeLinecap: "round" }, dash),
-        h("g", null, zebra),
+      const land = city.paths;
+      const d = land.map((r) => pathD(r.pts));
+      const wide = land.map((r) => r.kind !== "lane");
+      return h("g", { className: "roads", pointerEvents: "none", fill: "none", strokeLinecap: "round", strokeLinejoin: "round" },
+        d.map((p, n) => h("path", { key: "c" + n, d: p, stroke: "#C4B597", strokeWidth: wide[n] ? 40 : 30 })),
+        d.map((p, n) => h("path", { key: "s" + n, d: p, stroke: "#DCD0B8", strokeWidth: wide[n] ? 37 : 27 })),
+        city.roundabouts.map((c, n) => h(Nt, { key: "rb" + n, x: c[0], y: c[1], z: 0.2, a: 30, b: 30, fill: "#DCD0B8", stroke: "#C4B597", sw: 1.5 })),
+        d.map((p, n) => h("path", { key: "t" + n, d: p, stroke: wide[n] ? "#5F6B72" : "#6E797F", strokeWidth: wide[n] ? 25 : 17 })),
+        city.roundabouts.map((c, n) => h("g", { key: "rbi" + n },
+          h(Nt, { x: c[0], y: c[1], z: 0.3, a: 22, b: 22, fill: "#6E797F" }),
+          h(Nt, { x: c[0], y: c[1], z: 0.4, a: 10, b: 10, fill: "#8CC27A", stroke: "#DCD0B8", sw: 2 }))),
+        d.map((p, n) => wide[n] && h("path", { key: "m" + n, d: p, stroke: "#F3E3B3", strokeWidth: 1.3, strokeDasharray: "8 9" })),
         city.bridges.map((br, n) => h(Bridge, { key: "br" + n, br })),
       );
     }
-    const L_ = (v) => Math.round(v * 10) / 10;
 
     function Bridge({ br }) {
-      const { a0, b0, a1, b1, axis } = br;
-      const deck = [];
-      const len = axis === "a" ? a1 - a0 : b1 - b0;
-      const posts = [];
+      const p = br.pts;
       const piers = [];
-      const n = Math.max(2, Math.round(len / 34));
-      for (let k = 0; k <= n; k++) {
-        const t = k / n;
-        const a = a0 + (a1 - a0) * t, b = b0 + (b1 - b0) * t;
-        const side = axis === "a" ? [[a, b - SW / 2 + 2], [a, b + SW / 2 - 2]] : [[a - SW / 2 + 2, b], [a + SW / 2 - 2, b]];
-        side.forEach(([pa, pb], m2) => {
-          const q0 = scr(pa, pb, 4), q1 = scr(pa, pb, 12);
-          posts.push(h("line", { key: k + "p" + m2, x1: L_(q0[0]), y1: L_(q0[1]), x2: L_(q1[0]), y2: L_(q1[1]) }));
-        });
-        if (k > 0 && k < n && k % 2 === 0) {
-          const [px, py] = scr(a, b, 0);
-          piers.push(h("g", { key: "pier" + k },
-            h("rect", { x: L_(px - 7), y: L_(py - 2), width: 14, height: 12, rx: 2, fill: "#A89A84" }),
-            h("ellipse", { className: "ripple", cx: L_(px), cy: L_(py + 10), rx: 12, ry: 3.2, fill: "none", stroke: "rgba(255,255,255,0.6)", strokeWidth: 1 })));
-        }
+      for (let n = 2; n < p.length - 1; n += 3) {
+        const [x, y] = scr(p[n][0], p[n][1], 0);
+        piers.push(h("g", { key: n },
+          h("rect", { x: L_(x - 7), y: L_(y + 2), width: 14, height: 12, rx: 2, fill: "#A89A84" }),
+          h("ellipse", { className: "ripple", cx: L_(x), cy: L_(y + 14), rx: 12, ry: 3.2, fill: "none", stroke: "rgba(255,255,255,0.6)", strokeWidth: 1 })));
       }
-      const rail = (off) => {
-        const p = axis === "a" ? [[a0, b0 + off], [a1, b1 + off]] : [[a0 + off, b0], [a1 + off, b1]];
-        const q0 = scr(p[0][0], p[0][1], 12), q1 = scr(p[1][0], p[1][1], 12);
-        return h("line", { x1: L_(q0[0]), y1: L_(q0[1]), x2: L_(q1[0]), y2: L_(q1[1]) });
-      };
+      const deck = pathD(p, 4);
       return h("g", null,
-        h("polygon", { points: quad(a0, b0, a1, b1, SW + 10, -6, 0), fill: "rgba(8,60,70,0.25)", transform: "translate(8,10)" }),
+        h("path", { d: pathD(p, 0), stroke: "rgba(8,60,70,0.28)", strokeWidth: 44, transform: "translate(8,12)" }),
         piers,
-        h("polygon", { points: quad(a0, b0, a1, b1, SW, 0, 0), fill: "#B9A88C" }),
-        h("polygon", { points: quad(a0, b0, a1, b1, SW, 4, 0), fill: "#E3D6BD", stroke: "#B7A27E", strokeWidth: 1 }),
-        h("polygon", { points: quad(a0, b0, a1, b1, RW, 4.2, 0), fill: "#6A757B" }),
-        h("g", { stroke: "#8A6F4E", strokeWidth: 1.6, strokeLinecap: "round" }, posts),
-        h("g", { stroke: "#F6EDDF", strokeWidth: 2.2, strokeLinecap: "round" }, rail(-SW / 2 + 2), rail(SW / 2 - 2)),
+        h("path", { d: pathD(p, 0), stroke: "#A8977B", strokeWidth: 40 }),
+        h("path", { d: deck, stroke: "#B7A27E", strokeWidth: 40 }),
+        h("path", { d: deck, stroke: "#E3D6BD", strokeWidth: 37 }),
+        h("path", { d: deck, stroke: "#6A757B", strokeWidth: 25 }),
+        h("path", { d: deck, stroke: "#F3E3B3", strokeWidth: 1.3, strokeDasharray: "8 9" }),
+        [-17, 17].map((o) => h("g", { key: o },
+          h("path", { d: offsetD(p, o, 12), stroke: "#F6EDDF", strokeWidth: 2.2 }),
+          h("path", { d: offsetD(p, o, 8), stroke: "#8A6F4E", strokeWidth: 8, strokeDasharray: "1.6 12", opacity: 0.8 }))),
       );
     }
 
-    /* block slabs drawn flat on the ground under everything */
+    /* organic lots under each site */
+    const blobPts = (a, b, r, wob, z) => {
+      const out = [];
+      for (let k = 0; k < 28; k++) {
+        const th = (k / 28) * TAU;
+        const rr = r * (1 + 0.06 * Math.sin(3 * th + wob) + 0.04 * Math.sin(5 * th + wob * 2));
+        out.push([a + Math.cos(th) * rr, b + Math.sin(th) * rr, z]);
+      }
+      return J(out);
+    };
     function Lots({ city }) {
       return h("g", { pointerEvents: "none" }, city.blocks.map((k) => {
         const ct = k.content;
-        let fill = "#9CCB84", stroke = "#7FB06A";
+        let fill = "#A3D08B", stroke = "#86BB70";
         if (ct.startsWith("cs:") || ct.startsWith("free:")) { fill = "#CFAE7F"; stroke = "#B38F5E"; }
         else if (ct === "plaza") { fill = "#E7D8BC"; stroke = "#CDB892"; }
         else if (ct === "park") { fill = "#88C174"; stroke = "#6FA85C"; }
         else if (ct === "field") { fill = "#7DBA6A"; stroke = "#6AA658"; }
         return h("g", { key: k.id },
-          h("polygon", { points: sq(k.a, k.b, 62, 0.1), fill, stroke, strokeWidth: 1.4 }),
+          h("polygon", { points: blobPts(k.a, k.b, 66, k.wob, 0.1), fill, stroke, strokeWidth: 1.4 }),
           ct === "park" && h(ParkGround, { a: k.a, b: k.b }),
           ct === "field" && h(FieldGround, { a: k.a, b: k.b }),
         );
       }));
     }
     function ParkGround({ a, b }) {
+      const path = (p) => h("path", { d: pathD(p), stroke: "#E8D9B8", strokeWidth: 8, fill: "none", strokeLinecap: "round" });
       return h("g", null,
-        h("polygon", { points: quad(a - 62, b, a + 62, b, 9, 0.2), fill: "#E8D9B8" }),
-        h("polygon", { points: quad(a, b - 62, a, b + 62, 9, 0.2), fill: "#E8D9B8" }),
-        h(Nt, { x: a, y: b, z: 0.25, a: 16, b: 16, fill: "#E8D9B8" }),
+        path(curve([a - 58, b + 10], [a + 50, b - 20], 22, 10)),
+        path(curve([a - 10, b - 58], [a + 8, b + 56], -18, 10)),
         h(Nt, { x: a + 18, y: b - 12, z: 0.3, a: 26, b: 18, fill: "#D9C9A4" }),
         h(Nt, { x: a + 18, y: b - 12, z: 0.35, a: 22, b: 15, fill: "#5CC4CC", stroke: "#8FDCE0", sw: 1.2 }),
         h(Nt, { x: a + 22, y: b - 14, z: 0.4, a: 8, b: 4, fill: "none", stroke: "rgba(255,255,255,0.7)", sw: 1 }),
@@ -322,7 +350,7 @@
       return h("g", null,
         h(Nt, { x: a, y: b, z: 0.2, a: 58, b: 50, fill: "#D9734E", stroke: "#B85C3C", sw: 1 }),
         h(Nt, { x: a, y: b, z: 0.25, a: 48, b: 40, fill: "#7DBA6A" }),
-        h("polygon", { points: sq(a, b, 30, 0.3), fill: "#8CC878", stroke: "#F6F2E6", strokeWidth: 1.2 }),
+        h("polygon", { points: J([[a - 30, b - 30, 0.3], [a + 30, b - 30, 0.3], [a + 30, b + 30, 0.3], [a - 30, b + 30, 0.3]]), fill: "#8CC878", stroke: "#F6F2E6", strokeWidth: 1.2 }),
         h("polygon", { points: quad(a, b - 30, a, b + 30, 0.01, 0.3), stroke: "#F6F2E6", strokeWidth: 1.2 }),
         h(Nt, { x: a, y: b, z: 0.3, a: 8, b: 8, stroke: "#F6F2E6", sw: 1.2 }),
       );
@@ -356,7 +384,7 @@
           h(Nt, { x: -6, y: 4, z: 0.3, a: 34, b: 26, fill: "#BF9A68" }),
           [[-40, -40], [40, -40], [40, 40], [-40, 40]].map(([x, y], n) =>
             h(b, { key: n, x, y, z: 0, w: 3, d: 3, h: 9, c: "#E9DDC8" })),
-          h("polygon", { points: sq(0, 0, 40, 6), fill: "none", stroke: "#E9DDC8", strokeWidth: 1, strokeDasharray: "4 3" }),
+          h("polygon", { points: blobPts(0, 0, 40, 1, 6), fill: "none", stroke: "#E9DDC8", strokeWidth: 1, strokeDasharray: "4 3" }),
         ),
         // sand pile & cones
         h("path", { d: (() => { const [x, y] = scr(34, 30); return `M${x - 16},${y} Q${x},${y - 16} ${x + 16},${y} Z`; })(), fill: "#E3C48D", stroke: "#C7A56B", strokeWidth: 0.8 }),
@@ -664,5 +692,6 @@
       };
     }
 
-    return { layout, free, Ground, Lots, objects, Signs, startLife, P, RING };
+
+    return { layout, free, Ground, Lots, objects, Signs, startLife };
   })();
