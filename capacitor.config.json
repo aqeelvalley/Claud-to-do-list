@@ -1,0 +1,15 @@
+{
+  "appId": "app.lifelist.island",
+  "appName": "LifeList",
+  "webDir": "www",
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#6CB8C2",
+    "scrollEnabled": false,
+    "limitsNavigationsToAppBoundDomains": true
+  },
+  "plugins": {
+    "SplashScreen": { "launchAutoHide": false, "backgroundColor": "#6CB8C2", "showSpinner": false },
+    "LocalNotifications": { "iconColor": "#E4826A" }
+  }
+}

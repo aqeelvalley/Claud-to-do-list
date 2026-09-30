@@ -1,0 +1,124 @@
+name: LifeList iOS
+
+# Builds the iPhone app on GitHub's Macs, so no Mac is needed.
+#  - Every push: builds for the iOS Simulator (no Apple account needed) and checks it compiles.
+#  - TestFlight: runs only when the App Store Connect secrets are set (see README "iPhone app").
+on:
+  push:
+    branches: ["**"]
+    paths: ["src/**", "app/**", "ios/**", "scripts/**", "build.sh", "package.json", "package-lock.json", "capacitor.config.json", ".github/workflows/ios.yml"]
+  workflow_dispatch:
+    inputs:
+      testflight:
+        description: "Upload to TestFlight (needs the App Store Connect secrets)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  simulator:
+    name: Build (simulator)
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Use the newest Xcode on the runner
+        run: |
+          XC=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          sudo xcode-select -s "$XC/Contents/Developer"
+          xcodebuild -version
+      - run: npm ci
+      - name: Build the web app and copy it into the iOS project
+        run: |
+          npm run build:app
+          npx cap sync ios
+      - name: Build for the simulator
+        run: |
+          set -o pipefail
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build/sim CODE_SIGNING_ALLOWED=NO build | tail -n 60
+      - name: Package the simulator app
+        run: |
+          cd build/sim/Build/Products/Debug-iphonesimulator
+          zip -qry "$GITHUB_WORKSPACE/LifeList-simulator.zip" App.app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LifeList-simulator
+          path: LifeList-simulator.zip
+          retention-days: 14
+
+  testflight:
+    name: TestFlight
+    needs: simulator
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      - name: Check the Apple secrets are set
+        id: gate
+        run: |
+          if [ -n "$ASC_KEY_ID" ] && [ -n "$ASC_ISSUER_ID" ] && [ -n "$ASC_KEY_P8" ] && [ -n "$APPLE_TEAM_ID" ]; then
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.testflight }}" = "true" ]; then echo "go=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+            if [ "${{ github.ref }}" = "refs/heads/main" ]; then echo "go=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+            echo "Secrets are set; TestFlight uploads run on main or when started by hand with 'Upload to TestFlight'."
+          else
+            echo "No App Store Connect secrets yet, so skipping TestFlight. See README 'iPhone app'."
+          fi
+          echo "go=false" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.go == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.go == 'true'
+        with:
+          node-version: 22
+          cache: npm
+      - name: Use the newest Xcode on the runner
+        if: steps.gate.outputs.go == 'true'
+        run: |
+          XC=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          sudo xcode-select -s "$XC/Contents/Developer"
+      - name: Build the web app
+        if: steps.gate.outputs.go == 'true'
+        run: |
+          npm ci
+          npm run build:app
+          npx cap sync ios
+      - name: Archive and upload
+        if: steps.gate.outputs.go == 'true'
+        run: |
+          set -o pipefail
+          mkdir -p ~/private_keys
+          KEY=~/private_keys/AuthKey_$ASC_KEY_ID.p8
+          printf '%s' "$ASC_KEY_P8" > "$KEY"
+          AUTH=(-allowProvisioningUpdates -authenticationKeyPath "$KEY" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
+          BUILD_NO=$(( ${{ github.run_number }} + 100 ))
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath build/LifeList.xcarchive \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" CODE_SIGN_STYLE=Automatic CURRENT_PROJECT_VERSION=$BUILD_NO \
+            "${AUTH[@]}" archive | tail -n 60
+          cat > build/ExportOptions.plist <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>$APPLE_TEAM_ID</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict></plist>
+          PLIST
+          xcodebuild -exportArchive -archivePath build/LifeList.xcarchive -exportOptionsPlist build/ExportOptions.plist \
+            -exportPath build/export "${AUTH[@]}" | tail -n 40
+          rm -f "$KEY"
