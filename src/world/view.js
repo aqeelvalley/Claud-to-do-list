@@ -33,13 +33,14 @@
     }
   }
 
+  const ISLES_OF = (T) => T.isles || {};
   const WorldMap = React.forwardRef(function WorldMap(props, ref) {
     const { town: T, landmarks, onOpen, onShip, onPlot, onAgent, onCrew, onAssign, lightMode = "auto", leads = [], workers = [], reserveRight = 0 } = props;
     const wrap = React.useRef(null), cvs = React.useRef(null);
     const st = React.useRef(null);
     const prevRef = React.useRef(null); // the island as it was, kept for the transition to the new one
     const cb = React.useRef({});
-    cb.current = { onOpen, onShip, onPlot, onAgent, onCrew, onAssign, landmarks, lightMode, reserveRight, paused: props.paused, opening: props.opening, edit: props.edit, onEditMove: props.onEditMove, onEditSelect: props.onEditSelect, onEditInvalid: props.onEditInvalid };
+    cb.current = { onOpen, onShip, onPlot, onAgent, onCrew, onAssign, landmarks, lightMode, reserveRight, paused: props.paused, opening: props.opening, focus: props.focus, edit: props.edit, onEditMove: props.onEditMove, onEditSelect: props.onEditSelect, onEditInvalid: props.onEditInvalid };
 
     /* one-time engine setup per town */
     React.useEffect(() => {
@@ -49,7 +50,9 @@
       // world bounds in screen units
       const { x0, x1, y0, y1 } = T.bbox;
       const bounds = { x0: x0 - 120, x1: x1 + 120, y0: y0 - 220, y1: y1 + 120 };
-      const mob = window.innerWidth < 700, sim = createSim(T, { cars: Math.max(3, Math.min(mob ? 22 : 32, Math.round(T.edges.length * 0.9))), peds: Math.max(10, Math.min(mob ? 40 : 60, T.blocks.length * 4)) });
+      const mob = window.innerWidth < 700, sim = createSim(T, { cars: Math.max(3, Math.min(mob ? 16 : 24, Math.round(T.edges.length * 0.7))), peds: Math.max(8, Math.min(mob ? 30 : 44, T.blocks.length * 3)) });
+      // runways get a plane on a loop: taxi, take off, climb away, then the next one
+      const runways = T.objs.filter((o) => o.drawer === "runway").map((o, k) => ({ o, alongA: o.w >= o.d, L: Math.max(o.w, o.d), off: k * 5.3 }));
       const sprites = new Sprites();
       const chunks = new Map();
       const CH = 420;
@@ -118,6 +121,21 @@
           const far = Math.max(1, ...drawables.map((d) => Math.hypot(d.sx - cx, (d.sy - cy) * 2)));
           Object.assign(intro, { cx, cy, R: far });
           drawables.forEach((d) => (d._ap = 0.8 + 1.5 * (Math.hypot(d.sx - cx, (d.sy - cy) * 2) / far) + (d.kind === "tree" ? 0.15 : 0)));
+        }
+        // just built something? fly over to it so you see it go up
+        const fc = cb.current.focus;
+        if (fc && !fc.done && performance.now() - fc.t < 10000) {
+          const all = [...((ISLES_OF(T).life || {}).parcels || []), ...((ISLES_OF(T).work || {}).parcels || [])];
+          const pl = all.find((q) => q.id === fc.parcel);
+          const I = pl && T.isles[String(pl.id).startsWith("w:") ? "work" : "life"];
+          if (pl && pl.cells && I) {
+            fc.done = true;
+            const cs = pl.cells.map(([i, j]) => [(I.A[i] + I.A[i + 1]) / 2, (I.B[j] + I.B[j + 1]) / 2]);
+            const a = cs.reduce((m, c) => m + c[0], 0) / cs.length, b = cs.reduce((m, c) => m + c[1], 0) / cs.length;
+            const sx = a - b, sy = (a + b) / 2, ns = Math.max(S.cam.s, S.w < 700 ? 0.7 : 0.85);
+            const mob = S.w < 700, off = mob ? 0 : cb.current.reserveRight || 0;
+            setTimeout(() => fly({ s: ns, tx: (S.w - off) / 2 - sx * ns, ty: S.h * (mob ? 0.45 : 0.5) - (sy - 40) * ns }, 900), 60);
+          }
         }
         if (intro) { intro.el = intro.el || 0; intro.end = intro.mode === "rise" ? 3.6 : 2.3; S.intro = intro; }
       }
@@ -259,6 +277,18 @@
         sim.peds.forEach((w) => { if (!w.hidden) dyn.push({ kind: "ped", w, depth: w.a + w.b + (w.carried ? 9999 : 0), sx: w.a - w.b, sy: (w.a + w.b) / 2 }); });
         sim.animals.forEach((m) => dyn.push({ kind: "animal", m, depth: m.a + m.b, sx: m.a - m.b, sy: (m.a + m.b) / 2 }));
         sim.boats.forEach((b) => { if (b.a != null) dyn.push({ kind: "boat", b, depth: b.a + b.b - 40, sx: b.a - b.b, sy: (b.a + b.b) / 2 + SEA_DROP }); });
+        runways.forEach((rw) => {
+          const T2 = 17, t = ((time + rw.off) % T2), o = rw.o;
+          if (t > 12) return; // gap between flights
+          // 0-1.4 appear at the hold line, 1.4-7 roll and speed up, 7-12 lift off, climb and fade
+          const u0 = -rw.L / 2 + 44, uEnd = rw.L / 2 - 20;
+          let u, z = 0, al = 1;
+          if (t < 1.4) { u = u0; al = t / 1.4; }
+          else if (t < 7) { const q = (t - 1.4) / 5.6; u = u0 + (uEnd - u0) * 0.75 * q * q; }
+          else { const q = (t - 7) / 5; u = u0 + (uEnd - u0) * 0.75 + (rw.L * 0.55 + 260) * (q * 0.8 + q * q * 0.4); z = 150 * q * q + 20 * q; al = 1 - clamp((q - 0.55) / 0.45, 0, 1); }
+          const a = rw.alongA ? o.a + u : o.a, b = rw.alongA ? o.b : o.b + u;
+          dyn.push({ kind: "plane", rw, a, b, z, al, depth: z > 8 ? 99999 : Math.max(a + b, o.a + o.b) + 3, sx: a - b, sy: (a + b) / 2 - z });
+        });
         dyn.sort((x, y) => x.depth - y.depth);
         // merge with static (already sorted)
         const list = [];
@@ -309,6 +339,7 @@
           }
           if (IN && IN.mode === "rise" && age < 2.9 && d.kind !== "bnd") { if (age < 2.3) return; ctx.globalAlpha = (age - 2.3) / 0.6; }
           else ctx.globalAlpha = 1;
+          if (d.kind === "plane") { drawPlane(pen(ctx, 0, 0), d.a, d.b, d.z, d.rw.alongA ? "a" : "b", 1, "#E4826A", d.al); return; }
           if (d.kind === "car") { const c = d.c, s = carSprite(c.kind, c.color, c.yaw, Math.floor(c.wheel) % 3, sc, false); d._s = s; ctx.drawImage(s.cv, d.sx - s.ox, d.sy - s.oy, s.w, s.h); return; }
           if (d.kind === "boat") { const b = d.b, s = boatSprite(b, sc, false); d._s = s; const bob = Math.sin(time * 1.6 + d.sx * 0.01) * 1.2; ctx.drawImage(s.cv, d.sx - s.ox, d.sy - s.oy + bob, s.w, s.h); return; }
           if (d.kind === "ped") {

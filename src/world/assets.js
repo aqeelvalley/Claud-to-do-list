@@ -211,6 +211,33 @@
       trait: pick(TRAITS), scarf: r() < 0.25 ? pick(HATS) : null,
     };
   }
+  /* an airliner: fuselage, tapered nose and tail, swept wings, engines, fin in the livery colour.
+     (pa,pb,pz) is the centre; axis 'a'|'b' and dir ±1 give the heading (planes only fly along runways). */
+  function drawPlane(pn, pa, pb, pz, axis, dir, livery = "#E4826A", alpha = 1, k = 1.4) {
+    const ctx = pn.ctx;
+    const W = (x, y) => (axis === "a" ? [pa + dir * x * k, pb + dir * y * k] : [pa - dir * y * k, pb + dir * x * k]);
+    const box = (cx, cy, cz, lx, ly, lz, c) => { const [a, b] = W(cx, cy); pn.box(a, b, pz + cz * k, (axis === "a" ? lx : ly) * k, (axis === "a" ? ly : lx) * k, lz * k, c); };
+    const poly = (pts, c) => pn.poly(pts.map(([x, y, z]) => { const [a, b] = W(x, y); return [a, b, pz + z * k]; }), c);
+    ctx.save(); ctx.globalAlpha = alpha;
+    // shadow on the ground, drifting away as the plane climbs
+    if (!pn.E) { const [sa, sb] = W(0, 0), [x, y] = pn.P(sa + pz * 0.35, sb + pz * 0.2, 0); ctx.fillStyle = `rgba(40,30,70,${0.18 * Math.max(0.2, 1 - pz / 140)})`; ctx.beginPath(); ctx.ellipse(x, y, 30 * k, 12 * k, 0, 0, TAU); ctx.fill(); }
+    const near = (y) => { const [a1, b1] = W(0, y), [a2, b2] = W(0, -y); return a1 + b1 > a2 + b2; };
+    const wing = (sy) => { poly([[7, 3 * sy, 4], [-3, 3 * sy, 4], [-13, 27 * sy, 4.6], [-7, 27 * sy, 4.6]], "#DCE1EC"); box(3, 12 * sy, 0.8, 9, 4.4, 4, "#B8BFD0"); box(7.6, 12 * sy, 1.6, 0.8, 3, 2.4, "#5A4E7A"); };
+    const stab = (sy) => poly([[-19, 2 * sy, 7.5], [-24, 2 * sy, 7.5], [-28, 10 * sy, 8], [-25, 10 * sy, 8]], "#DCE1EC");
+    const farY = near(1) ? -1 : 1, nearY = -farY;
+    wing(farY); stab(farY);
+    // fuselage: tail cone, body, nose and cockpit, drawn back to front along the heading
+    const segs = [[-24, 5, 5, 3.5], [-19, 7, 7, 1.6], [0, 38, 7, 1.6], [22, 6, 6.2, 2], [26.5, 3, 4.6, 2.6], [29, 2, 3, 3.2]];
+    const order = (W(1, 0)[0] + W(1, 0)[1]) > (W(0, 0)[0] + W(0, 0)[1]) ? segs : [...segs].reverse();
+    order.forEach(([cx, lx, w, z]) => box(cx, 0, z, lx, w, w, "#FBFCFF"));
+    box(0, 0, 5.2, 36, 7.2, 1.3, livery);
+    // cabin windows along the side facing us, cockpit glass on the nose
+    for (let k = -14; k <= 16; k += 3.2) box(k, nearY * 3.62, 5.4, 1.1, 0.1, 1.2, "#5A6A96");
+    box(25.2, 0, 6.4, 2.4, 5.4, 1.2, "#3E4A70");
+    poly([[-16, 0, 8.6], [-26, 0, 8.6], [-29, 0, 21], [-24, 0, 21]], livery);
+    stab(nearY); wing(nearY);
+    ctx.restore();
+  }
   /* person at screen point (x,y) (feet). dir: +1 facing screen-right, -1 left.
      front: facing the viewer. phase: walk cycle radians. act: current idle action. */
   function drawPerson(ctx, x, y, look, dir, front, phase, moving, scale = 1, act = null, t = 0) {

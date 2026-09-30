@@ -190,6 +190,7 @@
     { type: "goals", id: "goals", label: "Lighthouse", kind: "lighthouse", blurb: "Goals and the money treasury", name: "Goals", sub: "Lighthouse \xB7 treasury", color: "#E9B949", group: "life" },
     { type: "bank", id: "bank", label: "Bank", kind: "bank", blurb: "Budget planner, spending, bills and savings goals", name: "Bank", sub: "Budget & savings", color: "#C9A227", group: "life" },
     { type: "faith", id: "faith", label: "Faith", kind: "faith", blurb: "Prayer, worship and faith goals", name: "Faith", sub: "Place of worship", color: "#8FB8B0", group: "life", styles: !0 },
+    { type: "health", id: "health", label: "Health Centre", kind: "health", blurb: "Steps, calories and a private period tracker, linked to the Gym", name: "Health Centre", sub: "Clinic", color: "#5CB88A", group: "life" },
     { type: "townhall", id: "townhall", label: "Town Hall", kind: "townhall", blurb: "Your week planner: every task by day", name: "Town Hall", sub: "Week planner", color: "#9F8FC9", group: "life" },
     { type: "section", id: null, label: "Something else", blurb: "Name it and pick a building style", color: "#C2577A", group: "life" },
     { type: "houses", id: null, label: "Neighbours", blurb: "A street of houses", color: "#F3D9C4", group: "scenery" },
@@ -209,6 +210,7 @@
     bank: { id: "bank", name: "Bank", sub: "Budget & savings", kind: "bank", color: "#C9A227" },
     faith: { id: "faith", name: "Faith", sub: "Place of worship", kind: "faith", color: "#8FB8B0" },
     townhall: { id: "townhall", name: "Town Hall", sub: "Week planner", kind: "townhall", color: "#9F8FC9" },
+    health: { id: "health", name: "Health Centre", sub: "Clinic", kind: "health", color: "#5CB88A" },
   };
   var STUDIO_CREW = [
     { id: "script", name: "Scriptwriter", kind: "role", color: "#3E9B6B" },
@@ -8169,8 +8171,12 @@
   /* island settings: rename, back up everything to a file, restore from one */
   var BACKUP_COLS = ["tasks", "workers", "leads", "sections", "pgoals", "spend", "bills", "savings", "journal", "videos"],
     BACKUP_DOCS = ["settings/island", "budget/plan", "habits/list", "fitness/profile", "fitness/weights", "fitness/workouts", "fitness/habits", "stats/activity", "stats/treasury", "stats/focus"];
-  async function exportIsland(db) {
-    let out = { app: "valley-isle", version: 1, exportedAt: new Date().toISOString(), collections: {}, docs: {} };
+  async function exportIsland(db, hb) {
+    let out = { app: "valley-isle", version: 1, exportedAt: new Date().toISOString(), collections: {}, docs: {}, health: {} };
+    if (hb) {
+      for (let c of ["days", "cycle"]) { let q = await db.collection(hb + "/health/" + c).get(); out.health[c] = q.docs.map((d) => ({ id: d.id, ...d.data() })); }
+      let cf = await db.doc(hb + "/healthcfg").get(); cf.exists && (out.health.cfg = cf.data());
+    }
     for (let c of BACKUP_COLS) { let q = await db.collection(c).get(); out.collections[c] = q.docs.map((d) => ({ id: d.id, ...d.data() })); }
     for (let d of BACKUP_DOCS) { let x = await db.doc(d).get(); x.exists && (out.docs[d] = x.data()); }
     return out;
@@ -8250,6 +8256,102 @@
         el("div", { className: "flex gap-1.5 mt-1.5" },
           el(Q, { variant: "ghost", onClick: pz }, f.paused ? "Resume" : "Pause"),
           el(Q, { variant: "ghost", onClick: st }, "Stop"))));
+  }
+  /* ---------------- Health Centre: steps, calories, cycle ---------------- */
+  // where health numbers come from. In the browser that's you typing them in; the App Store /
+  // Play Store build swaps this for Apple HealthKit / Android Health Connect (with permission).
+  var HealthSource = { name: "manual", connected: !1, readSteps: null };
+  var dayKey = (d) => { let x = new Date(d); return x.getFullYear() + "-" + String(x.getMonth() + 1).padStart(2, "0") + "-" + String(x.getDate()).padStart(2, "0"); };
+  var addDays = (k, n) => dayKey(new Date(new Date(k + "T12:00").getTime() + n * 864e5));
+  var diffDays = (a, b) => Math.round((new Date(a + "T12:00") - new Date(b + "T12:00")) / 864e5);
+  var MEALS = ["Breakfast", "Lunch", "Dinner", "Snack"];
+  function HealthDrawer({ days: ds, cycle: cy, cfg: cf, today: td, workoutsWeek: ww, building: bld, ready: rd, tab: t0, onClose: close, act: A, onGym: gym }) {
+    let el = React.createElement, cfg = { calTarget: 2000, stepTarget: 10000, cycleLen: 28, periodLen: 5, ...(cf || {}) },
+      byDay = Object.fromEntries((ds || []).map((x) => [x.id, x])), today = byDay[td] || { id: td },
+      [tab, setTab] = React.useState(t0 || "today"),
+      [st, setSt] = React.useState(""), [mOff, setMOff] = React.useState(0), [f, setF] = React.useState({ name: "", kcal: "", meal: "Breakfast" }), [tg, setTg] = React.useState(""),
+      eaten = (today.kcal || []).reduce((a, x) => a + (Number(x.kcal) || 0), 0),
+      steps = Number(today.steps) || 0,
+      numInp = (v, fn, ph) => el("input", { className: "inp", inputMode: "numeric", value: v, placeholder: ph, onChange: (e) => fn(e.target.value.replace(/[^0-9]/g, "")) });
+    if (!rd) return el(zt, { title: "Health Centre", sub: "Loading your private health space…", color: "#5CB88A", icon: el("span", { style: { color: "#fff", fontSize: 18 } }, "+"), onClose: close });
+    // ---- today: steps ----
+    let todayTab = el("div", { className: "space-y-3 mt-3" },
+      el("div", { className: "grid grid-cols-3 gap-2" },
+        el("div", { className: "stat" }, el("div", { className: "stat-v" }, steps.toLocaleString("en-ZA").replace(/,/g, " ")), el("div", { className: "stat-l" }, "Steps")),
+        el("div", { className: "stat" }, el("div", { className: "stat-v" }, eaten), el("div", { className: "stat-l" }, "kcal eaten")),
+        el("div", { className: "stat" }, el("div", { className: "stat-v" }, ww), el("div", { className: "stat-l" }, "Workouts this week"))),
+      el("div", { className: "chart-card space-y-2" },
+        el("div", { className: "flex items-center justify-between" }, el("b", { className: "text-[14px]" }, "Steps today"), el("span", { className: "muted text-[12px]" }, "Goal " + cfg.stepTarget.toLocaleString("en-ZA").replace(/,/g, " "))),
+        el("div", { className: "save-bar", role: "progressbar", "aria-valuenow": Math.round(Math.min(1, steps / cfg.stepTarget) * 100), "aria-valuemin": 0, "aria-valuemax": 100, "aria-label": "Steps" }, el("span", { style: { width: Math.min(100, (steps / cfg.stepTarget) * 100) + "%", background: steps >= cfg.stepTarget ? "#7CB87A" : "#5CB88A" } })),
+        el("div", { className: "flex gap-2 flex-wrap" }, numInp(st, setSt, "Steps so far today"), el(Q, { variant: "gold", disabled: !st, onClick: () => { A.setSteps(Number(st), cfg.stepTarget); setSt(""); } }, "Save"),
+          [1000, 2500, 5000].map((n2) => el("button", { key: n2, type: "button", className: "chip-btn sm", onClick: () => A.setSteps(steps + n2, cfg.stepTarget) }, "+" + n2 / 1000 + "k"))),
+        el("div", { className: "muted text-[12px]" }, "Reach your goal and the Gym's steps habit ticks itself.")),
+      el("div", { className: "chart-card phone-src" },
+        el("b", { className: "text-[14px]" }, "Phone health data"),
+        el("p", { className: "muted text-[12.5px]" }, "In the App Store and Play Store version, steps, workouts and cycle data can come straight from Apple Health or Google Health Connect, with your permission. In the browser, type them in here."),
+        el(Q, { variant: "ghost", disabled: !0 }, "Connect Apple Health / Health Connect (in the app)")),
+      el(Q, { variant: "ghost", onClick: gym }, "Open the Gym →"));
+    // ---- calories ----
+    let last7 = Array.from({ length: 7 }, (_, k) => addDays(td, k - 6)).map((k) => ({ k, v: ((byDay[k] || {}).kcal || []).reduce((a, x) => a + (Number(x.kcal) || 0), 0) })),
+      mx = Math.max(cfg.calTarget * 1.2, ...last7.map((x) => x.v), 1);
+    let calTab = el("div", { className: "space-y-3 mt-3" },
+      el("div", { className: "chart-card space-y-2" },
+        el("div", { className: "flex items-center justify-between" }, el("b", { className: "text-[14px]" }, "Today \xB7 " + eaten + " / " + cfg.calTarget + " kcal"), el("span", { className: "muted text-[12px]" }, eaten > cfg.calTarget ? "⚠ " + (eaten - cfg.calTarget) + " over" : cfg.calTarget - eaten + " left")),
+        el("div", { className: "save-bar", role: "progressbar", "aria-valuenow": Math.round(Math.min(1, eaten / cfg.calTarget) * 100), "aria-valuemin": 0, "aria-valuemax": 100, "aria-label": "Calories" }, el("span", { style: { width: Math.min(100, (eaten / cfg.calTarget) * 100) + "%", background: eaten > cfg.calTarget ? "#D0705A" : "#E9B949" } })),
+        el("div", { className: "flex flex-wrap gap-1.5" }, MEALS.map((m) => el("button", { key: m, type: "button", className: "chip-btn sm" + (f.meal === m ? " on" : ""), "aria-pressed": f.meal === m, onClick: () => setF({ ...f, meal: m }) }, m))),
+        el("div", { className: "grid grid-cols-3 gap-2" }, el("input", { className: "inp col-span-2", value: f.name, placeholder: "What did you eat?", onChange: (e) => setF({ ...f, name: e.target.value }) }), numInp(f.kcal, (v) => setF({ ...f, kcal: v }), "kcal")),
+        el(Q, { variant: "gold", disabled: !f.name.trim() || !(Number(f.kcal) > 0), onClick: () => { A.addFood({ name: f.name.trim(), kcal: Number(f.kcal), meal: f.meal }); setF({ ...f, name: "", kcal: "" }); } }, "Add")),
+      el("div", { className: "list-card" }, (today.kcal || []).length ? MEALS.flatMap((m) => (today.kcal || []).filter((x) => x.meal === m).map((x) => el("div", { key: x.id, className: "row-li" }, el("span", { className: "muted", style: { minWidth: 70 } }, m), el("span", { className: "flex-1 min-w-0" }, x.name), el("span", { className: "tnum" }, x.kcal + " kcal"), el("button", { type: "button", className: "x-btn", "aria-label": "Remove " + x.name, onClick: () => A.delFood(x.id) }, "\xD7"))))
+        : el("div", { className: "empty-li" }, "Nothing logged today. Add what you eat with its calories.")),
+      el("div", { className: "chart-card" },
+        el("b", { className: "text-[14px]" }, "Last 7 days"),
+        el("div", { className: "kc-chart", role: "list" }, last7.map((x) => el("div", { key: x.k, className: "kc-col", role: "listitem", title: new Date(x.k + "T12:00").toLocaleDateString("en", { weekday: "long" }) + ": " + x.v + " kcal" },
+          el("span", { className: "kc-v tnum" }, x.v || ""),
+          el("span", { className: "kc-track" }, el("span", { className: "kc-bar" + (x.v > cfg.calTarget ? " over" : ""), style: { height: (x.v / mx) * 100 + "%" } }), el("span", { className: "kc-target", style: { bottom: (cfg.calTarget / mx) * 100 + "%" } })),
+          el("span", { className: "kc-d" }, new Date(x.k + "T12:00").toLocaleDateString("en", { weekday: "narrow" }))))),
+        el("div", { className: "bar-legend" }, el("span", { className: "lg-fill" }), "eaten", el("span", { className: "lg-plan", style: { width: 12, height: 2 } }), "daily target " + cfg.calTarget)),
+      el("div", { className: "flex gap-2 items-center" }, numInp(tg, setTg, "Daily target (kcal)"), el(Q, { variant: "ghost", disabled: !(Number(tg) > 500), onClick: () => { A.setCfg({ ...cfg, calTarget: Number(tg) }); setTg(""); } }, "Set target")));
+    // ---- cycle ----
+    let periods = [...(cy || [])].sort((a, b) => (a.start < b.start ? -1 : 1)),
+      starts = periods.map((x) => x.start),
+      gaps = starts.slice(1).map((x, k) => diffDays(x, starts[k])).filter((g) => g > 15 && g < 60).slice(-6),
+      avg = gaps.length ? Math.round(gaps.reduce((a, g) => a + g, 0) / gaps.length) : cfg.cycleLen,
+      lens = periods.filter((x) => x.end).map((x) => diffDays(x.end, x.start) + 1).slice(-6),
+      plen = lens.length ? Math.round(lens.reduce((a, g) => a + g, 0) / lens.length) : cfg.periodLen,
+      last = periods[periods.length - 1], open = last && !last.end && diffDays(td, last.start) < 10,
+      nextStart = last ? addDays(last.start, avg) : null, ovu = nextStart ? addDays(nextStart, -14) : null,
+      cday = last ? diffDays(td, last.start) + 1 : null,
+      phase = !last ? null : open || cday <= plen ? "Period" : ovu && Math.abs(diffDays(td, ovu)) <= 1 ? "Ovulation (estimated)" : ovu && diffDays(td, ovu) >= -5 && diffDays(td, ovu) < -1 ? "Fertile window (estimated)" : ovu && diffDays(td, ovu) > 1 ? "Luteal phase" : "Follicular phase",
+      inPeriod = (k) => periods.some((x) => k >= x.start && k <= (x.end || (x === last && open ? td : addDays(x.start, plen - 1)))),
+      predicted = (k) => nextStart && k >= nextStart && k <= addDays(nextStart, plen - 1) && !inPeriod(k),
+      fertile = (k) => ovu && diffDays(k, ovu) >= -5 && diffDays(k, ovu) <= 1,
+      m0 = new Date(new Date(td + "T12:00").getFullYear(), new Date(td + "T12:00").getMonth() + mOff, 15), first = new Date(m0.getFullYear(), m0.getMonth(), 1), lead = (first.getDay() + 6) % 7, mKey = dayKey(first).slice(0, 7),
+      cells = Array.from({ length: 42 }, (_, k) => dayKey(new Date(first.getFullYear(), first.getMonth(), 1 - lead + k)));
+    let cycTab = el("div", { className: "space-y-3 mt-3" },
+      el("div", { className: "grid grid-cols-3 gap-2" },
+        el("div", { className: "stat" }, el("div", { className: "stat-v" }, cday ? "Day " + cday : "—"), el("div", { className: "stat-l" }, "Of cycle")),
+        el("div", { className: "stat" }, el("div", { className: "stat-v" }, nextStart ? (diffDays(nextStart, td) >= 0 ? "in " + diffDays(nextStart, td) + "d" : "late " + -diffDays(nextStart, td) + "d") : "—"), el("div", { className: "stat-l" }, "Next period")),
+        el("div", { className: "stat" }, el("div", { className: "stat-v" }, avg + "d"), el("div", { className: "stat-l" }, "Avg cycle"))),
+      phase && el("div", { className: "bank-note" }, "Today: ", el("b", null, phase), nextStart ? " \xB7 next period around " + new Date(nextStart + "T12:00").toLocaleDateString("en", { day: "numeric", month: "long" }) : ""),
+      el("div", { className: "flex gap-2 flex-wrap" },
+        open ? el(Q, { variant: "gold", onClick: () => A.endPeriod(last, td) }, "Period ended today") : el(Q, { variant: "gold", onClick: () => A.startPeriod(td) }, "Period started today"),
+        el("input", { className: "inp", type: "date", "aria-label": "Log a past period start", max: td, style: { maxWidth: 170 }, onChange: (e) => e.target.value && (A.startPeriod(e.target.value, !0), (e.target.value = "")) })),
+      el("div", { className: "chart-card" },
+        el("div", { className: "flex items-center justify-between" },
+          el("button", { type: "button", className: "x-btn", "aria-label": "Previous month", onClick: () => setMOff(mOff - 1) }, "\u2039"),
+          el("b", { className: "text-[14px]" }, m0.toLocaleDateString("en", { month: "long", year: "numeric" })),
+          el("button", { type: "button", className: "x-btn", "aria-label": "Next month", onClick: () => setMOff(mOff + 1) }, "\u203A")),
+        el("div", { className: "cal-grid", role: "grid", "aria-label": "Cycle calendar" },
+          ["M", "T", "W", "T", "F", "S", "S"].map((d2, k) => el("span", { key: "h" + k, className: "cal-h" }, d2)),
+          cells.map((k) => el("span", { key: k, role: "gridcell", title: k + (inPeriod(k) ? " \xB7 period" : predicted(k) ? " \xB7 predicted period" : fertile(k) ? " \xB7 fertile (estimated)" : ""), className: "cal-c" + (k.slice(0, 7) !== mKey ? " dim" : "") + (inPeriod(k) ? " per" : "") + (predicted(k) ? " pred" : "") + (!inPeriod(k) && fertile(k) ? " fert" : "") + (k === ovu ? " ovu" : "") + (k === td ? " today" : "") }, Number(k.slice(8))))),
+        el("div", { className: "bar-legend" }, el("span", { className: "cal-key per" }), "period", el("span", { className: "cal-key pred" }), "predicted", el("span", { className: "cal-key fert" }), "fertile (est.)")),
+      el("div", { className: "list-card" }, periods.length ? [...periods].reverse().slice(0, 6).map((x) => el("div", { key: x.id, className: "row-li" }, el("span", { className: "flex-1" }, new Date(x.start + "T12:00").toLocaleDateString("en", { day: "numeric", month: "short" }) + (x.end ? " – " + new Date(x.end + "T12:00").toLocaleDateString("en", { day: "numeric", month: "short" }) : " – ongoing")), el("span", { className: "muted" }, x.end ? diffDays(x.end, x.start) + 1 + " days" : ""), el("button", { type: "button", className: "x-btn", "aria-label": "Delete period", onClick: () => A.delPeriod(x.id) }, "\xD7")))
+        : el("div", { className: "empty-li" }, "Log when your period starts and ends. Predictions get better with each cycle.")),
+      el("p", { className: "muted text-[11.5px]" }, "Private to you: stored in your own space, not visible to anyone the island is shared with. Predictions are estimates from your history, not medical advice or contraception."));
+    return el(zt, { title: "Health Centre", sub: "Steps, calories and cycle \xB7 private to you", color: "#5CB88A", icon: el("span", { style: { color: "#fff", fontSize: 20, fontWeight: 700 } }, "+"), onClose: close },
+      bld && el("div", { className: "site-banner" }, el("b", null, "Under construction"), el("span", null, "Log your steps, a meal or your cycle to open the Health Centre.")),
+      el("div", { className: "seg", role: "tablist" }, [["today", "Today"], ["calories", "Calories"], ["cycle", "Cycle"]].map(([k, lb]) => el("button", { key: k, type: "button", role: "tab", "aria-selected": tab === k, className: "seg-b" + (tab === k ? " on" : ""), onClick: () => setTab(k) }, lb))),
+      tab === "today" ? todayTab : tab === "calories" ? calTab : cycTab);
   }
   /* ---------------- Bank: budget planner, spending, bills, savings goals ---------------- */
   var SAVE_KINDS = [
@@ -8630,6 +8732,12 @@
   function Ho() {
     let { db: e, live: t, sandbox: sandbox, setSandbox: setSandbox } = jo(),
       isl = St(e, "settings/island"),
+      // private health space: the viewer's own subtree when we know who they are
+      [uid, setUid] = He(void 0),
+      hBase = !t || sandbox ? "data/users/local" : uid === void 0 ? null : uid ? "data/users/" + uid : "healthdata",
+      hDays = Ht(hBase ? e : null, (hBase || "x") + "/health/days"),
+      hCycle = Ht(hBase ? e : null, (hBase || "x") + "/health/cycle"),
+      hCfg = St(hBase ? e : null, (hBase || "x") + "/healthcfg"),
       budgetDoc = St(e, "budget/plan"),
       focusDoc = St(e, "stats/focus"),
       habitsDoc = St(e, "habits/list"),
@@ -8662,6 +8770,7 @@
       [crewCard, setCrewCard] = He(null),
       [editing, setEditing] = He(!1),
       [focus, setFocus] = He(null),
+      [flyTo, setFlyTo] = He(null),
       [editSel, setEditSel] = He(null),
       [, setCrewTick] = He(0),
       [z, ne] = He(!0),
@@ -8696,6 +8805,7 @@
         (s || []).forEach((t2) => t2.status === "done" && (m[t2.venture] = (m[t2.venture] || 0) + 1));
         ((u && u.entries) || []).length && (m.fitness = (m.fitness || 0) + 1);
         (l || []).length && (m.goals = (m.goals || 0) + 1);
+        ((hDays || []).length || (hCycle || []).length) && (m.health = (m.health || 0) + 1);
         (budgetDoc || (spendC || []).length || (billsC || []).length || (savingsC || []).length) && (m.bank = (m.bank || 0) + 1);
         return m;
       })(),
@@ -8781,6 +8891,7 @@
       0,
     );
     ((focusDoc && focusDoc.sessions) || []).forEach((f2) => se[f2.venture] != null && (se[f2.venture] += 8)),
+    se.health != null && (se.health += (hDays || []).length * 3 + (hCycle || []).length * 5),
     (se.bank != null && (se.bank += (spendC || []).length * 2 + (billsC || []).reduce((a2, b2) => a2 + Object.keys(b2.paid || {}).length * 5, 0) + (savingsC || []).reduce((a2, g2) => a2 + ((g2.log || []).length) * 5, 0) + (budgetDoc ? 20 : 0)),
       se.fitness != null && (se.fitness += Z.length * 15 + _.length * 5 + ke * 3),
       se.goals != null && (se.goals += G.filter((a) => a.progress >= 100).length * 40));
@@ -9186,7 +9297,7 @@
         let S = "s_" + Date.now().toString(36);
         if (fresh) {
           let p2 = World.placeParcel(baseLayout.parcels, "section", { id: S, name: a.name.trim(), color: a.color, sKind: a.kind, status: "building" });
-          p2 && saveLayout({ ...baseLayout, parcels: [...baseLayout.parcels, { id: S, type: "section", at: p2.at, rot: p2.rot, name: a.name.trim(), color: a.color, sKind: a.kind, status: "building" }] });
+          p2 && (saveLayout({ ...baseLayout, parcels: [...baseLayout.parcels, { id: S, type: "section", at: p2.at, rot: p2.rot, name: a.name.trim(), color: a.color, sKind: a.kind, status: "building" }] }), setFlyTo({ parcel: S, t: performance.now() }));
         }
         U("sections/" + S, () =>
           e
@@ -9221,9 +9332,10 @@
         let c = CATALOG.find((x) => x.type === type);
         if (!c) return;
         if (type === "section") return M({ type: "section" });
-        M(null);
+        M(null); $(null);
         if (c.work) {
           saveLayout({ ...baseLayout, work: !0, workInfo: { name: a.name, sub: a.sub, color: a.color } });
+          setFlyTo({ parcel: "w:hq", t: performance.now() });
           Re(a.name + " is on its own island now, over the bridge.", "gold");
           return;
         }
@@ -9236,6 +9348,7 @@
         if (!p) return Re("There's no room left that fits it. Try moving things in Edit layout.", "bad");
         let clean = { id: p.id, type: p.type, at: p.at, rot: p.rot, ...(p.name ? { name: p.name, sub: p.sub, color: p.color, status: p.status } : {}), ...(p.style ? { style: p.style } : {}) };
         saveLayout(fresh ? { ...baseLayout, parcels: [...baseLayout.parcels, clean] } : { ...baseLayout, extra: [...(baseLayout.extra || []), clean] });
+        setFlyTo({ parcel: clean.id, t: performance.now() });
         if (a.crew) {
           let have = new Set((n || []).map((w) => w.id));
           [...(have.has("me") ? [] : [Ce[0] || { id: "me", name: "You", kind: "human", color: "#2A9D8F" }]), ...STUDIO_CREW.filter((w) => !have.has(w.id))].forEach((w) =>
@@ -9246,7 +9359,7 @@
       },
       doExport = async () => {
         try {
-          let data = await exportIsland(e), nm = ((isl && isl.islandName) || "valley-isle").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+          let data = await exportIsland(e, hBase), nm = ((isl && isl.islandName) || "valley-isle").toLowerCase().replace(/[^a-z0-9]+/g, "-");
           await saveFile(nm + "-backup-" + ue + ".json", JSON.stringify(data, null, 1));
           Re("Backup ready.", "gold");
         } catch (er) { er && er.code === "declined" ? Re("Backup not saved.") : Re("Couldn't make the backup" + (er && er.message ? ": " + er.message : "."), "bad"); }
@@ -9260,6 +9373,10 @@
           M(null);
           for (let [c2, list] of Object.entries(data.collections || {})) if (BACKUP_COLS.includes(c2)) for (let d2 of list) d2 && d2.id && (await e.collection(c2).doc(String(d2.id)).set(d2));
           for (let [p2, d2] of Object.entries(data.docs || {})) BACKUP_DOCS.includes(p2) && (await e.doc(p2).set(d2));
+          if (hBase && data.health) {
+            for (let c2 of ["days", "cycle"]) for (let d2 of data.health[c2] || []) d2 && d2.id && (await e.collection(hBase + "/health/" + c2).doc(String(d2.id)).set(d2));
+            data.health.cfg && (await e.doc(hBase + "/healthcfg").set(data.health.cfg));
+          }
           Re("Backup restored.", "gold");
         } });
       },
@@ -9276,6 +9393,22 @@
         Re("Focus session done: +8 XP for " + ((te[focus.task.venture] || {}).name || "that building") + ".", "gold");
         setFocus(null);
       },
+      healthAct = (() => {
+        let day = (hDays || []).find((x) => x.id === ue) || { id: ue, d: ue },
+          dref = () => e.collection(hBase + "/health/days").doc(ue);
+        return {
+          setSteps: (n2, target) => {
+            U("health/" + ue, () => dref().set({ ...day, steps: n2 }));
+            if (n2 >= target && !(Ae[ue] && Ae[ue].steps)) { eo("steps", ue, !0); Re("Step goal reached, habit ticked.", "gold"); } else Re(n2.toLocaleString("en-ZA").replace(/,/g, " ") + " steps saved.");
+          },
+          addFood: (x2) => U("health/" + ue, () => dref().set({ ...day, kcal: [...(day.kcal || []), { id: Ze("fd"), ...x2 }] })),
+          delFood: (id) => U("health/" + ue, () => dref().set({ ...day, kcal: (day.kcal || []).filter((x) => x.id !== id) })),
+          setCfg: (c2) => U("healthcfg", () => e.doc(hBase + "/healthcfg").set(c2)),
+          startPeriod: (d2, past) => { let id = Ze("pd"), pl = (hCfg && hCfg.periodLen) || 5, en = past ? [addDays(d2, pl - 1), ue].sort()[0] : null; U("cycle/" + id, () => e.collection(hBase + "/health/cycle").doc(id).set({ id, start: d2, end: en })); Re(past ? "Period logged." : "Period started. Tap 'Period ended' when it's over."); },
+          endPeriod: (p2, d2) => U("cycle/" + p2.id, () => e.collection(hBase + "/health/cycle").doc(p2.id).set({ ...p2, end: d2 })),
+          delPeriod: (id) => U("cycle/" + id, () => e.collection(hBase + "/health/cycle").doc(id).delete()),
+        };
+      })(),
       // bank: every write goes through U so failures surface like everything else
       bankAct = {
         savePlan: (pl) => U("budget/plan", () => e.doc("budget/plan").set(pl)),
@@ -9290,7 +9423,7 @@
           if (type) {
             let all = fresh ? baseLayout.parcels : [...World.classicPlan().parcels.map((p2) => { let m2 = baseLayout.moves && baseLayout.moves[p2.id]; return m2 && m2.at ? { ...p2, ...m2 } : p2; }), ...(baseLayout.extra || [])],
               p2 = World.placeParcel(all, type, { id: "sv:" + id });
-            p2 ? saveLayout(fresh ? { ...baseLayout, parcels: [...baseLayout.parcels, { id: p2.id, type, at: p2.at, rot: p2.rot }] } : { ...baseLayout, extra: [...(baseLayout.extra || []), { id: p2.id, type, at: p2.at, rot: p2.rot }] })
+            p2 ? (saveLayout(fresh ? { ...baseLayout, parcels: [...baseLayout.parcels, { id: p2.id, type, at: p2.at, rot: p2.rot }] } : { ...baseLayout, extra: [...(baseLayout.extra || []), { id: p2.id, type, at: p2.at, rot: p2.rot }] }), $(null), setFlyTo({ parcel: p2.id, t: performance.now() }))
               : Re("No room on the island for it right now. Try Edit layout.", "bad");
             Re(g2.name + ": " + ({ airport: "an airport", dreamhouse: "a plot for your house", dealership: "a dealership" }[type]) + " is going up on the island.", "gold");
           }
@@ -9516,6 +9649,8 @@
                 ? "fitness"
                 : a.type === "goals"
                   ? "goals"
+                  : a.type === "health"
+                    ? "health"
                   : a.type === "bank"
                     ? a.focus ? "sv:" + a.focus : "bank"
                     : null;
@@ -9530,6 +9665,7 @@
       },
       lo = ds((a) => {
         if (a === "bank") return Ie({ type: "bank" });
+        if (a === "health") return Ie({ type: "health" });
         if (a === "townhall") return Ie({ type: "week" });
         if (typeof a === "string" && a.startsWith("sv:")) return Ie({ type: "bank", tab: "savings", focus: a.slice(3) });
         Ie(
@@ -9609,6 +9745,12 @@
         }
       hs.current = a;
     }, [k, Hs]);
+    at(() => {
+      if (!t || sandbox) return;
+      let on = !0;
+      (async () => { try { let u2 = window.claude && window.claude.use ? await window.claude.use("user") : null; let id = u2 ? await u2.id() : null; on && setUid(id || null); } catch { on && setUid(null); } })();
+      return () => { on = !1; };
+    }, [t, sandbox]);
     // repeating tasks come back: a done repeating task from an earlier day reopens on its next day
     at(() => {
       if (!k || !t && !sandbox) return;
@@ -9704,6 +9846,7 @@
         workers: Ce,
         lightMode: lightMode,
         opening: opening,
+        focus: flyTo,
         paused: !!v || editing,
         edit: editing ? { A: planL.A, B: planL.B, parcels: editParcels, meta: editMeta, check: World.checkPlan, selected: editSel } : null,
         onEditMove: onEditMove,
@@ -10152,6 +10295,10 @@
       (v == null ? void 0 : v.type) === "week" &&
         React.createElement(WeekDrawer, { tasks: xe, secById: te, onClose: () => $(null), onOpen: (tk) => M({ type: "task", init: tk }),
           onMove: (tk, due) => (U("tasks/" + tk.id, () => e.collection("tasks").doc(tk.id).set({ ...tk, due, updatedAt: Date.now() })), Fe.tap(), Re(tk.title + (due ? " moved to " + new Date(due + "T12:00").toLocaleDateString("en", { weekday: "long" }) : " moved to anytime") + ".")) }),
+      (v == null ? void 0 : v.type) === "health" &&
+        React.createElement(HealthDrawer, { key: "health" + (v.tab || ""), tab: v.tab, ready: !!hBase, building: buildingIds.has("health"), days: hDays || [], cycle: hCycle || [], cfg: hCfg, today: ue,
+          workoutsWeek: Z.filter((w2) => w2.d && Math.round((new Date(ue + "T12:00") - new Date(w2.d + "T12:00")) / 864e5) < 7).length,
+          onClose: () => $(null), onGym: () => Ie({ type: "fitness" }), act: healthAct }),
       (v == null ? void 0 : v.type) === "bank" &&
         React.createElement(BankDrawer, { key: "bank" + (v.tab || "") + (v.focus || ""), building: buildingIds.has("bank"), plan: budgetDoc, spend: spendC, bills: billsC, savings: savingsC, business: B, tab: v.tab, focus: v.focus, onClose: () => $(null), act: bankAct }),
       (v == null ? void 0 : v.type) === "fitness" &&

@@ -209,6 +209,20 @@
       pn.gable(0, 0, 38, w * 0.6, d * 0.8, 24, "#9FB8D8", "b", "#F7F1E8", 4); spire(pn, 0, -d * 0.3, 50, 14, 30, "#8AA6CC");
     }
   };
+  // health centre: white clinic, mint trim, a green cross and an ambulance bay
+  B.clinic = (pn, o) => {
+    const w = Math.min(o.w, 130), d = Math.min(o.d * 0.75, 90), bx = { x: 0, y: 0, z: 0, w, d, h: 44 };
+    pn.box(0, 0, 0, w + 8, d + 8, 2, "#E6EEF0");
+    pn.box(0, 0, 2, w, d, 42, "#FBFDFD");
+    facade(pn, { ...bx, z: 2, h: 42 }, 2, o, { pitch: 18, frame: "#E6F4F0" });
+    pn.box(0, 0, 44, w + 4, d + 4, 4, "#8FD0C6");
+    pn.box(-w * 0.2, -d * 0.1, 48, w * 0.35, d * 0.4, 12, "#EEF6F5");
+    // the cross on the roof box, facing the street
+    const fr = FACE[o.face] || "L", cb = { x: -w * 0.2, y: -d * 0.1, z: 48, w: w * 0.35, d: d * 0.4, h: 12 };
+    pn.poly(pn.faceQ(cb, fr, 0.42, 0.58, 0.12, 0.88), "#5CB88A"); pn.poly(pn.faceQ(cb, fr, 0.3, 0.7, 0.36, 0.64), "#5CB88A");
+    if (pn.E) pn.glow(cb.x, cb.y + cb.d / 2, 54, 8, "#B8F0D0", 0.8);
+    pn.awning({ ...bx, z: 2, h: 42 }, fr, 0.36, 0.64, 0.34, "#8FD0C6", "#FFFFFF", 8);
+  };
   // a long thin wing in the owner's colour (offices, sheds, sound stages)
   B.annex = (pn, o) => {
     const bx = { x: 0, y: 0, z: 0, w: o.w, d: o.d, h: o.H - 12 };
@@ -242,15 +256,9 @@
     R4(-L / 2 + 6, L / 2 - 6, -Wd / 2, Wd / 2, 0.4, "#8E8CAA");
     for (let u = -L / 2 + 20; u < L / 2 - 20; u += 30) R4(u, u + 14, -1.2, 1.2, 0.6, "#FBF4EA");
     [-1, 1].forEach((sd) => { for (let u = -L / 2 + 12; u < L / 2 - 8; u += 22) { const p3 = alongA ? [u, sd * (Wd / 2 - 3), 0.7] : [sd * (Wd / 2 - 3), u, 0.7]; if (pn.E) pn.glow(p3[0], p3[1], 2, 3, "#FFE7A8", 0.6); else pn.box(p3[0], p3[1], 0.5, 2, 2, 1, "#F0C06A"); } });
-    const q = prog(o), u = -L / 2 + 34 + q * (L - 80), z = q >= 1 ? 26 : 0;
-    const at = (du, dv, dz) => (alongA ? [u + du, dv, z + dz] : [dv, u + du, z + dz]);
-    const bxA = (du, dv, dz, lu, lv, h, c) => { const [x, y, zz] = at(du, dv, dz); pn.box(x, y, zz, alongA ? lu : lv, alongA ? lv : lu, h, c); };
-    pn.poly([at(-4, -22, 5), at(6, -22, 5), at(10, 22, 5), at(0, 22, 5)].map((p3) => p3), "#E4E8F0"); // wings (under the body)
-    bxA(0, 0, 3, 46, 8, 7, "#FBFCFF");
-    bxA(-2, 0, 6, 40, 8.4, 1.6, "#E4826A");
-    pn.poly([at(-20, 0, 10), at(-12, 0, 10), at(-20, 0, 22)], "#E4826A");
-    bxA(-20, 0, 9, 6, 16, 1.2, "#E4E8F0");
-    if (q < 1) [[-10, -4], [-10, 4], [14, 0]].forEach(([du, dv]) => { const [x, y] = at(du, dv, 0); pn.cyl(x, y, 0, 1.3, 3, "#3E3A52"); });
+    // apron and a painted "hold" line at the start; the planes themselves are animated live (drawPlane)
+    R4(-L / 2 + 6, -L / 2 + 58, -Wd / 2 - 8, Wd / 2 + 8, 0.35, "#A6A3BE");
+    R4(-L / 2 + 60, -L / 2 + 63, -Wd / 2 + 4, Wd / 2 - 4, 0.65, "#F0C06A");
   };
   // car: a showroom with the car being put together on a turntable out front
   B.dealership = (pn, o) => {

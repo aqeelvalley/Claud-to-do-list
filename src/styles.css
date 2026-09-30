@@ -2777,3 +2777,33 @@ select.inp {
 .pipe-s.done { background: #9bc98a; }
 .pipe-s.now { background: #e9b949; }
 .crest { cursor: pointer; }
+/* phones: the dock spans the screen and every button shares it, so nothing runs off the edge */
+@media (max-width: 520px) {
+  .dock { left: 8px; right: 8px; transform: none; width: auto; justify-content: space-between; gap: 2px; padding: 4px; }
+  .dock-btn { flex: 1 1 0; min-width: 0; padding: 5px 2px 4px; }
+  .dock-l { font-size: 9.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .dock-main { flex: none; width: 40px; padding: 0 !important; justify-content: center; }
+  .dock-sep { margin: 6px 1px; }
+}
+/* ---- health ---- */
+.kc-chart { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; height: 132px; margin-top: 8px; }
+.kc-col { display: grid; grid-template-rows: 14px 1fr 14px; justify-items: center; gap: 2px; min-width: 0; }
+.kc-v { font-size: 10px; color: var(--ink2); font-weight: 700; }
+.kc-track { position: relative; width: 100%; max-width: 26px; border-radius: 4px 4px 0 0; background: rgba(70, 61, 99, 0.06); }
+.kc-bar { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 4px 4px 0 0; background: #e9b949; }
+.kc-bar.over { background: #d0705a; }
+.kc-target { position: absolute; left: -3px; right: -3px; height: 2px; background: var(--ink); }
+.kc-d { font-size: 10.5px; color: var(--ink3); }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; margin-top: 8px; }
+.cal-h { font-size: 10.5px; font-weight: 700; color: var(--ink3); text-align: center; }
+.cal-c { aspect-ratio: 1; display: grid; place-items: center; font-size: 12px; border-radius: 50%; color: var(--ink); }
+.cal-c.dim { color: var(--ink3); opacity: 0.55; }
+.cal-c.per { background: #e4826a; color: #fff; font-weight: 700; }
+.cal-c.pred { box-shadow: inset 0 0 0 2px #e4826a; }
+.cal-c.fert { background: #d9efe9; }
+.cal-c.ovu { background: #5cb8a4; color: #fff; }
+.cal-c.today { outline: 2px solid var(--ink); outline-offset: 1px; }
+.cal-key { width: 12px; height: 12px; border-radius: 50%; margin-left: 6px; }
+.cal-key.per { background: #e4826a; }
+.cal-key.pred { box-shadow: inset 0 0 0 2px #e4826a; }
+.cal-key.fert { background: #d9efe9; }

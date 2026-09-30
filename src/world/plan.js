@@ -18,6 +18,7 @@
     bank: { label: "Bank", landmark: "bank", cells: [[0, 0]] },
     faith: { label: "Faith", landmark: "faith", cells: [[0, 0], [0, 1]], wing: "courtyard" },
     townhall: { label: "Town Hall", landmark: "townhall", cells: [[0, 0]] },
+    health: { label: "Health Centre", landmark: "health", cells: [[0, 0], [0, 1]], wing: "garden" },
     // savings goals that grow on the island
     airport: { label: "Airport", cells: [[0, 0], [1, 0], [2, 0]], wing: "runway" },
     dealership: { label: "Dealership", cells: [[0, 0]] },
@@ -34,7 +35,7 @@
   };
   // which classic fill draws each parcel type's main cell
   const FILL_OF = { home: "home", studio: "studio", freelance: "freelance", maker: "maker", mill: "mill", cafe: "cafe", gym: "gym", marina: "marina",
-    goals: "lookout", bank: "bank", faith: "faith", townhall: "townhall", airport: "airport", dealership: "dealership", dreamhouse: "dreamhouse", section: "section",
+    goals: "lookout", bank: "bank", health: "health", faith: "faith", townhall: "townhall", airport: "airport", dealership: "dealership", dreamhouse: "dreamhouse", section: "section",
     houses: "houses", park: "park", square: "square", downtown: "downtown", farm: "farm", apartments: "apartments", garden: "garden" };
 
   /* grid line positions for a fresh island: uneven widths from a seed */

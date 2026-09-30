@@ -348,6 +348,19 @@
             ],
             label: "Dispatch office",
           };
+        case "health":
+          return {
+            wall: "#F4F8F7", floor: "#CFE3DE",
+            items: [
+              [60, 60, h(Bed, { a: 60, b: 60, c: "#8FD0C6" })],
+              [60, 150, h(Bed, { a: 60, b: 150, c: "#B7A6DC" })],
+              [150, 60, h(Desk, { a: 150, b: 60, c: "#E6EEF0", screen: "#8FD0C6" })],
+              [175, 150, h(Treadmill, { a: 175, b: 150 })],
+              [16, 105, h(Shelf, { a: 16, b: 105, c: "#E6EEF0", items: ["#8FD0C6", "#F0C06A", "#E4826A", "#9FB0D9"] })],
+              [205, 30, h(Plant, { a: 205, b: 30, s: 1.1 })],
+            ],
+            label: "Clinic",
+          };
         case "faith":
           // a calm hall: rows of prayer mats facing a lectern, books along the wall
           return {
@@ -527,6 +540,7 @@
       house: { W: 220, D: 190, H: 96, roof: "gable", rise: 50, tex: "plaster" },
       townhall: { W: 250, D: 210, H: 124, roof: "flat", tex: "plaster" },
       faith: { W: 240, D: 210, H: 132, roof: "flat", tex: "plaster" },
+      health: { W: 240, D: 210, H: 110, roof: "flat", tex: "plaster" },
     };
     SHELLS.shop = SHELLS.cafe; SHELLS.tower = SHELLS.office; SHELLS.farm = SHELLS.mill;
     const lerp2 = (x, y, t) => x + (y - x) * t;

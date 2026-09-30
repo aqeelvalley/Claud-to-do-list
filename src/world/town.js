@@ -613,9 +613,9 @@
         scatter(I, 9, (a, b) => Math.abs(a - ma) < 30 && Math.abs(b - mb) < 30, ["tree", "pine"], hash(k.id));
         put({ kind: "prop", p: "bench", a: ma - 20, b: mb + 16, axis: "a" }); put({ kind: "prop", p: "bench", a: ma + 16, b: mb - 20, axis: "b" });
         lamps.push({ a: ma, b: mb });
-      } else if (t === "bank" || t === "faith" || t === "townhall" || t === "section" || t === "dealership" || t === "dreamhouse" || t === "airport") {
+      } else if (t === "bank" || t === "health" || t === "faith" || t === "townhall" || t === "section" || t === "dealership" || t === "dreamhouse" || t === "airport") {
         const p = k.parcel, def = PARCELS[p.type] || {}, lm = p.landmark || def.landmark || p.id;
-        const drawer = t === "section" ? "section" : t === "airport" ? "terminal" : t;
+        const drawer = t === "section" ? "section" : t === "airport" ? "terminal" : t === "health" ? "clinic" : t;
         const big = { a0: I.a0 + 6, a1: I.a1 - 6, b0: I.b0 + 6, b1: lerp(I.b0, I.b1, t === "faith" ? 0.78 : 0.7) };
         plots[lm] = building(k, big, { drawer, id: lm, landmark: lm, style: p.style, sKind: p.sKind || "office", color: p.color, name: p.name, H: t === "faith" ? 150 : 100, pad: 14, face: face({ ...big, b1: I.b1 }, k) });
         const front = { a0: I.a0, a1: I.a1, b0: big.b1 + 10, b1: I.b1 };
