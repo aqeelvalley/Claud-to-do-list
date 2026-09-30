@@ -182,6 +182,7 @@ window.LLPlatform = {
   widgets: native && Capacitor.getPlatform() === "ios" ? {
     update: (json) => LLWidget.update({ data: json }).catch(() => {}),
     take: () => LLWidget.takeActions().then((r) => r.actions || []).catch(() => []),
+    status: () => LLWidget.status().catch((e) => ({ error: String((e && e.message) || e) })),
   } : null,
   onAction: (fn) => { actionHandlers.add(fn); pendingActions.splice(0).forEach(fn); return () => actionHandlers.delete(fn); },
   flush: () => (dbPromise ? dbPromise.then((db) => db.flush()) : Promise.resolve()),

@@ -8189,6 +8189,7 @@
   }
   function SettingsDlg({ isl: il, onRename: rn, onExport: ex, onImport: im, onClose: close }) {
     let el = React.createElement, [nm, setNm] = React.useState((il && il.islandName) || "Valley Isle"), [busy, setBusy] = React.useState(""), fileRef = React.useRef(null);
+    let wg = window.LLPlatform && window.LLPlatform.widgets, [ws, setWs] = React.useState(null);
     return el(cs, { title: "Island settings", color: "#9F8FC9", onClose: close, footer: el(Q, { variant: "ghost", onClick: close }, "Close") },
       el("div", { className: "space-y-4" },
         el(Y, { label: "Island name" }, el("div", { className: "flex gap-2" }, el("input", { className: "inp", value: nm, onChange: (e) => setNm(e.target.value) }), el(Q, { variant: "gold", disabled: !nm.trim(), onClick: () => rn(nm.trim()) }, "Rename"))),
@@ -8197,7 +8198,15 @@
           el("div", { className: "flex gap-2 flex-wrap" },
             el(Q, { variant: "gold", disabled: !!busy, onClick: async () => { setBusy("export"); try { await ex(); } finally { setBusy(""); } } }, busy === "export" ? "Preparing\u2026" : "Download backup"),
             el(Q, { variant: "ghost", disabled: !!busy, onClick: () => fileRef.current && fileRef.current.click() }, "Restore from a file\u2026"),
-            el("input", { ref: fileRef, type: "file", accept: "application/json,.json", style: { display: "none" }, onChange: async (e) => { let f2 = e.target.files && e.target.files[0]; e.target.value = ""; if (!f2) return; setBusy("import"); try { await im(await f2.text()); } finally { setBusy(""); } } })))));
+            el("input", { ref: fileRef, type: "file", accept: "application/json,.json", style: { display: "none" }, onChange: async (e) => { let f2 = e.target.files && e.target.files[0]; e.target.value = ""; if (!f2) return; setBusy("import"); try { await im(await f2.text()); } finally { setBusy(""); } } }))),
+        wg && el("div", { className: "chart-card space-y-2" }, el("b", { className: "text-[14px]" }, "Home-screen widgets"),
+          el("p", { className: "muted text-[12.5px]" }, "Check that the widgets came with this install and can share your island's data."),
+          el(Q, { variant: "ghost", disabled: busy === "wg", onClick: async () => { setBusy("wg"); try { setWs(await wg.status()); } finally { setBusy(""); } } }, busy === "wg" ? "Checking\u2026" : "Check widgets"),
+          ws && el("div", { className: "space-y-1 text-[12.5px]" },
+            [["Widgets installed with the app", (ws.plugins || []).some((p2) => /LifeListWidget/.test(p2)) && ws.widget && ws.widget.hasExecutable],
+              ["Can share data with the app (App Group)", !!ws.appGroup],
+              ["Today's data sent to widgets", !!ws.snapshotSaved]].map(([lb, ok]) => el("div", { key: lb, className: "flex gap-2" }, el("span", { style: { color: ok ? "#5CB88A" : "#D0705A", fontWeight: 700 } }, ok ? "\u2713" : "\u2717"), lb)),
+            el("pre", { className: "muted", style: { whiteSpace: "pre-wrap", fontSize: 10.5, userSelect: "text", WebkitUserSelect: "text" } }, JSON.stringify(ws, null, 1))))));
   }
   /* your own daily habits, alongside water, steps and sleep */
   function HabitEditor({ onChange: f }) {
