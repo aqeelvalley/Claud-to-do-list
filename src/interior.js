@@ -327,8 +327,9 @@
           const [a, bb] = SPOTS[n];
           const [x, y] = P(a, bb, 0);
           return { d: a + bb + 1, el: h("g", { key: "p" + w.id, className: "crew-in", style: { animationDelay: n * 0.4 + "s" } },
-            h(cn, { sx: x, sy: y, shirt: w.color, title: w.name, walk: n % 2 ? "walk-b" : "walk-a", delay: n * 0.9 }),
-            h("g", { transform: `translate(${R(x)},${R(y - 30)})` },
+            h("g", { transform: `translate(${R(x)},${R(y)}) scale(1.7) translate(${R(-x)},${R(-y)})` },
+              h(cn, { sx: x, sy: y, shirt: w.color, title: w.name, walk: n % 2 ? "walk-b" : "walk-a", delay: n * 0.9 })),
+            h("g", { transform: `translate(${R(x)},${R(y - 44)})` },
               h("rect", { x: -w.name.length * 2.6 - 5, y: -7, width: w.name.length * 5.2 + 10, height: 12, rx: 6, fill: "rgba(255,248,236,0.92)", stroke: w.color, strokeWidth: 1 }),
               h("text", { y: 2, textAnchor: "middle", className: "crew-t" }, w.name))) };
         })].sort((x, y) => x.d - y.d);
@@ -369,8 +370,6 @@
           h("rect", { x: -2, y: -2, width: 40, height: 18, rx: 3, fill: color }),
           h("text", { x: 18, y: 11, textAnchor: "middle", className: "plaque-t" }, "LV " + level)),
         // ceiling lamp
-        h("line", { x1: P(120, 100, H + 30)[0], y1: -150, x2: P(120, 100, H + 30)[0], y2: P(120, 100, H + 30)[1], stroke: "#44545A", strokeWidth: 1 }),
-        h("circle", { cx: P(120, 100, H + 30)[0], cy: P(120, 100, H + 30)[1] + 4, r: 40, fill: "url(#lampGlowIn)", opacity: 0.0 }),
         items.map((x) => x.el),
       );
     }

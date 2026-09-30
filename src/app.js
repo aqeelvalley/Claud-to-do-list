@@ -9396,6 +9396,41 @@
           React.createElement("span", { className: "hide-xs" }, "Expand"),
         ),
       ),
+      (() => {
+        if (!v) return null;
+        let k = null;
+        v.type === "section" && rt
+          ? (k = { kind: rt.kind, color: rt.color, name: rt.name, id: rt.id })
+          : v.type === "fitness"
+            ? (k = { kind: "gym", color: te.fitness.color, name: te.fitness.name, id: "fitness" })
+            : v.type === "goals"
+              ? (k = { kind: "lighthouse", color: te.goals.color, name: te.goals.name, id: "goals" })
+              : v.type === "port" &&
+                (k = { kind: "port", color: "#1F7A8C", name: "Port & Logistics Hub", id: null });
+        if (!k) return null;
+        let g = k.id
+            ? xe.filter((a) => a.venture === k.id)
+            : C.filter((a) => a.stage === "new" || a.stage === "qualifying" || a.stage === "quoted").map((a) => ({
+                id: a.id,
+                title: a.title,
+                priority: a.stage === "new" ? "high" : "med",
+                status: a.stage === "quoted" ? "doing" : "todo",
+                _lead: a,
+              })),
+          F = [...new Set(["me", ...g.filter((a) => a.status !== "done").map((a) => a.assignee)])]
+            .map((a) => Qe[a])
+            .filter(Boolean);
+        return React.createElement(Inside.Interior, {
+          key: k.name,
+          ...k,
+          level: k.id && be[k.id] ? be[k.id].level : Math.max(1, Ke.length),
+          tasks: g,
+          crew: F,
+          onTask: (a) => (a._lead ? _n.onEdit(a._lead) : Wt.onEdit(a)),
+          onClose: () => $(null),
+          onAdd: k.id ? () => Yt(k.id) : () => M({ type: "lead", init: {} }),
+        });
+      })(),
       rt &&
         React.createElement($n, {
           key: rt.id,

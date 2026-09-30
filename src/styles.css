@@ -2591,3 +2591,29 @@ select.inp {
 .agent.still .ag-legs { animation: none; }
 .agent .ag-tail { animation: sway 1.6s ease-in-out infinite; transform-box: fill-box; transform-origin: right bottom; }
 @keyframes agStep { from { transform: scaleY(0.82) skewX(-8deg); } to { transform: scaleY(1) skewX(8deg); } }
+
+/* ---- building interiors ---- */
+.interior { position: fixed; inset: 0; z-index: 26; animation: enterIn 0.45s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+@keyframes enterIn { 0% { opacity: 0; transform: scale(1.12); } to { opacity: 1; transform: none; } }
+.interior-bg { position: absolute; inset: 0; background: radial-gradient(90% 80% at 35% 45%, color-mix(in srgb, var(--tint) 22%, #2a3437) 0%, #1c2528 70%, #141b1d 100%); }
+.interior-bg::after { content: ""; position: absolute; inset: 0; background: radial-gradient(60% 50% at 35% 40%, rgba(255, 220, 160, 0.16), transparent 70%); }
+.interior-top { position: absolute; left: 16px; top: calc(env(safe-area-inset-top, 0px) + 16px); z-index: 2; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.interior-title { display: flex; align-items: center; gap: 8px; font: 700 20px Fredoka, sans-serif; color: #fff8ec; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4); }
+.interior-title small { font: 600 14px Nunito, sans-serif; color: rgba(255, 248, 236, 0.75); }
+.interior-dot { width: 12px; height: 12px; border-radius: 4px; box-shadow: 0 0 0 2px rgba(255, 248, 236, 0.8); }
+.interior-stage { position: absolute; left: 16px; right: 480px; top: 70px; bottom: 100px; }
+.room { width: 100%; height: 100%; overflow: visible; }
+.pin-btn { position: absolute; z-index: 2; left: 50%; transform: translateX(calc(-50% - 232px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 100px); }
+.note { cursor: pointer; outline: none; transition: filter 0.15s; }
+.note:hover, .note:focus-visible { filter: brightness(1.05) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.3)); }
+.note-t { font: 700 5.2px Nunito, sans-serif; fill: #3a2d1a; }
+.note-empty { font: 700 9px Fredoka, sans-serif; fill: #6f5a45; }
+.plaque-t { font: 700 9px Fredoka, sans-serif; fill: #fff; }
+.crew-t { font: 700 6.5px Fredoka, sans-serif; fill: #24393d; }
+.shaft { mix-blend-mode: screen; animation: glowp 6s ease-in-out infinite; }
+@media (max-width: 767px) {
+  .interior-stage { left: 4px; right: 4px; top: calc(env(safe-area-inset-top, 0px) + 60px); bottom: auto; height: 36vh; }
+  .interior ~ .drawer { max-height: 50vh; }
+  .interior-title { font-size: 16px; }
+  .pin-btn { display: none; }
+}
