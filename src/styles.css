@@ -1309,11 +1309,9 @@ button.pill:hover {
     600 13px Fredoka,
     sans-serif;
   color: #fbf7f0;
-  background: rgba(70, 61, 99, 0.42);
+  background: rgba(70, 61, 99, 0.66);
   padding: 7px 14px;
   border-radius: 999px;
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
   white-space: nowrap;
   animation: hintIn 0.6s 0.8s both;
 }
@@ -1642,9 +1640,7 @@ button.pill:hover {
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: rgba(20, 45, 50, 0.4);
-  -webkit-backdrop-filter: blur(2.5px);
-  backdrop-filter: blur(2.5px);
+  background: rgba(20, 45, 50, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;

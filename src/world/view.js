@@ -36,7 +36,7 @@
   const ISLES_OF = (T) => T.isles || {};
   const WorldMap = React.forwardRef(function WorldMap(props, ref) {
     const { town: T, landmarks, onOpen, onShip, onPlot, onAgent, onCrew, onAssign, lightMode = "auto", leads = [], workers = [], reserveRight = 0 } = props;
-    const wrap = React.useRef(null), cvs = React.useRef(null);
+    const wrap = React.useRef(null), cvs = React.useRef(null), glcv = React.useRef(null);
     const st = React.useRef(null);
     const prevRef = React.useRef(null); // the island as it was, kept for the transition to the new one
     const cb = React.useRef({});
@@ -45,6 +45,11 @@
     /* one-time engine setup per town */
     React.useEffect(() => {
       const cv = cvs.current, ctx = cv.getContext("2d");
+      // WebGL draws the world; the 2D canvas on top only carries overlays (edit grid, dust, the beam).
+      // Without WebGL the 2D canvas draws everything, as before.
+      const G = window.__noGL ? null : createGL(glcv.current);
+      glcv.current.style.display = G ? "" : "none";
+      if (G) G.reset();
       const emitCv = document.createElement("canvas"), ectx = emitCv.getContext("2d");
       const drawables = staticDrawables(T);
       // world bounds in screen units
@@ -56,14 +61,15 @@
       const sprites = new Sprites();
       const chunks = new Map();
       const CH = 420;
-      const S = window.__valleyWorld = st.current = { cam: { tx: 0, ty: 0, s: 0.5, fit: 0.3 }, bucket: 1, sim, sprites, drawables, bounds, hover: null, drag: null, lastSorted: [], dpr: 1, w: 0, h: 0, stopped: false, t0: performance.now(), plates: [] };
+      const S = window.__valleyWorld = st.current = { gl: !!G, cam: { tx: 0, ty: 0, s: 0.5, fit: 0.3 }, bucket: 1, sim, sprites, drawables, bounds, hover: null, drag: null, lastSorted: [], dpr: 1, w: 0, h: 0, stopped: false, t0: performance.now(), plates: [] };
       const reduce = (() => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; } })();
 
       const resize = () => {
         const r = wrap.current.getBoundingClientRect();
-        S.dpr = Math.min(window.devicePixelRatio || 1, r.width < 700 ? 1.5 : 2, S.dprCap || 9);
+        S.dpr = Math.min(window.devicePixelRatio || 1, G ? 2 : r.width < 700 ? 1.5 : 2, S.dprCap || 9);
         S.w = r.width; S.h = r.height;
         cv.width = Math.round(r.width * S.dpr); cv.height = Math.round(r.height * S.dpr);
+        if (G) { glcv.current.width = cv.width; glcv.current.height = cv.height; S.ovDirty = true; }
         emitCv.width = Math.ceil(cv.width / 2); emitCv.height = Math.ceil(cv.height / 2);
       };
       resize();
@@ -183,7 +189,7 @@
         const cv2 = makeCanvas(CH * r, CH * r), g = cv2.getContext("2d");
         g.scale(r, r); g.translate(-cx * CH, -cy * CH);
         drawGround(g, T);
-        c = { cv: cv2, used: S.frame };
+        c = { cv: cv2, used: S.frame, solo: true };
         chunks.set(key, c);
         if (chunks.size > 70) { [...chunks.entries()].sort((p, q) => p[1].used - q[1].used).slice(0, 25).forEach(([k]) => chunks.delete(k)); }
         return c;
@@ -195,6 +201,68 @@
       const glints = [];
       { const r = rng(7); for (let k = 0; k < 260; k++) { const a = T.abox.a0 - 400 + r() * (T.abox.a1 - T.abox.a0 + 800), b = T.abox.b0 - 400 + r() * (T.abox.b1 - T.abox.b0 + 800); if (!T.landAt(a, b) && !T.landAt(a + 40, b) && !T.landAt(a, b + 40) && !T.landAt(a - 40, b - 40)) glints.push({ x: a - b, y: (a + b) / 2 + SEA_DROP, w: 5 + r() * 10, p: r() * TAU }); } }
 
+      /* ---- everything to draw this frame, dynamic things merged into the depth-sorted statics ---- */
+      const collect = (time, vx0, vy0, vx1, vy1) => {
+        // collect dynamic drawables
+        const dyn = [];
+        sim.cars.forEach((c) => dyn.push({ kind: "car", c, depth: c.a + c.b, sx: c.a - c.b, sy: (c.a + c.b) / 2 }));
+        sim.peds.forEach((w) => { if (!w.hidden) dyn.push({ kind: "ped", w, depth: w.a + w.b + (w.carried ? 9999 : 0), sx: w.a - w.b, sy: (w.a + w.b) / 2 }); });
+        sim.animals.forEach((m) => dyn.push({ kind: "animal", m, depth: m.a + m.b, sx: m.a - m.b, sy: (m.a + m.b) / 2 }));
+        sim.boats.forEach((b) => { if (b.a != null) dyn.push({ kind: "boat", b, depth: b.a + b.b - 40, sx: b.a - b.b, sy: (b.a + b.b) / 2 + SEA_DROP }); });
+        runways.forEach((rw) => {
+          const T2 = 17, t = ((time + rw.off) % T2), o = rw.o;
+          if (t > 12) return; // gap between flights
+          // 0-1.4 appear at the hold line, 1.4-7 roll and speed up, 7-12 lift off, climb and fade
+          const u0 = -rw.L / 2 + 44, uEnd = rw.L / 2 - 20;
+          let u, z = 0, al = 1;
+          if (t < 1.4) { u = u0; al = t / 1.4; }
+          else if (t < 7) { const q = (t - 1.4) / 5.6; u = u0 + (uEnd - u0) * 0.75 * q * q; }
+          else { const q = (t - 7) / 5; u = u0 + (uEnd - u0) * 0.75 + (rw.L * 0.55 + 260) * (q * 0.8 + q * q * 0.4); z = 150 * q * q + 20 * q; al = 1 - clamp((q - 0.55) / 0.45, 0, 1); }
+          const a = rw.alongA ? o.a + u : o.a, b = rw.alongA ? o.b : o.b + u;
+          dyn.push({ kind: "plane", rw, a, b, z, al, depth: z > 8 ? 99999 : Math.max(a + b, o.a + o.b) + 3, sx: a - b, sy: (a + b) / 2 - z });
+        });
+        dyn.sort((x, y) => x.depth - y.depth);
+        // merge with static (already sorted)
+        const list = [];
+        const D = S.drawables;
+        let i = 0, j = 0;
+        const vis = (d) => d.sx + d.bnd.hw > vx0 && d.sx - d.bnd.hw < vx1 && d.sy - d.bnd.top < vy1 && d.sy + d.bnd.bot > vy0;
+        while (i < D.length || j < dyn.length) {
+          if (j >= dyn.length || (i < D.length && D[i].depth <= dyn[j].depth)) { if (vis(D[i])) list.push(D[i]); i++; }
+          else { const x = dyn[j++]; if (x.sx > vx0 - 60 && x.sx < vx1 + 60 && x.sy > vy0 - 40 && x.sy < vy1 + 80) list.push(x); }
+        }
+        S.lastSorted = list;
+        return list;
+      };
+      /* ---- a walker, with its bubble, crew chip and dog ---- */
+      const drawPed = (ctx, d, time) => {
+        const w = d.w, dx = (w.da || 0) - (w.db || 0), dy = (w.da || 0) + (w.db || 0);
+        const lift = w.carried ? -14 : 0;
+        if (w.carried) { ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.beginPath(); ctx.ellipse(d.sx, d.sy, 7, 3, 0, 0, TAU); ctx.fill(); }
+        drawPerson(ctx, d.sx, d.sy + lift, w.look, dx < 0 ? -1 : 1, dy >= 0, w.phase, w.moving || w.carried, w.crew ? 1.08 : 1, w.act, time);
+        if (w.bubble && !w.crew) drawBubble(ctx, d.sx + 3, d.sy + lift - 17 * w.look.h, w.bubble.ch, 1);
+        // crew at work now and then show what they're making
+        else if (w.crew && w.look.role && !w.moving && ((time * 0.4 + (w.phase || 0)) % 3) < 1.1) drawBubble(ctx, d.sx + 10, d.sy + lift - 13 * w.look.h, ROLE_BUBBLE[w.look.role], 1);
+        if (w.crew) {
+          const x = d.sx, y = d.sy + lift - 27 * w.look.h - (w.look.role === "thumb" && !w.moving ? 8 : 0);
+          ctx.fillStyle = w.crew.color; ctx.strokeStyle = "#FFF8EC"; ctx.lineWidth = 1.2;
+          ctx.beginPath(); ctx.arc(x, y, 4.2, 0, TAU); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = "#FFF"; ctx.font = "700 5px Fredoka, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText((w.name || "?")[0], x, y + 0.3);
+          if (S.hoverCrew === w || w.carried) { ctx.font = "700 6px Fredoka, sans-serif"; const tw = ctx.measureText(w.name).width + 8; ctx.fillStyle = "rgba(255,248,236,0.95)"; ctx.fillRect(x - tw / 2, y - 14, tw, 9); ctx.fillStyle = "#24393d"; ctx.fillText(w.name, x, y - 9.3); }
+        }
+        if (w.dog && w.dog.trail.length > 8) {
+          const [ta, tb] = w.dog.trail[0];
+          const ddx = w.a - ta - (w.b - tb);
+          const px = ta - tb, py = (ta + tb) / 2;
+          ctx.strokeStyle = "rgba(60,40,30,0.6)"; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.moveTo(d.sx + (dx < 0 ? -2 : 2), d.sy - 6.5); ctx.quadraticCurveTo((d.sx + px) / 2, (d.sy + py) / 2 - 1, px, py - 6); ctx.stroke();
+          drawAnimal(ctx, "dog", px, py, ddx < 0 ? -1 : 1, w.phase * 1.3, w.dog.col, w.moving, time);
+        }
+      };
+      const pedBox = (d) => {
+        const w = d.w, lift = w.carried ? -14 : 0, hw = w.crew ? 34 : 14, bx = [d.sx - hw, d.sy + lift - (w.crew ? 72 : 44), d.sx + hw, d.sy + 8];
+        if (w.dog && w.dog.trail.length > 8) { const [ta, tb] = w.dog.trail[0], px = ta - tb, py = (ta + tb) / 2; bx[0] = Math.min(bx[0], px - 12); bx[2] = Math.max(bx[2], px + 12); bx[1] = Math.min(bx[1], py - 14); bx[3] = Math.max(bx[3], py + 4); }
+        return bx;
+      };
       /* ---- frame ---- */
       let raf = 0, last = performance.now();
       S.frame = 0;
@@ -205,12 +273,14 @@
         const dt = Math.min(0.08, rawDt); last = now;
         // adaptive quality: drop resolution if frames stay slow
         S.ema = S.ema == null ? rawDt : S.ema * 0.95 + rawDt * 0.05;
-        if (S.frame > 90 && S.ema > 0.036 && S.dprCap !== 1 && !document.hidden) { S.dprCap = 1; resize(); }
+        if (S.frame > (S.capAt || 0) + 90 && S.ema > 0.036 && S.dpr > 1 && !document.hidden) { S.dprCap = S.dpr > 1.5 ? 1.5 : 1; S.capAt = S.frame; S.ema = null; resize(); }
         S.frame++;
         if (cb.current.paused && S.frame % 4) return;
         if (!reduce) sim.step(cb.current.paused ? dt * 4 : dt);
         else if (S.frame === 1) sim.step(0.016);
-        render(now / 1000);
+        const t0 = performance.now();
+        (G && !G.lost ? renderGL : render)(now / 1000);
+        S.cpu = S.cpu == null ? performance.now() - t0 : S.cpu * 0.95 + (performance.now() - t0) * 0.05;
       };
       const render = (time) => {
         const { cam, dpr } = S;
@@ -271,35 +341,7 @@
             ctx.globalAlpha = 1 - p; ctx.drawImage(s2.cv, d.sx - s2.ox, d.sy - s2.oy + p * s2.oy, s2.w, s2.h); ctx.restore();
           });
         } else drawChunks(chunk, S.bounds);
-        // collect dynamic drawables
-        const dyn = [];
-        sim.cars.forEach((c) => dyn.push({ kind: "car", c, depth: c.a + c.b, sx: c.a - c.b, sy: (c.a + c.b) / 2 }));
-        sim.peds.forEach((w) => { if (!w.hidden) dyn.push({ kind: "ped", w, depth: w.a + w.b + (w.carried ? 9999 : 0), sx: w.a - w.b, sy: (w.a + w.b) / 2 }); });
-        sim.animals.forEach((m) => dyn.push({ kind: "animal", m, depth: m.a + m.b, sx: m.a - m.b, sy: (m.a + m.b) / 2 }));
-        sim.boats.forEach((b) => { if (b.a != null) dyn.push({ kind: "boat", b, depth: b.a + b.b - 40, sx: b.a - b.b, sy: (b.a + b.b) / 2 + SEA_DROP }); });
-        runways.forEach((rw) => {
-          const T2 = 17, t = ((time + rw.off) % T2), o = rw.o;
-          if (t > 12) return; // gap between flights
-          // 0-1.4 appear at the hold line, 1.4-7 roll and speed up, 7-12 lift off, climb and fade
-          const u0 = -rw.L / 2 + 44, uEnd = rw.L / 2 - 20;
-          let u, z = 0, al = 1;
-          if (t < 1.4) { u = u0; al = t / 1.4; }
-          else if (t < 7) { const q = (t - 1.4) / 5.6; u = u0 + (uEnd - u0) * 0.75 * q * q; }
-          else { const q = (t - 7) / 5; u = u0 + (uEnd - u0) * 0.75 + (rw.L * 0.55 + 260) * (q * 0.8 + q * q * 0.4); z = 150 * q * q + 20 * q; al = 1 - clamp((q - 0.55) / 0.45, 0, 1); }
-          const a = rw.alongA ? o.a + u : o.a, b = rw.alongA ? o.b : o.b + u;
-          dyn.push({ kind: "plane", rw, a, b, z, al, depth: z > 8 ? 99999 : Math.max(a + b, o.a + o.b) + 3, sx: a - b, sy: (a + b) / 2 - z });
-        });
-        dyn.sort((x, y) => x.depth - y.depth);
-        // merge with static (already sorted)
-        const list = [];
-        let i = 0, j = 0;
-        const D = S.drawables;
-        const vis = (d) => d.sx + d.bnd.hw > vx0 && d.sx - d.bnd.hw < vx1 && d.sy - d.bnd.top < vy1 && d.sy + d.bnd.bot > vy0;
-        while (i < D.length || j < dyn.length) {
-          if (j >= dyn.length || (i < D.length && D[i].depth <= dyn[j].depth)) { if (vis(D[i])) list.push(D[i]); i++; }
-          else { const x = dyn[j++]; if (x.sx > vx0 - 60 && x.sx < vx1 + 60 && x.sy > vy0 - 40 && x.sy < vy1 + 80) list.push(x); }
-        }
-        S.lastSorted = list;
+        const list = collect(time, vx0, vy0, vx1, vy1);
         const lightState = (d) => (d.kind === "signal" ? lightFor(d.o.node, d.o.axis === "a" ? "a" : "b", sim.t) : "");
         // colour pass
         list.forEach((d) => {
@@ -342,30 +384,7 @@
           if (d.kind === "plane") { drawPlane(pen(ctx, 0, 0), d.a, d.b, d.z, d.rw.alongA ? "a" : "b", 1, "#E4826A", d.al); return; }
           if (d.kind === "car") { const c = d.c, s = carSprite(c.kind, c.color, c.yaw, Math.floor(c.wheel) % 3, sc, false); d._s = s; ctx.drawImage(s.cv, d.sx - s.ox, d.sy - s.oy, s.w, s.h); return; }
           if (d.kind === "boat") { const b = d.b, s = boatSprite(b, sc, false); d._s = s; const bob = Math.sin(time * 1.6 + d.sx * 0.01) * 1.2; ctx.drawImage(s.cv, d.sx - s.ox, d.sy - s.oy + bob, s.w, s.h); return; }
-          if (d.kind === "ped") {
-            const w = d.w, dx = (w.da || 0) - (w.db || 0), dy = (w.da || 0) + (w.db || 0);
-            const lift = w.carried ? -14 : 0;
-            if (w.carried) { ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.beginPath(); ctx.ellipse(d.sx, d.sy, 7, 3, 0, 0, TAU); ctx.fill(); }
-            drawPerson(ctx, d.sx, d.sy + lift, w.look, dx < 0 ? -1 : 1, dy >= 0, w.phase, w.moving || w.carried, w.crew ? 1.08 : 1, w.act, time);
-            if (w.bubble && !w.crew) drawBubble(ctx, d.sx + 3, d.sy + lift - 17 * w.look.h, w.bubble.ch, 1);
-            // crew at work now and then show what they're making
-            else if (w.crew && w.look.role && !w.moving && ((time * 0.4 + (w.phase || 0)) % 3) < 1.1) drawBubble(ctx, d.sx + 10, d.sy + lift - 13 * w.look.h, ROLE_BUBBLE[w.look.role], 1);
-            if (w.crew) {
-              const x = d.sx, y = d.sy + lift - 27 * w.look.h - (w.look.role === "thumb" && !w.moving ? 8 : 0);
-              ctx.fillStyle = w.crew.color; ctx.strokeStyle = "#FFF8EC"; ctx.lineWidth = 1.2;
-              ctx.beginPath(); ctx.arc(x, y, 4.2, 0, TAU); ctx.fill(); ctx.stroke();
-              ctx.fillStyle = "#FFF"; ctx.font = "700 5px Fredoka, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText((w.name || "?")[0], x, y + 0.3);
-              if (S.hoverCrew === w || w.carried) { ctx.font = "700 6px Fredoka, sans-serif"; const tw = ctx.measureText(w.name).width + 8; ctx.fillStyle = "rgba(255,248,236,0.95)"; ctx.fillRect(x - tw / 2, y - 14, tw, 9); ctx.fillStyle = "#24393d"; ctx.fillText(w.name, x, y - 9.3); }
-            }
-            if (w.dog && w.dog.trail.length > 8) {
-              const [ta, tb] = w.dog.trail[0];
-              const ddx = w.a - ta - (w.b - tb);
-              const px = ta - tb, py = (ta + tb) / 2;
-              ctx.strokeStyle = "rgba(60,40,30,0.6)"; ctx.lineWidth = 0.5; ctx.beginPath(); ctx.moveTo(d.sx + (dx < 0 ? -2 : 2), d.sy - 6.5); ctx.quadraticCurveTo((d.sx + px) / 2, (d.sy + py) / 2 - 1, px, py - 6); ctx.stroke();
-              drawAnimal(ctx, "dog", px, py, ddx < 0 ? -1 : 1, w.phase * 1.3, w.dog.col, w.moving, time);
-            }
-            return;
-          }
+          if (d.kind === "ped") { drawPed(ctx, d, time); return; }
           if (d.kind === "animal" && d.m.kind === "builder") { const m = d.m; drawPerson(ctx, d.sx, d.sy, m.look, ((m.da || 1) - (m.db || 0)) < 0 ? -1 : 1, true, m.phase, m.moving, 0.95, m.moving ? null : { kind: "hammer" }, time); return; }
           if (d.kind === "animal") { const m = d.m; drawAnimal(ctx, m.kind, d.sx, d.sy, ((m.da || 1) - (m.db || 0)) < 0 ? -1 : 1, m.phase, m.col, m.moving, time); return; }
         });
@@ -385,7 +404,7 @@
           const ed = dpr / 2;
           ectx.setTransform(ed * cam.s, 0, 0, ed * cam.s, ed * cam.tx, ed * cam.ty);
           // lamp pools on the ground
-          D.forEach((d) => {
+          S.drawables.forEach((d) => {
             if (d.kind !== "lamp" || !(d.sx > vx0 - 60 && d.sx < vx1 + 60 && d.sy > vy0 - 60 && d.sy < vy1 + 60)) return;
             if ((hash("l" + d.o.idx) % 100) / 100 > q * 1.4) return;
             ectx.drawImage(poolSprite, d.sx + 3 - 46, d.sy + 2 - 23, 92, 46);
@@ -426,7 +445,148 @@
         // gulls above everything
         sim.gulls.forEach((gl) => { const a = gl.cx + Math.cos(gl.t) * gl.r, b = gl.cy + Math.sin(gl.t) * gl.r * 0.6; drawAnimal(ctx, "gull", a - b, (a + b) / 2 - gl.z, Math.cos(gl.t + 1.57) < 0 ? -1 : 1, time * 7 + gl.cx, null); });
         if (cb.current.edit) drawEdit(time);
-        plates(time);
+        plates2D();
+      };
+      /* ---- the same frame through WebGL: one batch of quads, lighting in the shader ---- */
+      const hex3 = (h) => [parseInt(h.slice(1, 3), 16) / 255, parseInt(h.slice(3, 5), 16) / 255, parseInt(h.slice(5, 7), 16) / 255];
+      const SEA0 = [...hex3("#6CB8C2"), 1], SEA1 = [...hex3("#4A93A8"), 1], LIFT = hex3("#2B2757");
+      const glintS = { cv: (() => { const c = makeCanvas(32, 16), g = c.getContext("2d"); g.fillStyle = "#fff"; g.beginPath(); g.moveTo(16, 0); g.lineTo(32, 8); g.lineTo(16, 16); g.lineTo(0, 8); g.closePath(); g.fill(); return c; })() };
+      const poolS = { cv: poolSprite };
+      const LIT = GLF.LIT;
+      const renderGL = (time) => {
+        const { cam, dpr } = S;
+        const sc = Math.min(2.8, bucketFor(cam.s * dpr));
+        const L = lightAt(hourNow());
+        const q = Math.round(L.night * 12) / 12;
+        const lk = L.night > 0 ? 0.5 * L.night : 0;
+        if (!G.begin(glcv.current.width, glcv.current.height, cam, dpr, hex3(tintColor(L)), LIFT.map((v) => v * lk))) return;
+        // the 2D overlay is cleared only when something was drawn on it
+        if (S.ovDirty) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height); S.ovDirty = false; }
+        ctx.setTransform(dpr * cam.s, 0, 0, dpr * cam.s, dpr * cam.tx, dpr * cam.ty);
+        const vx0 = -cam.tx / cam.s, vy0 = -cam.ty / cam.s, vx1 = vx0 + S.w / cam.s, vy1 = vy0 + S.h / cam.s;
+        // sea and glints
+        G.rect(vx0 - 4, vy0 - 4, vx1 + 4, vy1 + 4, SEA0, SEA1, LIT);
+        glints.forEach((w) => {
+          if (w.x < vx0 - 20 || w.x > vx1 + 20 || w.y < vy0 - 20 || w.y > vy1 + 20) return;
+          const a = 0.2 + 0.5 * (0.5 + 0.5 * Math.sin(time * 1.3 + w.p)), r = 1.6 + w.w * 0.12;
+          G.sprite(glintS, w.x - r, w.y - r * 0.5, r * 2, r, a, LIT);
+        });
+        // ground
+        const r = Math.min(2, sc);
+        const chunksGL = (chunkFn, B, a = 1, f = LIT) => {
+          for (let cy = Math.floor(vy0 / CH) - 1; cy <= Math.floor(vy1 / CH); cy++)
+            for (let cx = Math.floor(vx0 / CH); cx <= Math.floor(vx1 / CH); cx++) {
+              if ((cx + 1) * CH < B.x0 || cx * CH > B.x1 || (cy + 1) * CH < B.y0 - 100 || cy * CH > B.y1 + 100) continue;
+              G.sprite(chunkFn(cx, cy, r), cx * CH, cy * CH, CH, CH, a, f);
+            }
+        };
+        const IN = S.intro;
+        if (IN) { const nw = performance.now(); IN.el = (IN.el || 0) + (IN.last ? Math.min(0.05, (nw - IN.last) / 1000) : 0); IN.last = nw; }
+        const age = IN ? IN.el : 99;
+        if (IN && age > IN.end) { S.intro = null; drawables.forEach((d) => { d._ap = null; d._hid = false; }); }
+        if (IN && age <= IN.end && IN.mode === "rise") {
+          const e = clamp(age / 1.2, 0, 1), eb = 1 + 2.2 * Math.pow(e - 1, 3) + 1.2 * Math.pow(e - 1, 2);
+          S.ovDirty = true;
+          for (let k = 0; k < 4; k++) {
+            const q2 = ((age * 0.55 + k / 4) % 1), rr = IN.R * (0.55 + q2 * 0.9);
+            ctx.strokeStyle = `rgba(236,250,248,${0.45 * (1 - q2) * clamp(2.6 - age, 0, 1)})`; ctx.lineWidth = 3 / cam.s;
+            ctx.beginPath(); ctx.ellipse(IN.cx, IN.cy + 20, rr, rr / 2, 0, 0, TAU); ctx.stroke();
+          }
+          const k = 0.9 + 0.1 * eb;
+          G.setXf([k, IN.cx - k * IN.cx, IN.cy - k * IN.cy + k * (1 - eb) * 90]);
+          chunksGL(chunk, S.bounds, clamp(e * 1.4, 0, 1));
+          G.setXf(null);
+        } else if (IN && age <= IN.end && IN.mode === "grow") {
+          const rr = IN.R * (1 - Math.pow(1 - clamp(age / 1.35, 0, 1), 3));
+          chunksGL(IN.prev.chunk, IN.prev.bounds);
+          G.ellipse(IN.cx, IN.cy, rr, rr / 2);
+          chunksGL(chunk, S.bounds, 1, LIT | GLF.CLIP);
+          if (age < 1.6) { S.ovDirty = true; ctx.strokeStyle = `rgba(255,248,236,${0.8 * (1 - age / 1.6)})`; ctx.lineWidth = 4 / cam.s; ctx.setLineDash([10 / cam.s, 8 / cam.s]); ctx.beginPath(); ctx.ellipse(IN.cx, IN.cy, Math.max(1, rr), Math.max(1, rr / 2), 0, 0, TAU); ctx.stroke(); ctx.setLineDash([]); }
+          IN.gone.forEach((d) => {
+            const p = clamp(age / 0.7, 0, 1); if (p >= 1) return;
+            const s2 = IN.prev.spriteFor(d, sc, ""); if (!s2) return;
+            G.sprite(s2, d.sx - s2.ox, d.sy - s2.oy + p * s2.oy, s2.w, s2.h, 1 - p, LIT, d.sy - s2.oy - 4, d.sy + 2);
+          });
+        } else chunksGL(chunk, S.bounds);
+        const eA = L.night > 0.04 ? Math.min(0.85, L.night * 0.95) : 0;
+        const lampOff = (d) => (hash("l" + d.o.idx) % 100) / 100 > q * 1.4;
+        // lamp pools on the ground
+        if (eA) S.drawables.forEach((d) => {
+          if (d.kind !== "lamp" || !(d.sx > vx0 - 60 && d.sx < vx1 + 60 && d.sy > vy0 - 60 && d.sy < vy1 + 60) || lampOff(d) || d._hid) return;
+          G.sprite(poolS, d.sx + 3 - 46, d.sy + 2 - 23, 92, 46, eA, 0);
+        });
+        const list = collect(time, vx0, vy0, vx1, vy1);
+        const lightState = (d) => (d.kind === "signal" ? lightFor(d.o.node, d.o.axis === "a" ? "a" : "b", sim.t) : "");
+        const dynA = IN && IN.mode === "rise" && age < 2.9 ? (age < 2.3 ? 0 : (age - 2.3) / 0.6) : 1;
+        const dust = (x, y, n, rr, a, spin) => { S.ovDirty = true; for (let k = 0; k < n; k++) { const th = (k / n) * TAU + spin; ctx.fillStyle = `rgba(240,232,220,${a})`; ctx.beginPath(); ctx.ellipse(x + Math.cos(th) * rr, y + Math.sin(th) * rr * 0.5, n > 6 ? 9 : 7, n > 6 ? 5 : 4, 0, 0, TAU); ctx.fill(); } };
+        list.forEach((d) => {
+          if (d.bnd) {
+            const ls = lightState(d), s = spriteFor(d, sc, ls);
+            d._s = s;
+            const op = cb.current.opening, oage = op && d.o.landmark === op.id ? (performance.now() - op.t) / 1000 : 99;
+            const loc = IN && d._ap != null ? age - d._ap : 99;
+            d._hid = loc < 0;
+            if (loc < 0) return;
+            let x = d.sx - s.ox, y = d.sy - s.oy, w = s.w, h = s.h, cy0 = -1e9;
+            if (loc < 0.55) {
+              // growing in: buildings rise from the ground up with a puff of dust; trees and props pop
+              const p = clamp(loc / 0.55, 0, 1), e = 1 - Math.pow(1 - p, 3);
+              if (d.kind === "building") { cy0 = y + s.h * (1 - e) - 2; dust(d.sx, d.sy, 6, 8 + p * 22, 0.45 * (1 - p), 0); }
+              else { const k = p < 0.7 ? e * 1.12 : 1 + 0.12 * (1 - (p - 0.7) / 0.3); x = d.sx - s.ox * k; y = d.sy - s.oy * k; w *= k; h *= k; }
+            } else if (oage < 3.4) {
+              // just opened: the building rises out of the ground, dust at the base, confetti on top
+              const p = clamp(oage / 2.4, 0, 1), e = 1 - Math.pow(1 - p, 3);
+              cy0 = y + s.h * (1 - e) - 2;
+              dust(d.sx, d.sy, 10, 20 + oage * 18, 0.5 * (1 - oage / 3.4), oage);
+              if (oage > 1.8) for (let k = 0; k < 26; k++) { const h2 = (k * 97) % 100 / 100, fall = (oage - 1.8) * 40; ctx.fillStyle = ["#E4826A", "#F0C06A", "#7CC2CB", "#9BC98A", "#B7A6DC"][k % 5]; ctx.fillRect(d.sx - 40 + h2 * 80 + Math.sin(oage * 4 + k) * 6, y + 10 + fall + ((k * 37) % 30), 2.4, 3.6); }
+            }
+            G.sprite(s, x, y, w, h, 1, LIT | (S.hover && d.o.landmark && S.hover === d.o.landmark ? GLF.BRIGHT : 0), cy0);
+            if (eA && d.emit && !(d.kind === "lamp" && lampOff(d))) { const es = emitFor(d, sc, q, s, ls); if (es) G.sprite(es, x, y, w, h, eA, 0, cy0); }
+            return;
+          }
+          const a = dynA;
+          if (a <= 0) return;
+          if (d.kind === "car") {
+            const c = d.c, s = carSprite(c.kind, c.color, c.yaw, Math.floor(c.wheel) % 3, sc, false); d._s = s;
+            G.sprite(s, d.sx - s.ox, d.sy - s.oy, s.w, s.h, a, LIT);
+            if (eA) { const es = carSprite(c.kind, c.color, c.yaw, 0, sc, true); G.sprite(es, d.sx - es.ox, d.sy - es.oy, es.w, es.h, eA * a, 0); }
+            return;
+          }
+          if (d.kind === "boat") {
+            const b = d.b, s = boatSprite(b, sc, false), bob = Math.sin(time * 1.6 + d.sx * 0.01) * 1.2; d._s = s;
+            G.sprite(s, d.sx - s.ox, d.sy - s.oy + bob, s.w, s.h, a, LIT);
+            if (eA) { const es = boatSprite(b, sc, true); G.sprite(es, d.sx - es.ox, d.sy - es.oy + bob, es.w, es.h, eA * a, 0); }
+            return;
+          }
+          if (d.kind === "plane") {
+            if (d.al <= 0) return;
+            G.paint(d.sx - 86, d.sy - 76, d.sx + 86 + d.z * 0.16, d.sy + 46 + d.z * 1.3, sc, (c) => drawPlane(pen(c, 0, 0), d.a, d.b, d.z, d.rw.alongA ? "a" : "b", 1, "#E4826A", d.al), a);
+            return;
+          }
+          if (d.kind === "ped") { const bx = pedBox(d); G.paint(bx[0], bx[1], bx[2], bx[3], sc, (c) => drawPed(c, d, time), a); return; }
+          if (d.kind === "animal" && d.m.kind === "builder") { const m = d.m; G.paint(d.sx - 14, d.sy - 40, d.sx + 14, d.sy + 4, sc, (c) => drawPerson(c, d.sx, d.sy, m.look, ((m.da || 1) - (m.db || 0)) < 0 ? -1 : 1, true, m.phase, m.moving, 0.95, m.moving ? null : { kind: "hammer" }, time), a); return; }
+          if (d.kind === "animal") { const m = d.m; G.paint(d.sx - 12, d.sy - 14, d.sx + 12, d.sy + 3, sc, (c) => drawAnimal(c, m.kind, d.sx, d.sy, ((m.da || 1) - (m.db || 0)) < 0 ? -1 : 1, m.phase, m.col, m.moving, time), a); }
+        });
+        // effects, then gulls above everything
+        if (!IN || IN.mode !== "rise" || age > 2.6) fxItems(time).forEach((it) => { const [x0, y0, x1, y1] = it.box; if (x1 > vx0 && x0 < vx1 && y1 > vy0 && y0 < vy1) G.paint(x0, y0, x1, y1, sc, it.draw); });
+        sim.gulls.forEach((gl) => {
+          const a = gl.cx + Math.cos(gl.t) * gl.r, b = gl.cy + Math.sin(gl.t) * gl.r * 0.6, x = a - b, y = (a + b) / 2 - gl.z;
+          if (x < vx0 - 10 || x > vx1 + 10 || y < vy0 - 10 || y > vy1 + 10) return;
+          G.paint(x - 8, y - 6, x + 8, y + 3, sc, (c) => drawAnimal(c, "gull", x, y, Math.cos(gl.t + 1.57) < 0 ? -1 : 1, time * 7 + gl.cx, null));
+        });
+        if (cb.current.edit) { S.ovDirty = true; G.end(); drawEdit(time); return; }
+        platesGL();
+        G.end();
+        // lighthouse beam (on the overlay, it only ever adds light)
+        const lh = T.plots.goals;
+        if (lh && L.night > 0.04) {
+          S.ovDirty = true;
+          const [bx, by] = [lh.sx, lh.sy - 111], ang = time * 0.9;
+          const dx = Math.cos(ang), dy = Math.sin(ang) * 0.5, L2 = 520, px = -dy, py = dx;
+          const gb = ctx.createLinearGradient(bx, by, bx + dx * L2, by + dy * L2);
+          gb.addColorStop(0, `rgba(255,240,214,${0.32 * L.night})`); gb.addColorStop(1, "rgba(255,246,200,0)");
+          ctx.fillStyle = gb; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx + dx * L2 + px * 70, by + dy * L2 + py * 70); ctx.lineTo(bx + dx * L2 - px * 70, by + dy * L2 - py * 70); ctx.closePath(); ctx.fill();
+        }
       };
       /* ---- layout editor overlay: the grid, every parcel's cells, and the one being dragged ---- */
       const cellOfWorld = (wx, wy) => {
@@ -475,13 +635,18 @@
         ctx.restore();
       };
 
-      const fx = (time) => {
+      /* effects as world-space items (box + draw), so WebGL can paint them into its sheet */
+      const fxItems = (time) => {
+        const out = [];
         const puff = (a, b, z, n = 4, col = "rgba(244,239,231,") => {
-          for (let k = 0; k < n; k++) {
-            const p = ((time * 0.35 + k / n) % 1);
-            const x = a - b + p * 10, y = (a + b) / 2 - z - p * 34;
-            ctx.fillStyle = col + (0.7 * (1 - p)) + ")"; ctx.beginPath(); ctx.arc(x, y, 3 + p * 6, 0, TAU); ctx.fill();
-          }
+          const x0 = a - b, y0 = (a + b) / 2 - z;
+          out.push({ box: [x0 - 10, y0 - 45, x0 + 20, y0 + 10], draw: (ctx) => {
+            for (let k = 0; k < n; k++) {
+              const p = ((time * 0.35 + k / n) % 1);
+              const x = x0 + p * 10, y = y0 - p * 34;
+              ctx.fillStyle = col + (0.7 * (1 - p)) + ")"; ctx.beginPath(); ctx.arc(x, y, 3 + p * 6, 0, TAU); ctx.fill();
+            }
+          } });
         };
         const home = T.plots.personal; if (home) puff(home.a + 20, home.b - 2, 64);
         const wood = T.plots.wood; if (wood) puff(wood.a - 30, wood.b, 72, 3, "rgba(230,220,205,");
@@ -489,59 +654,88 @@
         if (plant) {
           const fa = plant.a + plant.w / 2 - 30, fb = plant.b + plant.d / 2 - 30, x = fa - fb, y = (fa + fb) / 2 - 152;
           const fl = 1 + Math.sin(time * 9) * 0.15 + Math.sin(time * 23) * 0.08;
-          ctx.fillStyle = "rgba(255,160,60,0.9)"; ctx.beginPath(); ctx.ellipse(x, y - 6 * fl, 3.4, 8 * fl, 0.12, 0, TAU); ctx.fill();
-          ctx.fillStyle = "rgba(255,236,160,0.95)"; ctx.beginPath(); ctx.ellipse(x, y - 4 * fl, 1.6, 4.4 * fl, 0.1, 0, TAU); ctx.fill();
+          out.push({ box: [x - 6, y - 20, x + 6, y + 4], draw: (ctx) => {
+            ctx.fillStyle = "rgba(255,160,60,0.9)"; ctx.beginPath(); ctx.ellipse(x, y - 6 * fl, 3.4, 8 * fl, 0.12, 0, TAU); ctx.fill();
+            ctx.fillStyle = "rgba(255,236,160,0.95)"; ctx.beginPath(); ctx.ellipse(x, y - 4 * fl, 1.6, 4.4 * fl, 0.1, 0, TAU); ctx.fill();
+          } });
           puff(fa + 4, fb, 172, 3, "rgba(120,120,125,");
         }
         const pl = T.plots.plaza || T.objs.find((o) => o.id === "plaza");
         if (pl) {
           const x = pl.a - pl.b, y = (pl.a + pl.b) / 2 - 28;
-          ctx.strokeStyle = "rgba(210,245,250,0.85)"; ctx.lineWidth = 1.3;
-          for (let k = 0; k < 6; k++) { const th = (k / 6) * TAU + time * 0.4, ex = Math.cos(th) * 16, ey = Math.sin(th) * 8; ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + ex * 0.5, y - 12 - Math.sin(time * 5 + k) * 1.5, x + ex, y + 14 + ey); ctx.stroke(); }
+          out.push({ box: [x - 20, y - 18, x + 20, y + 26], draw: (ctx) => {
+            ctx.strokeStyle = "rgba(210,245,250,0.85)"; ctx.lineWidth = 1.3;
+            for (let k = 0; k < 6; k++) { const th = (k / 6) * TAU + time * 0.4, ex = Math.cos(th) * 16, ey = Math.sin(th) * 8; ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + ex * 0.5, y - 12 - Math.sin(time * 5 + k) * 1.5, x + ex, y + 14 + ey); ctx.stroke(); }
+          } });
         }
-        sim.dolphins.forEach((d) => { const p = (d.t % 9) / 2.2; if (p < 1) drawAnimal(ctx, "dolphin", d.a - d.b, (d.a + d.b) / 2 + SEA_DROP, d.dir, p); });
+        sim.dolphins.forEach((d) => { const p = (d.t % 9) / 2.2; if (p < 1) { const x = d.a - d.b, y = (d.a + d.b) / 2 + SEA_DROP; out.push({ box: [x - 30, y - 26, x + 30, y + 6], draw: (ctx) => drawAnimal(ctx, "dolphin", x, y, d.dir, p) }); } });
         const mw = T.marinaWater;
-        if (mw) { const p = (time % 5) / 1.1; if (p < 1) { const a = lerp(mw.a0, mw.a1, 0.3 + 0.4 * ((Math.floor(time / 5) * 0.37) % 1)), b = mw.b0 + 150; drawAnimal(ctx, "fish", a - b, (a + b) / 2 + SEA_DROP, 1, p); } }
+        if (mw) { const p = (time % 5) / 1.1; if (p < 1) { const a = lerp(mw.a0, mw.a1, 0.3 + 0.4 * ((Math.floor(time / 5) * 0.37) % 1)), b = mw.b0 + 150, x = a - b, y = (a + b) / 2 + SEA_DROP; out.push({ box: [x - 8, y - 10, x + 8, y + 4], draw: (ctx) => drawAnimal(ctx, "fish", x, y, 1, p) }); } }
+        return out;
       };
+      const fx = (time) => fxItems(time).forEach((it) => it.draw(ctx));
 
       /* ---- nameplates & crew chips (screen-steady size) ---- */
-      const plates = () => {
+      const plateW = new Map();
+      const plateSpec = (lm) => {
+        const o = T.plots[lm.id];
+        if (!o) return null;
+        let nameW = plateW.get(lm.name);
+        if (nameW == null) {
+          ctx.save(); ctx.font = "600 12.5px Fredoka, Nunito, sans-serif"; nameW = ctx.measureText(lm.name).width; ctx.restore();
+          if (!document.fonts || document.fonts.status === "loaded") plateW.set(lm.name, nameW);
+        }
+        const inside = [...sim.crew.values()].filter((w) => w.hidden && w.crew.base === lm.id);
+        return { x: o.sx, y: o.sy - Math.min(o.H || 60, 150) * 0.78 - 10, wdt: nameW + 10 + 32 + (lm.open > 0 ? 22 : 0), inside };
+      };
+      // one plate in its own units, centred on (0,0)
+      const drawPlate = (ctx, lm, P, hover, bob) => {
+        const wdt = P.wdt;
+        // flat tag: a cream pill with a pastel tab, no drop shadow; outline only on hover
+        ctx.fillStyle = "#FFF6EC"; roundRect(ctx, -wdt / 2, -12, wdt, 25, 12.5); ctx.fill();
+        if (hover) { ctx.strokeStyle = lm.color; ctx.lineWidth = 1.6; ctx.stroke(); }
+        ctx.fillStyle = "rgba(90,78,122,0.16)"; ctx.beginPath(); ctx.moveTo(-4, 13); ctx.lineTo(4, 13); ctx.lineTo(0, 17); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = lm.color; ctx.beginPath(); ctx.arc(-wdt / 2 + 13, 0.5, 9, 0, TAU); ctx.fill();
+        const lvs = String(lm.level); ctx.fillStyle = "#FFF"; ctx.font = lvs.length > 2 ? "700 7px Fredoka, sans-serif" : "700 11px Fredoka, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(lvs, -wdt / 2 + 13, 1);
+        // savings goals carry a loading bar under their name
+        if (lm.data && lm.data.bar != null) { const bw = wdt - 16, f = clamp(lm.data.bar, 0, 1); ctx.fillStyle = "rgba(70,61,99,0.18)"; roundRect(ctx, -bw / 2, 15, bw, 6, 3); ctx.fill(); if (f > 0) { ctx.fillStyle = f >= 1 ? "#7CB87A" : "#E9B949"; roundRect(ctx, -bw / 2, 15, Math.max(6, bw * f), 6, 3); ctx.fill(); } }
+        ctx.fillStyle = "#4A4068"; ctx.font = "600 12.5px Fredoka, Nunito, sans-serif"; ctx.textAlign = "left"; ctx.fillText(lm.name, -wdt / 2 + 27, 1);
+        if (lm.open > 0) { ctx.fillStyle = shade(lm.color, 0.78); roundRect(ctx, wdt / 2 - 27, -7.5, 20, 16, 8); ctx.fill(); ctx.fillStyle = shade(lm.color, -0.35); ctx.textAlign = "center"; ctx.font = "700 11px Fredoka, sans-serif"; ctx.fillText(String(lm.open), wdt / 2 - 17, 1); }
+        if (lm.alert) { ctx.fillStyle = "#D9534F"; ctx.strokeStyle = "#FFF8EC"; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.arc(wdt / 2 - 3, -17 + bob, 8.5, 0, TAU); ctx.fill(); ctx.stroke(); ctx.fillStyle = "#FFF"; ctx.font = "800 12px Fredoka, sans-serif"; ctx.textAlign = "center"; ctx.fillText("!", wdt / 2 - 3, -16.5 + bob); }
+        // crew working inside
+        P.inside.forEach((w, k) => {
+          const cx = -wdt / 2 + 12 + k * 15, cy = -24;
+          ctx.fillStyle = w.crew.color; ctx.strokeStyle = "#FFF8EC"; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(cx, cy, 7, 0, TAU); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = "#FFF"; ctx.font = "700 8px Fredoka, sans-serif"; ctx.textAlign = "center"; ctx.fillText((w.name || "?")[0], cx, cy + 0.5);
+        });
+      };
+      const plates = (put) => {
         if (cb.current.edit) return;
         if (S.intro && S.intro.mode === "rise" && (S.intro.el || 0) < 2.7) return;
         const ls = clamp(1 / S.cam.s, 0.45, 3.4);
-        const lms = cb.current.landmarks;
         S.plates = [];
-        Object.values(lms).forEach((lm) => {
-          const o = T.plots[lm.id];
-          if (!o) return;
-          const x = o.sx, y = o.sy - Math.min(o.H || 60, 150) * 0.78 - 10;
-          ctx.save(); ctx.translate(x, y); ctx.scale(ls, ls);
-          ctx.font = "600 12.5px Fredoka, Nunito, sans-serif";
-          const nameW = ctx.measureText(lm.name).width;
-          const wdt = nameW + 10 + 32 + (lm.open > 0 ? 22 : 0);
-                    // flat tag: a cream pill with a pastel tab, no drop shadow; outline only on hover
-          ctx.fillStyle = "#FFF6EC"; roundRect(ctx, -wdt / 2, -12, wdt, 25, 12.5); ctx.fill();
-          if (S.hover === lm.id) { ctx.strokeStyle = lm.color; ctx.lineWidth = 1.6; ctx.stroke(); }
-          ctx.fillStyle = "rgba(90,78,122,0.16)"; ctx.beginPath(); ctx.moveTo(-4, 13); ctx.lineTo(4, 13); ctx.lineTo(0, 17); ctx.closePath(); ctx.fill();
-          ctx.fillStyle = lm.color; ctx.beginPath(); ctx.arc(-wdt / 2 + 13, 0.5, 9, 0, TAU); ctx.fill();
-          const lvs = String(lm.level); ctx.fillStyle = "#FFF"; ctx.font = lvs.length > 2 ? "700 7px Fredoka, sans-serif" : "700 11px Fredoka, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(lvs, -wdt / 2 + 13, 1);
-          // savings goals carry a loading bar under their name
-          if (lm.data && lm.data.bar != null) { const bw = wdt - 16, f = clamp(lm.data.bar, 0, 1); ctx.fillStyle = "rgba(70,61,99,0.18)"; roundRect(ctx, -bw / 2, 15, bw, 6, 3); ctx.fill(); if (f > 0) { ctx.fillStyle = f >= 1 ? "#7CB87A" : "#E9B949"; roundRect(ctx, -bw / 2, 15, Math.max(6, bw * f), 6, 3); ctx.fill(); } }
-          ctx.fillStyle = "#4A4068"; ctx.font = "600 12.5px Fredoka, Nunito, sans-serif"; ctx.textAlign = "left"; ctx.fillText(lm.name, -wdt / 2 + 27, 1);
-          if (lm.open > 0) { ctx.fillStyle = shade(lm.color, 0.78); roundRect(ctx, wdt / 2 - 27, -7.5, 20, 16, 8); ctx.fill(); ctx.fillStyle = shade(lm.color, -0.35); ctx.textAlign = "center"; ctx.font = "700 11px Fredoka, sans-serif"; ctx.fillText(String(lm.open), wdt / 2 - 17, 1); }
-          if (lm.alert) { const bob = Math.sin(performance.now() / 240) * 1.5; ctx.fillStyle = "#D9534F"; ctx.strokeStyle = "#FFF8EC"; ctx.lineWidth = 1.8; ctx.beginPath(); ctx.arc(wdt / 2 - 3, -17 + bob, 8.5, 0, TAU); ctx.fill(); ctx.stroke(); ctx.fillStyle = "#FFF"; ctx.font = "800 12px Fredoka, sans-serif"; ctx.textAlign = "center"; ctx.fillText("!", wdt / 2 - 3, -16.5 + bob); }
-          // crew working inside
-          const inside = [...sim.crew.values()].filter((w) => w.hidden && w.crew.base === lm.id);
-          inside.forEach((w, k) => {
-            const cx = -wdt / 2 + 12 + k * 15, cy = -24;
-            ctx.fillStyle = w.crew.color; ctx.strokeStyle = "#FFF8EC"; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(cx, cy, 7, 0, TAU); ctx.fill(); ctx.stroke();
-            ctx.fillStyle = "#FFF"; ctx.font = "700 8px Fredoka, sans-serif"; ctx.textAlign = "center"; ctx.fillText((w.name || "?")[0], cx, cy + 0.5);
-            S.plates.push({ crew: w, x: x + cx * ls, y: y + cy * ls, r: 8 * ls });
-          });
-          S.plates.push({ lm: lm.id, x0: x - (wdt / 2) * ls, x1: x + (wdt / 2) * ls, y0: y - 12 * ls, y1: y + 13 * ls });
-          ctx.restore();
+        Object.values(cb.current.landmarks).forEach((lm) => {
+          const P = plateSpec(lm);
+          if (!P) return;
+          put(lm, P, ls);
+          P.inside.forEach((w, k) => S.plates.push({ crew: w, x: P.x + (-P.wdt / 2 + 12 + k * 15) * ls, y: P.y - 24 * ls, r: 8 * ls }));
+          S.plates.push({ lm: lm.id, x0: P.x - (P.wdt / 2) * ls, x1: P.x + (P.wdt / 2) * ls, y0: P.y - 12 * ls, y1: P.y + 13 * ls });
         });
       };
+      const plates2D = () => plates((lm, P, ls) => { ctx.save(); ctx.translate(P.x, P.y); ctx.scale(ls, ls); drawPlate(ctx, lm, P, S.hover === lm.id, Math.sin(performance.now() / 240) * 1.5); ctx.restore(); });
+      // WebGL: each plate is painted once into a small canvas and redrawn only when it changes
+      const plateCache = new Map();
+      const platesGL = () => plates((lm, P, ls) => {
+        const pr = Math.max(0.5, Math.round(ls * S.cam.s * S.dpr * 4) / 4), hov = S.hover === lm.id;
+        const key = [lm.name, lm.color, lm.level, lm.open, lm.data && lm.data.bar != null ? Math.round(lm.data.bar * 100) : "", !!lm.alert, hov, P.inside.map((w) => w.crew.color + (w.name || "?")[0]).join(""), pr, P.wdt, document.fonts ? document.fonts.status : ""].join("|");
+        let e = plateCache.get(lm.id);
+        if (!e || e.key !== key) {
+          const bx0 = -P.wdt / 2 - 12, by0 = -36, bw = P.wdt + 26, bh = 62, c = makeCanvas(bw * pr, bh * pr), g = c.getContext("2d");
+          g.scale(pr, pr); g.translate(-bx0, -by0); drawPlate(g, lm, P, hov, 0);
+          e = { key, cv: c, bx0, by0, bw, bh }; plateCache.set(lm.id, e);
+        }
+        G.sprite(e, P.x + e.bx0 * ls, P.y + e.by0 * ls, e.bw * ls, e.bh * ls, 1, 0);
+      });
 
       /* ---- hit testing ---- */
       const toWorld = (px, py) => ({ x: (px - S.cam.tx) / S.cam.s, y: (py - S.cam.ty) / S.cam.s });
@@ -721,6 +915,7 @@
     }), []);
 
     return React.createElement("div", { ref: wrap, className: "viewport", role: "application", "aria-label": "Valley Isle map. Drag to explore, pinch or scroll to zoom, tap a building to go inside." },
+      React.createElement("canvas", { ref: glcv, className: "world-canvas" }),
       React.createElement("canvas", { ref: cvs, className: "world-canvas" }));
   });
   function roundRect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
