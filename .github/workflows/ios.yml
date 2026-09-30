@@ -55,6 +55,45 @@ jobs:
           path: LifeList-simulator.zip
           retention-days: 14
 
+  device:
+    name: Build (iPhone .ipa for Sideloadly)
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Use the newest Xcode on the runner
+        run: |
+          XC=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)
+          sudo xcode-select -s "$XC/Contents/Developer"
+      - name: Build the web app and copy it into the iOS project
+        run: |
+          npm ci
+          npm run build:app
+          npx cap sync ios
+      # Unsigned build for real iPhones. Sideloadly (or AltStore) signs it with your own
+      # Apple ID when it installs, so no paid developer account is needed.
+      - name: Build for iPhone (unsigned)
+        run: |
+          set -o pipefail
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build/dev \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build | tail -n 60
+      - name: Package LifeList.ipa
+        run: |
+          mkdir -p Payload
+          cp -R build/dev/Build/Products/Release-iphoneos/App.app Payload/
+          zip -qry LifeList.ipa Payload
+          ls -la LifeList.ipa
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LifeList-ipa
+          path: LifeList.ipa
+          retention-days: 30
+
   testflight:
     name: TestFlight
     needs: simulator
