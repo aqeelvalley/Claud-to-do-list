@@ -9449,7 +9449,7 @@
               }
               await e.doc(hBase + "/healthcfg").set({ ...(hCfg || {}), phone: !0, phoneSyncAt: Date.now() });
               quiet || Re("Apple Health synced: " + st2.toLocaleString("en-ZA").replace(/,/g, " ") + " steps today" + (wos.length ? ", " + wos.length + " workout" + (wos.length > 1 ? "s" : "") : "") + (added ? ", " + added + " period" + (added > 1 ? "s" : "") : "") + ".", "gold");
-            } catch (er) { quiet || Re("Couldn't read Apple Health" + (er && er.message ? ": " + er.message : "."), "bad"); }
+            } catch (er) { quiet || Re(/entitlement/i.test(String(er && er.message)) ? "Apple Health isn't available in this install (it needs the TestFlight / App Store version). Type your steps in for now." : "Couldn't read Apple Health" + (er && er.message ? ": " + er.message : "."), "bad"); }
           },
         };
       })(),
